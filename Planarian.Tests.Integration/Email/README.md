@@ -31,7 +31,6 @@ The cases below still require the real PostgreSQL or application-host integratio
 - Verify PostgreSQL-backed email identity lookups trim surrounding whitespace and behave culture-independently, including under a Turkish current culture.
 - Verify Settings password changes require the current password, increment `SessionVersion`, refresh the initiating session, invalidate older sessions, and attempt the password-changed notification without rolling back the password change when email submission fails.
 - Verify Forgot Password completion does not require the old password, increments `SessionVersion`, invalidates existing sessions, and attempts the same password-changed notification.
-- Verify anonymous user mutations allow only registration, invitation cleanup, email confirmation, password-reset issuance, and password-reset completion field sets; unrelated anonymous user mutations must fail.
 - Verify requesting an email change to another user's verified email returns `EmailAlreadyExists`, leaves both verified/pending email state unchanged, and does not send a confirmation email.
 - Verify multiple users may hold the same unverified pending email, but only one can ultimately claim it as the verified address; a losing confirmation preserves the user's original verified email.
 - Verify concurrent confirmations racing for the same verified email preserve the unique database invariant and return `EmailAlreadyExists` rather than a generic unexpected-error response for the loser.

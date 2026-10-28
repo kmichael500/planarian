@@ -762,22 +762,18 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
     private static async Task GrantScopedManagerAsync(
         PostgresTestDatabase database, string accountId, string countyId, string userId)
     {
+        const string permissionId = "mAnageR000";
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId,
+            Key = "Manager",
+            Name = "Manager",
+            Description = "Manage Caves",
+            PermissionType = "Cave"
+        });
+
         await using var db = database.CreateDbContext(userId, accountId);
         await CavePermissions.EnsureAccountUserAsync(db, accountId);
-        const string permissionId = "mAnageR000";
-        if (!await db.Permissions.AnyAsync(row => row.Id == permissionId))
-        {
-            db.Permissions.Add(new Permission
-            {
-                Id = permissionId,
-                Key = "Manager",
-                Name = "Manager",
-                Description = "Manage Caves",
-                PermissionType = "Cave"
-            });
-            await db.SaveChangesAsync();
-        }
-
         db.CavePermissions.Add(new CavePermission
         {
             UserId = db.RequestUser.Id,

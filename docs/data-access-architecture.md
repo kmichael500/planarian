@@ -19,8 +19,9 @@ repositories own EF Core, Npgsql, and PostgreSQL access; there is no generic CRU
 materialized projections, never `IQueryable`.
 
 For ordinary tracked mutations, a service may coordinate application intent through its feature repository and use that
-repository's unit-of-work helpers such as `Add`, `Delete`, and `SaveChanges`; those calls are not themselves a persistence
-leak. Prefer cohesive resource- or capability-oriented repositories over one repository per command. Extract persistence
+repository's unit-of-work helpers such as `Add`, `Delete`, and `SaveChangesAsync`; those calls are not themselves a persistence
+leak. Planarian's ownership interceptor intentionally rejects synchronous `SaveChanges`, because its authorization checks
+perform asynchronous database access. Prefer cohesive resource- or capability-oriented repositories over one repository per command. Extract persistence
 behind a stronger repository capability when the operation requires provider-specific SQL, row-lock ordering, set-based
 rewrites, provider exception translation, or another database algorithm that application orchestration should not know.
 

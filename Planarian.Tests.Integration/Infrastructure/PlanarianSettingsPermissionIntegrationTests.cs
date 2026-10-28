@@ -24,23 +24,20 @@ public sealed class PlanarianSettingsPermissionIntegrationTests(PostgresTestServ
         await using (var seed = database.CreateDbContext(userId, null))
         {
             seed.Users.Add(new User("Planarian", "Admin", "platform-admin@integration.test") { Id = userId });
-            seed.Permissions.AddRange(
-                new Permission
-                {
-                    Id = "plnadmperm", Key = PermissionKey.PlanarianAdmin, Name = "Planarian Admin",
-                    Description = "Platform administration", PermissionType = PermissionType.User
-                },
-                new Permission
-                {
-                    Id = "acctadmprm", Key = PermissionKey.Admin, Name = "Admin",
-                    Description = "Account administration", PermissionType = PermissionType.User
-                });
-            seed.UserPermissions.Add(new UserPermission
-            {
-                UserId = userId, PermissionId = "plnadmperm", AccountId = null
-            });
             await seed.SaveChangesAsync();
         }
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "plnadmperm", Key = PermissionKey.PlanarianAdmin, Name = "Planarian Admin",
+            Description = "Platform administration", PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "acctadmprm", Key = PermissionKey.Admin, Name = "Admin",
+            Description = "Account administration", PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.AddUserPermissionAsync(
+            database, "plnadmup01", userId, "plnadmperm");
 
         await using var db = database.CreateDbContext(userId, null);
         await db.RequestUser.Initialize(null, userId);

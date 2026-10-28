@@ -91,15 +91,9 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(DefaultEntranceTagIsReusable));
         var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
-        string id;
-        await using (var seed = d.CreateDbContext("a", t.AccountId))
-        {
-            var tag = new TagType("Default Status", TagTypeKeyConstant.EntranceStatus)
-                { Id = IdGenerator.Generate(), AccountId = null, IsDefault = true };
-            seed.TagTypes.Add(tag);
-            await seed.SaveChangesAsync();
-            id = tag.Id;
-        }
+        var tag = await ReferenceTestData.AddTagAsync(d, t.AccountId,
+            TagTypeKeyConstant.EntranceStatus, "Default Status", isDefault: true);
+        var id = tag.Id;
         await using var db = d.CreateDbContext("a", t.AccountId);
         var planner = new EntranceImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +

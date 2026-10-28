@@ -108,18 +108,14 @@ public sealed class CavePermissionHierarchyIntegrationTests(PostgresTestServer f
     private static async Task GrantScopedAsync(PostgresTestDatabase database, PublishedCaveTestData cave,
         string userId, string scope, string permissionKey, string permissionId)
     {
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId, Key = permissionKey, Name = permissionKey,
+            Description = permissionKey, PermissionType = "Cave"
+        });
+
         await using var db = database.CreateDbContext(userId, cave.AccountId);
         await CavePermissions.EnsureAccountUserAsync(db, cave.AccountId);
-        if (!await db.Permissions.AnyAsync(row => row.Id == permissionId))
-        {
-            db.Permissions.Add(new Permission
-            {
-                Id = permissionId, Key = permissionKey, Name = permissionKey,
-                Description = permissionKey, PermissionType = "Cave"
-            });
-            await db.SaveChangesAsync();
-        }
-
         db.CavePermissions.Add(new CavePermission
         {
             UserId = db.RequestUser.Id,

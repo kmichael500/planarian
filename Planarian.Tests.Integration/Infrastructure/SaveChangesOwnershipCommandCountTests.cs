@@ -66,6 +66,75 @@ public sealed class SaveChangesOwnershipCommandCountTests(PostgresTestServer fix
         Assert.InRange(ownership, 1, 2);
     }
 
+    [Fact]
+    public async Task UnchangedCaveCountyDoesNotRequeryOwnershipOnUnrelatedUpdate()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(UnchangedCaveCountyDoesNotRequeryOwnershipOnUnrelatedUpdate));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var counter = new DbCommandCounter();
+        await using var db = CreateContext(database, tenant.AccountId, counter);
+        var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+
+        counter.Reset();
+        cave.Narrative = "Unrelated update";
+        await db.SaveChangesAsync();
+
+        var countyOwnership = counter.Commands.Count(sql =>
+            sql.Contains("FROM \"Counties\"", StringComparison.OrdinalIgnoreCase) &&
+            sql.Contains("SELECT", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(0, countyOwnership);
+    }
+
+    [Fact]
+    public async Task SixHundredCountyAssociationsUseBoundedOwnershipSelects()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(SixHundredCountyAssociationsUseBoundedOwnershipSelects));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        const string permissionId = "perm000001";
+
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId,
+            Name = "County test permission",
+            Description = "Command-count fixture",
+            Key = "county-test",
+            PermissionType = "Cave"
+        });
+
+        await using (var seed = database.CreateDbContext("seed", tenant.AccountId))
+        {
+            seed.Counties.AddRange(Enumerable.Range(0, 600).Select(i => new County
+            {
+                Id = $"n{i:D9}",
+                AccountId = tenant.AccountId,
+                StateId = tenant.StateId,
+                DisplayId = $"C{i:D3}",
+                Name = $"County {i}"
+            }));
+            await seed.SaveChangesAsync();
+        }
+
+        var counter = new DbCommandCounter();
+        await using var db = CreateContext(database, tenant.AccountId, counter);
+        db.CavePermissions.AddRange(Enumerable.Range(0, 600).Select(i => new CavePermission
+        {
+            AccountId = tenant.AccountId,
+            UserId = "counter",
+            PermissionId = permissionId,
+            CountyId = $"n{i:D9}"
+        }));
+
+        counter.Reset();
+        await db.SaveChangesAsync();
+
+        var ownership = counter.Commands.Count(sql =>
+            sql.Contains("FROM \"Counties\"", StringComparison.OrdinalIgnoreCase) &&
+            sql.Contains("SELECT", StringComparison.OrdinalIgnoreCase));
+        Assert.InRange(ownership, 2, 3);
+    }
+
     private static PlanarianDbContext CreateContext(PostgresTestDatabase database, string accountId, DbCommandCounter counter)
     {
         // Account-scoped writes are audit-stamped by SaveChangesInterceptor, so

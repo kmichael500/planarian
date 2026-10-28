@@ -19,9 +19,16 @@ internal static class ReferenceTestData
             AccountId = isDefault ? null : accountId,
             IsDefault = isDefault
         };
-        await using var db = database.CreateDbContext("tag-seed", accountId);
-        db.TagTypes.Add(tag);
-        await db.SaveChangesAsync();
+        if (isDefault)
+        {
+            await GlobalSystemTestData.AddTagAsync(database, tag);
+        }
+        else
+        {
+            await using var db = database.CreateDbContext("tag-seed", accountId);
+            db.TagTypes.Add(tag);
+            await db.SaveChangesAsync();
+        }
         return tag;
     }
 

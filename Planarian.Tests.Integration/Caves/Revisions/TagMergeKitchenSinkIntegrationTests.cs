@@ -234,9 +234,9 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var global = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
-            TagTypeKeyConstant.Biology, "Global", "global0000a", isDefault: true);
+            TagTypeKeyConstant.Biology, "Global", "global000a", isDefault: true);
         var owned = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
-            TagTypeKeyConstant.Biology, "Owned", "owned00000a");
+            TagTypeKeyConstant.Biology, "Owned", "owned0000a");
         var source = defaultIsSource ? global : owned;
         var destination = defaultIsSource ? owned : global;
 
@@ -279,9 +279,9 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var global = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
-            key, "Global Source", "global0000a", isDefault: true);
+            key, "Global Source", "global000a", isDefault: true);
         var destination = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
-            key, "Owned Destination", "owned00000a");
+            key, "Owned Destination", "owned0000a");
 
         if (key == TagTypeKeyConstant.File)
         {
@@ -374,7 +374,7 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var owned = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
-            TagTypeKeyConstant.Biology, "Owned", "owned00000a");
+            TagTypeKeyConstant.Biology, "Owned", "owned0000a");
         var foreign = await ReferenceTestData.AddTagAsync(database, accountB.AccountId,
             TagTypeKeyConstant.Biology, "Foreign", "foreign000a");
         var source = foreignIsDestination ? owned : foreign;
