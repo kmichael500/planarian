@@ -92,6 +92,10 @@ an already-stale base; it is never retried or applied as last-write-wins.
 Rejection preserves the request, proposal versions, decision, and reviewer audit data, but does not alter published
 Cave state or create a Cave revision.
 
+An existing-Cave PUT must identify its Cave and carry the revision loaded by the client. Missing or blank
+revision identifiers return HTTP 400; a stale but supplied revision returns HTTP 409, and rejected requests
+do not trigger deferred object-cleanup retries. New-Cave POST requests omit the expected revision.
+
 ## Proposal files and object-storage consistency
 
 Interactive Cave Files use one provider-neutral object-storage address for their entire lifecycle. Uploading through the
@@ -110,7 +114,8 @@ relationships do not survive. The same relational transaction queues the exact o
 `StorageCleanupTarget` with purpose `CaveAssetRemoval` and publishes the Cave revision without the File. Only after that
 transaction commits does Planarian attempt external deletion. Successful cleanup removes the target; an external failure
 leaves durable retryable cleanup debt without making the already-committed Cave publication false. Cleanup failures are
-logged; later Cave/File authoring retries older debt in bounded batches. There is no dedicated ordinary-asset background
+logged; successful Cave saves and later File authoring retry older debt in bounded batches,
+not rejected Cave edits (including stale-client requests). There is no dedicated ordinary-asset background
 relay, so debt can remain while an account is inactive. Revision history keeps the File's stable ID and historical
 user-facing metadata, not its storage locator or removed bytes.
 

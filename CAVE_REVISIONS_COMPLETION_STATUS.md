@@ -3,7 +3,7 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-27
-**Completion HEAD reviewed:** `bb45e4a2` (`fix(import): align bulk import with authoring semantics`)
+**Completion HEAD reviewed:** `cd213c56` (`Merge storage cleanup safety and Azurite contracts`) — base of the read-integrity working-tree validation. Earlier full-suite/package evidence remains SHA-pinned to its original source and is not being relabeled as a full-suite rerun on this working tree.
 **Package refresh:** 2026-10-27; the external-cleanup safety + production `AzureBlobObjectStorage` contract package was independently validated from `fca098d45ebb0dc0a2b65ee2ed75c63ad4f40cc5`, then reconciled against completion HEAD `bb45e4a2`, which adds the import-authoring parity package and shared Azurite fixture. The combined tree preserves durable published/unpublished File cleanup, cross-replica archive-job coordination with age-gated temp cleanup, import parity, and the automated real production-adapter contract against isolated Azurite. Exact package evidence is recorded under GAP-004/GAP-005 below; earlier evidence remains SHA-pinned where applicable.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
@@ -91,7 +91,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | Area | Status | Evidence / remaining work |
 | --- | --- | --- |
 | Cave revision entity/model and rollout history boundary | **DONE + VALIDATED** | Existing Caves are initialized in a deliberate bounded rollout step before the API serves requests; normal runtime fails closed instead of creating a late baseline. PostgreSQL coverage includes multi-account initialization, idempotence, resume with one preserved boundary timestamp, late-baseline rejection, and migration-to-rollout behavior. |
-| Direct manager edit optimistic concurrency | **DONE + VALIDATED** | Existing Cave edits require client-loaded `ExpectedRevisionId`; stale edits conflict instead of silently overwriting. Add explicit missing-ID regression if not already present as noted below. |
+| Direct manager edit optimistic concurrency | **DONE + VALIDATED** | Existing Cave edits require client-loaded `ExpectedRevisionId`; stale edits conflict instead of silently overwriting. Explicit missing-token and malformed-PUT regression coverage is now in GAP-008. |
 | Semantic no-op suppression | **DONE + VALIDATED** | Snapshot comparison avoids published revisions/proposal versions for semantically unchanged aggregate state. |
 | Revision history query + diff UI | **DONE + VALIDATED** | Unit/frontend coverage exists for nested diffs, line-plot presentation, historical labels, false/zero preservation, etc. |
 | Suggest Cave Changes flow | **DONE + VALIDATED** | Immutable proposal-version architecture and authoring flow have broad integration/frontend coverage. |
@@ -605,38 +605,36 @@ Prove end to end:
 
 Unit tests already prove frontend request-option construction and backend throttling separately. This browser test proves their integration.
 
-## GAP-008 — Mixed-version / stale-SPA deployment safety
+## GAP-008 — RESOLVED — Mixed-version / stale-SPA deployment safety
 
-**Priority: P1**
+**Priority: P1 — validated on `test/cave-revisions-read-integrity`**
 
-A user can keep an older SPA tab open while a new backend deploys.
+`CaveStaleClientSafetyIntegrationTests` round-trips old-client-shaped web JSON (including an omitted
+`ExpectedRevisionId`) through controller/service boundaries and tests null, empty, whitespace-only,
+malformed, and stale identifiers alongside valid current-client edits and new-Cave creation.
+Its controller-action contract checks HTTP 400/409 mapping and
+refuses a malformed PUT without a Cave ID. Real PostgreSQL snapshots assert rejected requests preserve
+Cave fields, Entrances, Tags, Files, line plots, proposal/revision state, and current pointers across accounts.
+An additional regression exposed opportunistic File cleanup running before a rejected update; older cleanup
+debt now runs only after a successful direct Cave save, with both rejection and successful-retry paths tested.
 
-The backend currently appears to do the safe thing for existing Cave edits: missing `ExpectedRevisionId` is rejected.
+## GAP-009 — RESOLVED — Ordinary read and authoring-context paths have no unintended writes
 
-Add an explicit regression:
+**Priority: P1 — validated on `test/cave-revisions-read-integrity`**
 
-- send an old-client-shaped existing-Cave update without `ExpectedRevisionId`;
-- expect controlled 400;
-- assert Cave state, current revision, Files, line plots, and revision count remain unchanged.
+`CaveReadIntegrityIntegrationTests` fingerprints relevant PostgreSQL durable domain tables from an isolated
+multi-account test database via an independent connection, including row versions (`xmin`) to detect
+same-value writes. A negative-control regression proves the fingerprint detects such a rewrite, and the
+read matrix also asserts that EF change trackers remain clean. It exercises Cave detail, list/search/advanced
+search, map/line plots, File metadata and authorized response setup, revision history, proposal
+list/detail/version, authoring contexts, County and Tag lookups, plus denied foreign-account reads.
+Legitimate File access throttling, `User.LastActiveOn`, and other diagnostics are excluded from this domain fingerprint.
 
-Keep this invariant so a future compatibility change cannot silently restore last-write-wins behavior.
-
-## GAP-009 — Ordinary read and authoring-context paths have no unintended writes
-
-**Priority: P1**
-
-Rollout baseline creation is deployment-only. Ordinary reads and authoring-context reads must remain read-only; a missing `CurrentRevisionId` on an existing Cave is an integrity error, not permission to manufacture history during a request.
-
-Create a read-only contract test that fingerprints relevant database state, performs representative reads, and compares afterward:
-
-- Cave detail;
-- Cave list/search/advanced search;
-- map/current line-plot retrieval;
-- File view/download metadata path;
-- revision/history read;
-- other major ordinary GET flows touched by this branch.
-
-Assert no timestamps, revision pointers, workflow rows, File rows, tag rows, or other durable state change. Authoring-context coverage should additionally prove that an uninitialized existing Cave fails closed rather than creating a revision as a request side effect.
+For an existing Cave without `CurrentRevisionId`, detail and list remain safe reads, while both authoring
+contexts and revision-history operations fail closed without making any baseline. A rejected write also
+cannot create late history. The tests include a separately initialized foreign account to catch cross-tenant
+mutations. Cave list/search now explicitly constrains the Cave row by account when bypassing its global
+query filter, matching the data-access architecture's tenant-qualification rule.
 
 ## GAP-010 — Full archive generation/content validation
 
