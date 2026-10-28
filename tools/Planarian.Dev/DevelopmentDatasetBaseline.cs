@@ -15,6 +15,11 @@ internal static class DevelopmentDatasetBaseline
     public const string StateAbbreviation = "TN";
     public const string CountyName = "Demo County";
     public const string CountyDisplayId = "DEMO";
+    public const string E2ESecondaryAccountName = "Planarian E2E Secondary";
+    public const string E2ESecondaryCountyId = "e2ecounty2";
+    public const string E2ESecondaryCountyName = "Isolation County";
+    public const string E2ESecondaryCountyDisplayId = "ISO";
+    public const string E2ESecondaryCountyIdDelimiter = "/";
 
     public static IReadOnlyList<DatasetTagSpec> Tags { get; } =
     [
@@ -22,6 +27,13 @@ internal static class DevelopmentDatasetBaseline
         new("geology:monteagle", "Monteagle Limestone", TagTypeKeyConstant.Geology),
         new("people:surveyor", "Dev Surveyor", TagTypeKeyConstant.People),
         new("other:training", "Training Data", TagTypeKeyConstant.CaveOther)
+    ];
+
+    public static IReadOnlyList<DatasetTagSpec> E2ESecondaryTags { get; } =
+    [
+        new("geology:secondary", "Copper Ridge Limestone", TagTypeKeyConstant.Geology),
+        new("people:secondary", "Isolation Surveyor", TagTypeKeyConstant.People),
+        new("other:secondary", "Account B Only", TagTypeKeyConstant.CaveOther)
     ];
 
     public static IReadOnlyList<DatasetUserSpec> Users(DatasetConfig dataset) =>
@@ -48,6 +60,21 @@ internal static class DevelopmentDatasetBaseline
 
     public static string AdminPermissionId(DatasetConfig dataset) =>
         StableId($"{dataset.Name}:admin-permission");
+
+    public static string BootstrapPlanarianAdminPermissionId(DatasetConfig dataset) =>
+        StableId($"{dataset.Name}:bootstrap-planarian-admin");
+
+    public static string E2ESecondaryAccountStateId(DatasetConfig dataset) =>
+        StableId($"{dataset.Name}:secondary:account-state:{StateAbbreviation.ToLowerInvariant()}");
+
+    public static string E2ESecondaryFeatureId(DatasetConfig dataset, FeatureKey key) =>
+        StableId($"{dataset.Name}:secondary:feature:{key}");
+
+    public static string E2ESecondaryAccountUserId(DatasetConfig dataset, string userId) =>
+        StableId($"{dataset.Name}:secondary:account-user:{userId}");
+
+    public static string E2ESecondaryCavePermissionId(DatasetConfig dataset, string userId, string permissionId) =>
+        StableId($"{dataset.Name}:secondary:cave-permission:{userId}:{permissionId}");
 
     public static string CavePermissionId(DatasetConfig dataset, string userId, string permissionId) =>
         StableId($"{dataset.Name}:cave-permission:{userId}:{permissionId}");

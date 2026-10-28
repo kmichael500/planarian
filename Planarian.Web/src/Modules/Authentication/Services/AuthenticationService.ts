@@ -15,6 +15,12 @@ interface SessionSnapshot {
 
 type UnauthorizedHandler = () => void;
 
+export const ACCOUNT_SWITCH_EVENT = "planarian:account-switch";
+export interface AccountSwitchRequest {
+  accountId: string;
+  redirectPath: string;
+}
+
 const currentIdStorageKey = (userId: string) => `currentAccountId-${userId}`;
 
 const getStorage = () =>
@@ -95,15 +101,24 @@ const AuthenticationService = {
     return sessionSnapshot.currentUser?.currentAccountId ?? null;
   },
   SwitchAccount(accountId: string, redirectPath?: string | null): void {
-    const userId = sessionSnapshot.currentUser?.id;
-    if (userId) {
-      this.SetStoredAccountId(userId, accountId);
-    }
-
     const targetPath =
       redirectPath ??
       `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    window.location.assign(targetPath);
+
+    const beforeUnload = new Event("beforeunload", { cancelable: true });
+    const hasUnsavedChanges = !window.dispatchEvent(beforeUnload);
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("Discard unsaved changes and switch accounts?")
+    ) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent<AccountSwitchRequest>(ACCOUNT_SWITCH_EVENT, {
+        detail: { accountId, redirectPath: targetPath },
+      })
+    );
   },
   SetStoredAccountId(userId: string, accountId: string): void {
     const storage = getStorage();

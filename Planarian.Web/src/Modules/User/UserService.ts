@@ -58,9 +58,12 @@ const UserService = {
     );
     return response.data;
   },
-  async GetPendingInvitations(): Promise<AcceptInvitationVm[]> {
+  async GetPendingInvitations(accountId?: string | null): Promise<AcceptInvitationVm[]> {
     const response = await HttpClient.get<AcceptInvitationVm[]>(
-      `${baseUrl}/invitations`
+      `${baseUrl}/invitations`,
+      {
+        headers: accountId ? { "x-account": accountId } : undefined,
+      }
     );
     return response.data;
   },

@@ -6,6 +6,7 @@ import { Helmet } from "react-helmet";
 import { createBrowserRouter, RouterProvider, useLocation } from "react-router-dom";
 import "./App.css";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
+import { AccountSwitchCoordinator } from "./Configuration/Context/AccountSwitchCoordinator";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
 import { getAppContentStyle } from "./Configuration/Layout/AppContentLayout";
 import { AppRouting } from "./Configuration/Routing/App.routing";
@@ -89,7 +90,9 @@ export const AppShell: React.FC = () => {
 
 const RoutedAppContent: React.FC = () => (
   <AppProvider>
-    <AppShell />
+    <AccountSwitchCoordinator>
+      <AppShell />
+    </AccountSwitchCoordinator>
   </AppProvider>
 );
 

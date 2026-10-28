@@ -44,15 +44,15 @@ services:
     build: *dev-build
     init: true
     working_dir: /workspace
-    command: >-
-      bash -lc "dotnet watch --project Planarian/Planarian/Planarian.csproj
-      run --no-launch-profile --urls http://0.0.0.0:8080"
+    command: /workspace/docker/dev/start-backend.sh
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       PLANARIAN_DATASET: ${PLANARIAN_DATASET:-generic}
+      RequestThrottle__LoginIpLimit: ${PLANARIAN_LOGIN_IP_LIMIT:-30}
+      RequestThrottle__LoginEmailLimit: ${PLANARIAN_LOGIN_EMAIL_LIMIT:-12}
       AllowedHosts: "planarian.local;localhost;backend"
       Server__AllowedCorsOrigins: "https://planarian.local"
       "Server__ClientOriginMappings__planarian.local": "https://planarian.local"
@@ -63,7 +63,7 @@ services:
       interval: 2s
       timeout: 3s
       retries: 60
-      start_period: 5s
+      start_period: ${PLANARIAN_BACKEND_HEALTH_START_PERIOD:-5s}
     volumes:
       - *source-volume
       - type: bind
@@ -94,7 +94,9 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
       WDS_SOCKET_PORT: "443"
-      REACT_APP_API_ORIGIN_MAPPINGS: '{"planarian.local":"https://planarian.local"}'
+      PLANARIAN_FRONTEND_MODE: ${PLANARIAN_FRONTEND_MODE:-development}
+      PLANARIAN_FRONTEND_PREBUILT: ${PLANARIAN_FRONTEND_PREBUILT:-0}
+      REACT_APP_API_ORIGIN_MAPPINGS: ${PLANARIAN_FRONTEND_API_ORIGIN_MAPPINGS:-'{"planarian.local":"https://planarian.local"}'}
     ports:
       - "127.0.0.1:13000:3000"
     healthcheck:
@@ -102,7 +104,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 90
-      start_period: 10s
+      start_period: ${PLANARIAN_FRONTEND_HEALTH_START_PERIOD:-10s}
     volumes:
       - *source-volume
       - ./docker/dev/frontend.env:/workspace/Planarian.Web/.env:ro
@@ -118,6 +120,7 @@ services:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
       - "0.0.0.0:443:443/udp"
+      - "0.0.0.0:8443:8443"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2019/config/ >/dev/null"]
       interval: 2s

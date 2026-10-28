@@ -96,6 +96,7 @@
   },
   "devDependencies": {
     "@azure/static-web-apps-cli": "^1.1.4",
+    "@playwright/test": "1.64.1",
     "@types/react-highlight-words": "^0.16.4",
     "@types/react-text-mask": "^5.4.11",
     "@types/shpjs": "^3.4.7",

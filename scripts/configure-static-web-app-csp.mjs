@@ -2,6 +2,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// react-map-gl 7.1.x loads this default RTL-text helper at runtime. Keep the
+// allowlist at the exact versioned file instead of trusting arbitrary Mapbox scripts.
+const RTL_TEXT_PLUGIN_SCRIPT =
+  "https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js";
+
 const CONNECT_SOURCES = [
   "https://cloud.umami.is",
   "https://api.mapbox.com",
@@ -101,7 +106,10 @@ export function buildContentSecurityPolicy(apiOrigins) {
 
   const directives = [
     ["default-src", ["'none'"]],
-    ["script-src", ["'self'", "'wasm-unsafe-eval'", "https://cloud.umami.is"]],
+    [
+      "script-src",
+      ["'self'", "'wasm-unsafe-eval'", "https://cloud.umami.is", RTL_TEXT_PLUGIN_SCRIPT],
+    ],
     ["style-src", ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]],
     ["img-src", imageSources],
     ["font-src", ["'self'", "data:", "https://fonts.gstatic.com"]],

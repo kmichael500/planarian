@@ -1,4 +1,5 @@
 import { List, Tag, Typography } from "antd";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { FileVm } from "../Models/FileVm";
 import { getFileType } from "../Services/FileHelpers";
 import { FileService } from "../Services/FileService";
@@ -36,13 +37,13 @@ const FileListItemComponent = ({
       className="planarian-file-list-item"
       role="group" aria-label={ariaLabel ?? `${file.name} file`}
       actions={[
-        ...(onView ? [<Typography.Link key="view" aria-label={`View ${file.name}`}
-          onClick={() => onView(file)}>View</Typography.Link>] : []),
-        ...((onDownload || (allowDefaultDownload && !unavailableText)) ? [<Typography.Link key="download"
-          aria-label={`Download ${file.name}`} onClick={() => {
+        ...(onView ? [<PlanarianButton key="view" type="link" size="small" alwaysShowChildren className="planarian-file-action"
+          aria-label={`View ${file.name}`} onClick={() => onView(file)}>View</PlanarianButton>] : []),
+        ...((onDownload || (allowDefaultDownload && !unavailableText)) ? [<PlanarianButton key="download" type="link"
+          size="small" alwaysShowChildren className="planarian-file-action" aria-label={`Download ${file.name}`} onClick={() => {
             if (onDownload) onDownload(file);
             else FileService.startFileDownload(file.id);
-          }}>Download</Typography.Link>] : []),
+          }}>Download</PlanarianButton>] : []),
       ]}
     >
       <Typography.Text>

@@ -22,4 +22,15 @@ if [[ "$installed_hash" != "$lock_hash" ]]; then
   printf '%s' "$lock_hash" > "$marker"
 fi
 
+if [[ "${PLANARIAN_FRONTEND_MODE:-development}" == "production" ]]; then
+  if [[ "${PLANARIAN_FRONTEND_PREBUILT:-0}" != "1" ]]; then
+    echo "Building production frontend for browser E2E validation..."
+    npm run build
+  elif [[ ! -f /workspace/Planarian.Web/build/index.html ]]; then
+    echo "PLANARIAN_FRONTEND_PREBUILT=1 but build/index.html is missing." >&2
+    exit 2
+  fi
+  exec node /workspace/docker/dev/serve-static-build.mjs /workspace/Planarian.Web/build
+fi
+
 exec npm start

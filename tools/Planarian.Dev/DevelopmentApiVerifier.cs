@@ -54,6 +54,8 @@ internal static class DevelopmentApiVerifier
         await VerifyUsers(adminClient, dataset);
         await VerifyPermissions(adminClient, managerClient, viewerClient, dataset);
         await VerifyAccountIsolation(wrongAccountClient);
+        if (dataset.Name == "e2e")
+            await VerifyE2ESecondaryAccount(baseAddress, authOptions, users, connectionString, dataset);
 
         Console.WriteLine($"Planarian API verification passed for '{dataset.Name}'.");
     }
@@ -176,6 +178,71 @@ internal static class DevelopmentApiVerifier
         Require(response.StatusCode == HttpStatusCode.Unauthorized,
             $"Expected a valid user with an invalid account scope to receive 401; received {(int)response.StatusCode} {response.StatusCode}.");
         Pass("invalid account scope rejected");
+    }
+
+    private static async Task VerifyE2ESecondaryAccount(
+        Uri baseAddress,
+        AuthOptions authOptions,
+        IReadOnlyDictionary<string, ApiUserIdentity> users,
+        string connectionString,
+        DatasetConfig dataset)
+    {
+        var accountId = await LoadSecondaryAccountId(connectionString);
+        using var adminClient = CreateClient(
+            baseAddress,
+            BuildToken(authOptions, users[dataset.AdminUserId], accountId),
+            accountId);
+        using var managerClient = CreateClient(
+            baseAddress,
+            BuildToken(authOptions, users[dataset.ManagerUserId], accountId),
+            accountId);
+
+        var settings = await GetJson<MiscAccountSettingsVm>(adminClient, "/api/account/settings");
+        Require(settings.AccountName == DevelopmentDatasetBaseline.E2ESecondaryAccountName,
+            "Secondary E2E account name did not round-trip through AccountService.");
+        Require(settings.CountyIdDelimiter == DevelopmentDatasetBaseline.E2ESecondaryCountyIdDelimiter,
+            "Secondary E2E account delimiter did not round-trip through AccountService.");
+
+        var features = await GetJson<List<FeatureSettingVm>>(adminClient, "/api/account/feature-settings");
+        Require(features.Any(feature =>
+                !feature.IsDefault &&
+                feature.Key == FeatureKey.EnabledFieldCaveAlternateNames &&
+                !feature.IsEnabled),
+            "Secondary E2E account did not expose its intentionally disabled authoring field.");
+
+        var geology = await GetJson<List<TagTypeTableVm>>(adminClient, "/api/account/tags-table/Geology");
+        Require(geology.Any(tag => tag.Name == "Copper Ridge Limestone"),
+            "Secondary E2E account is missing its account-specific geology tag.");
+        Require(geology.All(tag => tag.Name != "Bangor Limestone"),
+            "Secondary E2E account leaked the primary account's geology tag.");
+
+        var states = await GetJson<List<SelectListItem<string>>>(adminClient, "/api/account/states");
+        var stateId = states.Single(state => state.Display == DevelopmentDatasetBaseline.StateAbbreviation).Value;
+        var counties = await GetJson<List<TagTypeTableCountyVm>>(
+            adminClient, $"/api/account/counties-table/{stateId}");
+        Require(counties.Any(county => county.TagTypeId == DevelopmentDatasetBaseline.E2ESecondaryCountyId),
+            "Secondary E2E account is missing its account-specific County.");
+        Require(counties.All(county => county.TagTypeId != dataset.CountyId),
+            "Secondary E2E account leaked the primary account's County.");
+
+        using var forbidden = await managerClient.GetAsync("/api/account/user-manager");
+        Require(forbidden.StatusCode == HttpStatusCode.Forbidden,
+            $"Expected secondary-account manager fixture to have View-only access; received {(int)forbidden.StatusCode} {forbidden.StatusCode}.");
+        await GetJson<MiscAccountSettingsVm>(managerClient, "/api/account/settings");
+        Pass("secondary account feature/tag/county/permission isolation");
+    }
+
+    private static async Task<string> LoadSecondaryAccountId(string connectionString)
+    {
+        var options = new DbContextOptionsBuilder<PlanarianDbContext>()
+            .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
+            .Options;
+        await using var db = new PlanarianDbContext(options);
+        return await db.Counties
+            .AsNoTracking()
+            .Where(county => county.Id == DevelopmentDatasetBaseline.E2ESecondaryCountyId)
+            .Select(county => county.AccountId)
+            .SingleAsync();
     }
 
     private static HttpClient CreateClient(Uri baseAddress, string token, string accountId)

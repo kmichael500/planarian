@@ -12,6 +12,12 @@
 **Branch distance at baseline review:** 170 commits ahead of `main`, 0 behind
 **Three-dot diff at baseline review:** 481 files changed, 67,926 insertions, 5,989 deletions
 
+## Browser-E2E worktree validation addendum (unmerged; 2026-10-28)
+
+The separate `test/cave-revisions-browser-e2e` worktree (based on `cd213c56`) now contains a small Chromium/WebKit Playwright suite, disposable E2E dataset provisioning, production frontend/CSP serving, account-switch/cache isolation changes, and file-action `PlanarianButton` compatibility. **These changes are not yet merged into `feature/cave-revisions-completion`; the unchecked GAP-007/GAP-013 and browser acceptance gates below remain unchecked until integration and final verification.** The ledger's historical statement that no Playwright suite existed describes the completion branch's inspected baseline, not this unmerged worktree.
+
+Final pre-integration validation on 2026-10-28 ran the repository-owned `npm run test:browser:e2e` command from a stopped stack. The command built the production frontend, reset and verified the isolated `e2e` Postgres/Azurite dataset, started the real local HTTPS/CORS/CSP topology, and completed **20/20 Playwright tests green** (10 scenarios in both Chromium and WebKit) before tearing the stack down cleanly with exit code 0. The first full run exposed one over-specific PDF assertion: Chromium's trace proved the server returned the expected `206` range response, but PDF.js canceled that fetch after response headers and Playwright did not emit the page `response` event. The test now proves real browser rendering/CORS/range-request behavior separately from a deterministic authenticated byte-range probe; that focused PDF scenario passed in both browsers before the final 20/20 run. Focused account-switch/cache/button tests, TypeScript checking, and the runner's active-Compose refusal regression also passed. Reconcile this package against the later completion HEAD before changing the outstanding completion gates below.
+
 ## Purpose
 
 This is the durable handoff/status ledger for the Cave revisions completion branch. It records what is implemented, what has actually been validated, what remains only partially validated, concrete defects found during adversarial review, and high-value validation still needed before merge.

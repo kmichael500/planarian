@@ -198,28 +198,29 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       const resolvedCurrentAccountId =
         appOptions.currentUser?.currentAccountId ?? null;
 
+      // Prepare all account-dependent state before committing the new runtime
+      // account. A failed account switch must leave the previous account fully
+      // active rather than mixing the target account with stale permissions.
+      const featureSettings =
+        isAuthenticated && resolvedCurrentAccountId
+          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
+          : [];
+      const pendingInvitations = isAuthenticated
+        ? await UserService.GetPendingInvitations(resolvedCurrentAccountId)
+        : [];
+
       AuthenticationService.SyncSession(appOptions.currentUser);
       setCurrentUser(appOptions.currentUser);
       setCurrentAccountId(resolvedCurrentAccountId);
       setAccountIds(appOptions.accountIds);
       setPermissionKeys(appOptions.permissions);
-
-      const featureSettings =
-        isAuthenticated && resolvedCurrentAccountId
-          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
-          : [];
       setPermissions({ visibleFields: featureSettings });
-
-      if (isAuthenticated) {
-        await refreshPendingInvitations();
-      } else {
-        setPendingInvitationCount(0);
-      }
+      setPendingInvitationCount(pendingInvitations.length);
 
       setInitializedError(null);
       setIsInitialized(true);
     },
-    [refreshPendingInvitations]
+    []
   );
 
   const refreshSession = useCallback(

@@ -6,8 +6,11 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { TagType } from "../../Tag/Models/TagType";
 import { ChunkedUploaderConfig } from "../../../Shared/Components/FileUploader/types";
 import { CountyMetadataVm } from "../Models/CountyMetadataVm";
+import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 
 const baseUrl = "api/settings";
+const accountScopedCacheKey = (key: string) =>
+  `${RequestRuntimeState.getCurrentAccountId() ?? "anonymous"}:${key}`;
 const SettingsService = {
   async GetChunkedUploaderConfig(): Promise<ChunkedUploaderConfig> {
     const response = await HttpClient.get<ChunkedUploaderConfig>(
@@ -28,7 +31,7 @@ const SettingsService = {
     return response.data;
   },
   async GetStateName(stateId?: string): Promise<string> {
-    const cacheKey = `state-name-${stateId}`;
+    const cacheKey = accountScopedCacheKey(`state-name-${stateId}`);
     const cachedDisplayValue = CacheService.get<string>(cacheKey);
     if (cachedDisplayValue) {
       return cachedDisplayValue;
@@ -53,7 +56,7 @@ const SettingsService = {
     return response.data;
   },
   async GetCountyName(countyId?: string): Promise<string> {
-    const cacheKey = `county-name-${countyId}`;
+    const cacheKey = accountScopedCacheKey(`county-name-${countyId}`);
     const cachedDisplayValue = CacheService.get<string>(cacheKey);
     if (cachedDisplayValue) {
       return cachedDisplayValue;
@@ -65,7 +68,7 @@ const SettingsService = {
     return response.data;
   },
   async GetCountyMetadata(countyId?: string): Promise<CountyMetadataVm> {
-    const cacheKey = `county-metadata-${countyId}`;
+    const cacheKey = accountScopedCacheKey(`county-metadata-${countyId}`);
     const cachedDisplayValue = CacheService.get<CountyMetadataVm>(cacheKey);
     if (cachedDisplayValue) {
       return cachedDisplayValue;
@@ -77,7 +80,7 @@ const SettingsService = {
     return response.data;
   },
   async GetTagName(tagId: string): Promise<string> {
-    const cacheKey = `tag-name-${tagId}`;
+    const cacheKey = accountScopedCacheKey(`tag-name-${tagId}`);
     const cachedDisplayValue = CacheService.get<string>(cacheKey);
     if (cachedDisplayValue) {
       return cachedDisplayValue;
