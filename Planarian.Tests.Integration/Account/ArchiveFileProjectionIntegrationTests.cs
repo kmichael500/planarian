@@ -28,5 +28,6 @@ public sealed class ArchiveFileProjectionIntegrationTests(PostgresTestServer fix
         Assert.Equal("Mügelhöhle.final.PDF", result.FileName);
         Assert.Equal(file.FileId, result.Id);
         Assert.Equal(entity.BlobKey, result.BlobKey);
+        Assert.Equal(entity.BlobContainer, result.BlobContainer);
     }
 }

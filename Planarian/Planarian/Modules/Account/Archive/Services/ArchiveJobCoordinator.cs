@@ -1,4 +1,11 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using Azure;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,7 +24,14 @@ public class ArchiveJobCoordinator
     public const int MaxRetainedArchives = 5;
     public const string ArchivePrefix = "archives/";
     public const string TempArchivePrefix = "archives/temp/";
+    // Azure Put Block From URL supports 50,000 committed blocks and 4,000 MiB per block
+    // for service version 2020-04-08 and later. Azure.Storage.Blobs 12.20.0 uses a later version.
+    internal const int MaxArchivePublicationBlocks = 50_000;
+    internal const long MaxArchivePublicationBlockBytes = 4_000L * 1024 * 1024;
+    internal const long PreferredArchivePublicationBlockBytes = 256L * 1024 * 1024;
     internal static readonly TimeSpan AbandonedTempArchiveMinimumAge = TimeSpan.FromDays(7);
+    internal static readonly TimeSpan ArchiveSourceSasValidity = TimeSpan.FromHours(1);
+    private static readonly TimeSpan ArchiveSourceSasClockSkewAllowance = TimeSpan.FromMinutes(15);
 
     private readonly ConcurrentDictionary<string, ArchiveJobHandle> _jobs = new();
     private readonly HashSet<string> _resettingAccounts = new(StringComparer.Ordinal);
@@ -119,7 +133,7 @@ public class ArchiveJobCoordinator
 
         lock (jobHandle.SyncRoot)
         {
-            return jobHandle.ArchiveBlobKey;
+            return jobHandle.FinalArchiveBlobKey;
         }
     }
 
@@ -135,8 +149,9 @@ public class ArchiveJobCoordinator
 
             var groupName = GetGroupName(jobHandle.AccountId);
             var fileName = await BuildArchiveFileName(accountRepository, jobHandle.AccountId);
-            var finalArchiveBlobKey = $"{ArchivePrefix}{fileName}";
-            jobHandle.ArchiveBlobKey = $"{TempArchivePrefix}{fileName}";
+            var (tempArchiveBlobKey, finalArchiveBlobKey) = BuildArchiveBlobKeys(fileName, Guid.NewGuid());
+            jobHandle.TempArchiveBlobKey = tempArchiveBlobKey;
+            jobHandle.FinalArchiveBlobKey = finalArchiveBlobKey;
             jobHandle.ContainerName = jobHandle.AccountContainerName;
 
             var processedCount = 0;
@@ -148,11 +163,11 @@ public class ArchiveJobCoordinator
                 fileService,
                 accountBlobContainerClient,
                 jobHandle.AccountContainerName,
-                jobHandle.ArchiveBlobKey,
+                jobHandle.TempArchiveBlobKey,
                 CancellationToken.None);
             await using (var outputStream = await fileService.OpenBlobWriteStream(
                              accountBlobContainerClient,
-                             jobHandle.ArchiveBlobKey,
+                             jobHandle.TempArchiveBlobKey,
                              jobHandle.CancellationTokenSource.Token))
             {
                 await exportService.WriteArchive(
@@ -200,7 +215,7 @@ public class ArchiveJobCoordinator
 
             jobHandle.CancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-            var publishedTempBlobKey = jobHandle.ArchiveBlobKey;
+            var publishedTempBlobKey = jobHandle.TempArchiveBlobKey;
             await PublishArchive(
                 accountBlobContainerClient,
                 publishedTempBlobKey,
@@ -217,7 +232,7 @@ public class ArchiveJobCoordinator
                     "Published archive {ArchiveKey} for account {AccountId}, but temporary archive {TempKey} could not be deleted; a later archive job will retry it",
                     finalArchiveBlobKey, jobHandle.AccountId, publishedTempBlobKey);
             }
-            jobHandle.ArchiveBlobKey = null;
+            jobHandle.TempArchiveBlobKey = null;
 
             await PruneOldArchivesBestEffort(
                 fileService,
@@ -247,6 +262,19 @@ public class ArchiveJobCoordinator
                 StatusMessage = "Archive canceled."
             });
         }
+        catch (ArchivePublicationUncertainException)
+        {
+            // Publication reached a point where a client-side timeout or transport error
+            // cannot prove whether the atomic final commit succeeded. Preserve the completed
+            // temp source so a retry or later age-gated cleanup remains safe.
+            using var scope = _scopeFactory.CreateScope();
+            var notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
+            await notificationService.SendNotificationToGroupAsync(GetGroupName(jobHandle.AccountId), new ArchiveProgressVm
+            {
+                State = ProgressState.Failed,
+                StatusMessage = "Archive publication result is uncertain. The completed temporary archive was preserved for recovery."
+            });
+        }
         catch (Exception ex)
         {
             await CleanupPartialArchive(jobHandle);
@@ -274,6 +302,7 @@ public class ArchiveJobCoordinator
         CancellationToken cancellationToken)
     {
         List<(string BlobKey, DateTimeOffset LastModified)> existingArchives = [];
+        List<string> invalidLegacyCopyArchives = [];
         try
         {
             await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(
@@ -286,6 +315,15 @@ public class ArchiveJobCoordinator
                     continue;
                 }
 
+                if (IsArchiveCopyFailed(blobItem.Properties.CopyStatus, blobItem.Properties.CopyId))
+                {
+                    invalidLegacyCopyArchives.Add(blobItem.Name);
+                    continue;
+                }
+
+                if (!IsArchiveReady(blobItem.Properties.CopyStatus, blobItem.Properties.CopyId))
+                    continue;
+
                 existingArchives.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
             }
         }
@@ -297,7 +335,8 @@ public class ArchiveJobCoordinator
             return;
         }
 
-        var archivesToDelete = SelectArchivesToPrune(existingArchives);
+        var archivesToDelete = invalidLegacyCopyArchives
+            .Concat(SelectArchivesToPrune(existingArchives));
         var failures = await DeleteArchiveKeysBestEffortAsync(
             archivesToDelete, key => fileService.DeleteFile(key, accountContainerName));
         foreach (var failedKey in failures)
@@ -335,8 +374,18 @@ public class ArchiveJobCoordinator
 
         var abandonedKeys = SelectAbandonedTempArchives(
             tempArchives, currentTempArchiveBlobKey, DateTimeOffset.UtcNow);
+        var safeToDelete = new List<string>(abandonedKeys.Count);
+        foreach (var abandonedKey in abandonedKeys)
+        {
+            if (await IsAbandonedTempSafeToDelete(
+                    accountBlobContainerClient, abandonedKey, cancellationToken))
+            {
+                safeToDelete.Add(abandonedKey);
+            }
+        }
+
         var failures = await DeleteArchiveKeysBestEffortAsync(
-            abandonedKeys, key => fileService.DeleteFile(key, accountContainerName));
+            safeToDelete, key => fileService.DeleteFile(key, accountContainerName));
         foreach (var failedKey in failures)
         {
             _logger.LogWarning(
@@ -345,14 +394,79 @@ public class ArchiveJobCoordinator
         }
     }
 
+    private async Task<bool> IsAbandonedTempSafeToDelete(
+        Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
+        string tempArchiveBlobKey,
+        CancellationToken cancellationToken)
+    {
+        var finalArchiveBlobKey = TryGetFinalArchiveBlobKey(tempArchiveBlobKey);
+        if (finalArchiveBlobKey is null)
+        {
+            _logger.LogWarning(
+                "Skipping malformed abandoned temporary archive key {TempArchiveKey}",
+                tempArchiveBlobKey);
+            return false;
+        }
+
+        try
+        {
+            var properties = await accountBlobContainerClient.GetBlobClient(finalArchiveBlobKey)
+                .GetPropertiesAsync(cancellationToken: cancellationToken);
+            return !IsArchiveCopyInProgress(properties.Value.CopyStatus, properties.Value.CopyId);
+        }
+        catch (RequestFailedException exception) when (exception.Status == 404)
+        {
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Unable to verify publication state for abandoned temporary archive {TempArchiveKey}; leaving it in place",
+                tempArchiveBlobKey);
+            return false;
+        }
+    }
+
+    internal static string? TryGetFinalArchiveBlobKey(string tempArchiveBlobKey)
+    {
+        if (!tempArchiveBlobKey.StartsWith(TempArchivePrefix, StringComparison.Ordinal) ||
+            tempArchiveBlobKey.Length == TempArchivePrefix.Length)
+        {
+            return null;
+        }
+
+        return ArchivePrefix + tempArchiveBlobKey[TempArchivePrefix.Length..];
+    }
+
     internal static IReadOnlyList<string> SelectArchivesToPrune(
         IEnumerable<(string BlobKey, DateTimeOffset LastModified)> existingArchives) =>
         existingArchives
+            .GroupBy(x => x.BlobKey, StringComparer.Ordinal)
+            .Select(group => (BlobKey: group.Key, LastModified: group.Max(x => x.LastModified)))
             .OrderByDescending(x => x.LastModified)
             .ThenByDescending(x => x.BlobKey, StringComparer.Ordinal)
             .Skip(MaxRetainedArchives - 1)
             .Select(x => x.BlobKey)
             .ToList();
+
+    internal static bool IsArchiveReady(CopyStatus? copyStatus, string? copyId) =>
+        string.IsNullOrWhiteSpace(copyId) || copyStatus == CopyStatus.Success;
+
+    internal static bool IsArchiveCopyInProgress(CopyStatus? copyStatus, string? copyId) =>
+        !string.IsNullOrWhiteSpace(copyId) && copyStatus == CopyStatus.Pending;
+
+    internal static bool IsArchiveCopyFailed(CopyStatus? copyStatus, string? copyId) =>
+        !string.IsNullOrWhiteSpace(copyId) &&
+        copyStatus is CopyStatus.Failed or CopyStatus.Aborted;
+
+    internal static (string TempBlobKey, string FinalBlobKey) BuildArchiveBlobKeys(
+        string fileName, Guid operationId)
+    {
+        var operationSegment = operationId.ToString("N");
+        return (
+            $"{TempArchivePrefix}{operationSegment}/{fileName}",
+            $"{ArchivePrefix}{operationSegment}/{fileName}");
+    }
 
     internal static IReadOnlyList<string> SelectAbandonedTempArchives(
         IEnumerable<(string BlobKey, DateTimeOffset LastModified)> tempArchives,
@@ -395,24 +509,208 @@ public class ArchiveJobCoordinator
         return failures.Count == 0;
     }
 
-    private static async Task PublishArchive(
+    internal static async Task PublishArchive(
         Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
         string tempArchiveBlobKey,
         string finalArchiveBlobKey,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long preferredBlockSizeBytes = PreferredArchivePublicationBlockBytes)
     {
         var tempBlobClient = accountBlobContainerClient.GetBlobClient(tempArchiveBlobKey);
         var finalBlobClient = accountBlobContainerClient.GetBlobClient(finalArchiveBlobKey);
+        var finalBlockBlobClient = accountBlobContainerClient.GetBlockBlobClient(finalArchiveBlobKey);
 
-        var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
-            tempBlobClient.Uri,
+        // Reading source properties happens before publication begins. A failure here has a
+        // known outcome and can use normal partial-temp cleanup. The ETag is then pinned on
+        // every server-side block copy so a source mutation cannot produce a mixed archive.
+        var tempProperties = (await tempBlobClient.GetPropertiesAsync(
+            cancellationToken: cancellationToken)).Value;
+        var blocks = BuildArchivePublicationBlocks(
+            tempProperties.ContentLength,
+            preferredBlockSizeBytes);
+
+        try
+        {
+            foreach (var block in blocks)
+            {
+                // The SAS stays inside the backend-to-Azure publication path and is never returned
+                // to a client. Generate a fresh, blob-scoped, read-only credential for each
+                // Azure-to-Azure block copy so even very large archives do not require one
+                // long-lived bearer token or relay their bytes through Planarian.
+                var sourceUri = CreateArchiveSourceReadSasUri(
+                    tempBlobClient,
+                    DateTimeOffset.UtcNow);
+                await finalBlockBlobClient.StageBlockFromUriAsync(
+                    sourceUri,
+                    block.BlockId,
+                    new StageBlockFromUriOptions
+                    {
+                        SourceRange = new HttpRange(block.Offset, block.Length),
+                        SourceConditions = new RequestConditions { IfMatch = tempProperties.ETag }
+                    },
+                    cancellationToken);
+            }
+
+            // Uncommitted blocks are not a published archive. The single conditional block-list
+            // commit makes the final blob visible atomically and refuses to overwrite an existing
+            // destination, preserving mixed-version/retry safety.
+            await finalBlockBlobClient.CommitBlockListAsync(
+                blocks.Select(block => block.BlockId),
+                new CommitBlockListOptions
+                {
+                    Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All }
+                },
+                cancellationToken);
+        }
+        catch (Exception publicationException)
+        {
+            // A commit can succeed even if its response is lost. Reconcile against storage
+            // before deciding whether publication failed. Hashing is deliberately an error-path
+            // operation; the normal publication path never relays archive bytes through the app.
+            ArchivePublicationVerification verification;
+            try
+            {
+                verification = await VerifyPublishedArchiveAsync(
+                    tempBlobClient, finalBlobClient, CancellationToken.None);
+            }
+            catch (Exception verificationException)
+            {
+                throw new ArchivePublicationUncertainException(
+                    finalArchiveBlobKey,
+                    new AggregateException(publicationException, verificationException));
+            }
+
+            switch (verification)
+            {
+                case ArchivePublicationVerification.Identical:
+                    return;
+                case ArchivePublicationVerification.Missing:
+                    throw new IOException(
+                        "Archive publication failed before a final archive was committed.",
+                        publicationException);
+                case ArchivePublicationVerification.Different:
+                    throw new InvalidOperationException(
+                        "Archive publication destination already exists with different content.",
+                        publicationException);
+                default:
+                    throw new ArchivePublicationUncertainException(
+                        finalArchiveBlobKey, publicationException);
+            }
+        }
+    }
+
+    internal static IReadOnlyList<ArchivePublicationBlock> BuildArchivePublicationBlocks(
+        long contentLength,
+        long preferredBlockSizeBytes = PreferredArchivePublicationBlockBytes)
+    {
+        if (contentLength < 0)
+            throw new ArgumentOutOfRangeException(nameof(contentLength));
+        if (preferredBlockSizeBytes <= 0 || preferredBlockSizeBytes > MaxArchivePublicationBlockBytes)
+            throw new ArgumentOutOfRangeException(nameof(preferredBlockSizeBytes));
+
+        var maxSupportedContentLength =
+            MaxArchivePublicationBlockBytes * MaxArchivePublicationBlocks;
+        if (contentLength > maxSupportedContentLength)
+        {
+            throw new InvalidOperationException(
+                $"Archive size {contentLength} bytes exceeds Azure block-blob publication capacity.");
+        }
+
+        if (contentLength == 0)
+            return [];
+
+        var minimumBlockSizeForBlockCount =
+            ((contentLength - 1) / MaxArchivePublicationBlocks) + 1;
+        var blockSize = Math.Max(preferredBlockSizeBytes, minimumBlockSizeForBlockCount);
+        var blockCount = checked((int)(((contentLength - 1) / blockSize) + 1));
+        var blocks = new List<ArchivePublicationBlock>(blockCount);
+
+        for (var index = 0; index < blockCount; index++)
+        {
+            var offset = index * blockSize;
+            var length = Math.Min(blockSize, contentLength - offset);
+            var blockId = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes(index.ToString("D8", CultureInfo.InvariantCulture)));
+            blocks.Add(new ArchivePublicationBlock(blockId, offset, length));
+        }
+
+        return blocks;
+    }
+
+    internal static Uri CreateArchiveSourceReadSasUri(
+        Azure.Storage.Blobs.BlobClient sourceBlobClient,
+        DateTimeOffset now)
+    {
+        if (!sourceBlobClient.CanGenerateSasUri)
+        {
+            throw new InvalidOperationException(
+                "Archive server-side publication requires shared-key Blob Storage credentials capable of generating a source read SAS.");
+        }
+
+        var startsOn = now - ArchiveSourceSasClockSkewAllowance;
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = sourceBlobClient.BlobContainerName,
+            BlobName = sourceBlobClient.Name,
+            Resource = "b",
+            StartsOn = startsOn,
+            ExpiresOn = startsOn + ArchiveSourceSasValidity
+        };
+        if (string.Equals(sourceBlobClient.Uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            sasBuilder.Protocol = SasProtocol.Https;
+
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+        return sourceBlobClient.GenerateSasUri(sasBuilder);
+    }
+
+    private static async Task<ArchivePublicationVerification> VerifyPublishedArchiveAsync(
+        Azure.Storage.Blobs.BlobClient tempBlobClient,
+        Azure.Storage.Blobs.BlobClient finalBlobClient,
+        CancellationToken cancellationToken)
+    {
+        BlobProperties finalProperties;
+        try
+        {
+            finalProperties = (await finalBlobClient.GetPropertiesAsync(
+                cancellationToken: cancellationToken)).Value;
+        }
+        catch (RequestFailedException exception) when (exception.Status == 404)
+        {
+            return ArchivePublicationVerification.Missing;
+        }
+
+        var tempProperties = (await tempBlobClient.GetPropertiesAsync(
+            cancellationToken: cancellationToken)).Value;
+        if (tempProperties.ContentLength != finalProperties.ContentLength)
+            return ArchivePublicationVerification.Different;
+
+        await using var tempStream = await tempBlobClient.OpenReadAsync(
             cancellationToken: cancellationToken);
-        await copyOperation.WaitForCompletionAsync(cancellationToken);
+        await using var finalStream = await finalBlobClient.OpenReadAsync(
+            cancellationToken: cancellationToken);
+
+        using var tempHashAlgorithm = SHA256.Create();
+        using var finalHashAlgorithm = SHA256.Create();
+        var tempHash = await tempHashAlgorithm.ComputeHashAsync(tempStream, cancellationToken);
+        var finalHash = await finalHashAlgorithm.ComputeHashAsync(finalStream, cancellationToken);
+
+        return CryptographicOperations.FixedTimeEquals(tempHash, finalHash)
+            ? ArchivePublicationVerification.Identical
+            : ArchivePublicationVerification.Different;
+    }
+
+    internal readonly record struct ArchivePublicationBlock(string BlockId, long Offset, long Length);
+
+    private enum ArchivePublicationVerification
+    {
+        Missing,
+        Identical,
+        Different
     }
 
     private async Task CleanupPartialArchive(ArchiveJobHandle jobHandle)
     {
-        if (string.IsNullOrWhiteSpace(jobHandle.ArchiveBlobKey) || string.IsNullOrWhiteSpace(jobHandle.ContainerName))
+        if (string.IsNullOrWhiteSpace(jobHandle.TempArchiveBlobKey) || string.IsNullOrWhiteSpace(jobHandle.ContainerName))
         {
             return;
         }
@@ -420,11 +718,11 @@ public class ArchiveJobCoordinator
         using var scope = _scopeFactory.CreateScope();
         var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
         if (!await TryDeleteArchiveObjectAsync(
-                fileService, jobHandle.ArchiveBlobKey, jobHandle.ContainerName, CancellationToken.None))
+                fileService, jobHandle.TempArchiveBlobKey, jobHandle.ContainerName, CancellationToken.None))
         {
             _logger.LogWarning(
                 "Partial archive {ArchiveKey} for account {AccountId} could not be deleted; the next archive job will retry it",
-                jobHandle.ArchiveBlobKey, jobHandle.AccountId);
+                jobHandle.TempArchiveBlobKey, jobHandle.AccountId);
         }
     }
 
@@ -450,6 +748,10 @@ public class ArchiveJobCoordinator
         return string.IsNullOrWhiteSpace(normalizedValue) ? "Account" : normalizedValue;
     }
 
+    internal sealed class ArchivePublicationUncertainException(
+        string finalArchiveBlobKey, Exception innerException)
+        : IOException($"Archive publication outcome is uncertain for '{finalArchiveBlobKey}'.", innerException);
+
     private sealed class ArchiveJobHandle
     {
         public ArchiveJobHandle(string accountId, string accountContainerName, CancellationTokenSource cancellationTokenSource)
@@ -463,7 +765,8 @@ public class ArchiveJobCoordinator
         public string AccountId { get; }
         public string AccountContainerName { get; }
         public CancellationTokenSource CancellationTokenSource { get; }
-        public string? ArchiveBlobKey { get; set; }
+        public string? TempArchiveBlobKey { get; set; }
+        public string? FinalArchiveBlobKey { get; set; }
         public string? ContainerName { get; set; }
         public string StatusMessage { get; set; } = string.Empty;
         public int? ProcessedCount { get; set; }

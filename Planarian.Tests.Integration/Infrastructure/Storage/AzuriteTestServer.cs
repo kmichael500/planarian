@@ -6,8 +6,8 @@ namespace Planarian.Tests;
 
 /// <summary>
 /// Real Azurite fixture for integration paths that still use the Azure Blob SDK directly,
-/// such as chunked account File imports. Business-level durable object storage remains
-/// covered separately by the in-memory IObjectStorage fake.
+/// such as chunked account File imports and archive block-from-URI publication. Business-level
+/// durable object storage remains covered separately by the in-memory IObjectStorage fake.
 /// </summary>
 public sealed class AzuriteTestServer : IAsyncLifetime
 {
@@ -35,7 +35,7 @@ public sealed class AzuriteTestServer : IAsyncLifetime
     {
         PostgresTestServer.ConfigureColimaForTestcontainers();
         _container = new ContainerBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:3.36.0")
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:3.37.0")
             .WithPortBinding(BlobPort, assignRandomHostPort: true)
             .WithCommand("azurite", "--blobHost", "0.0.0.0")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(BlobPort))

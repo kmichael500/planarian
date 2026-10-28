@@ -17,7 +17,11 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
     public AzureBlobObjectStorage(FileOptions options) => _options = options;
 
     public void InvalidateContainer(string partition)
-        => ContainerInitializationTasks.TryRemove(partition.ToLowerInvariant(), out _);
+    {
+        var normalized = partition.ToLowerInvariant();
+        var container = new BlobContainerClient(_options.ConnectionString, normalized);
+        ContainerInitializationTasks.TryRemove(GetContainerInitializationKey(container), out _);
+    }
 
     public async Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken)
@@ -108,17 +112,22 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
         var container = new BlobContainerClient(_options.ConnectionString, normalized);
         if (!createIfNotExists) return container;
 
-        var initializationTask = ContainerInitializationTasks.GetOrAdd(normalized, _ => container.CreateIfNotExistsAsync());
+        var initializationKey = GetContainerInitializationKey(container);
+        var initializationTask = ContainerInitializationTasks.GetOrAdd(
+            initializationKey, _ => container.CreateIfNotExistsAsync());
         try
         {
             await initializationTask;
         }
         catch
         {
-            ContainerInitializationTasks.TryRemove(normalized, out _);
+            ContainerInitializationTasks.TryRemove(initializationKey, out _);
             throw;
         }
 
         return container;
     }
+
+    internal static string GetContainerInitializationKey(BlobContainerClient containerClient) =>
+        containerClient.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
 }
