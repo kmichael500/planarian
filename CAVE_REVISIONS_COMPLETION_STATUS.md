@@ -2,15 +2,15 @@
 
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
-**Ledger last refreshed:** 2026-10-27
-**Completion HEAD reviewed:** `cd213c56` (`Merge storage cleanup safety and Azurite contracts`) — base of the read-integrity working-tree validation. Earlier full-suite/package evidence remains SHA-pinned to its original source and is not being relabeled as a full-suite rerun on this working tree.
-**Package refresh:** 2026-10-27; the external-cleanup safety + production `AzureBlobObjectStorage` contract package was independently validated from `fca098d45ebb0dc0a2b65ee2ed75c63ad4f40cc5`, then reconciled against completion HEAD `bb45e4a2`, which adds the import-authoring parity package and shared Azurite fixture. The combined tree preserves durable published/unpublished File cleanup, cross-replica archive-job coordination with age-gated temp cleanup, import parity, and the automated real production-adapter contract against isolated Azurite. Exact package evidence is recorded under GAP-004/GAP-005 below; earlier evidence remains SHA-pinned where applicable.
+**Ledger last refreshed:** 2026-10-28
+**Completion HEAD reviewed:** `3bdb3146` (`test(caves): prove read-only integrity and stale-client safety`) immediately before archive-runtime integration. Earlier package evidence remains SHA-pinned to its original source rather than being relabeled as a combined full-suite run.
+**Package refresh:** 2026-10-28; the completion branch now combines the read-integrity/stale-client package at `3bdb3146` with archive-runtime package `cc79c062`, which was developed from completion base `cd213c56`. The archive package adds generated-archive content validation, bounded-memory large-File generation, Azure server-side block-from-URI publication for large archives, backend-only source SAS hardening, cancellation/retry, tenant isolation, retention, non-mutating archive-list reads, Reset/delete coordination, endpoint-scoped Blob-container initialization, and pinned historical old/new storage-algorithm coverage. GAP-008/GAP-009 and GAP-010 retain their exact package evidence below; the combined branch is rerun in full after this merge.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 170 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 481 files changed, 67,926 insertions, 5,989 deletions
+**Branch distance at baseline review:** 183 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 590 files changed, 81,274 insertions, 7,912 deletions
 
 ## Browser-E2E integration validation (2026-10-28)
 
@@ -60,7 +60,7 @@ No known Cave-revision implementation blocker remains in the current working tre
 
 The **P0 implementation/validation checklist is now complete in this package**. GAP-001 adds a strict current-main v32 database preservation census plus a separate revision-rollout preservation boundary; the package still needs to be included in the branch's final adversarial validation pass.
 
-The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, current-main migration/rollout preservation, shared-interceptor compatibility, durable external cleanup, and the production Azure Blob adapter against Azurite. The remaining high-value risks are P1/P2 work outside the core publication machinery: real-browser integration, archive generation/runtime behavior, account-switch cache isolation, mixed-version deployment/runtime safety, and live-provider/deployment boundaries that an emulator cannot prove.
+The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, current-main migration/rollout preservation, shared-interceptor compatibility, durable external cleanup, archive generation/runtime behavior, and the production Azure Blob adapter against Azurite. The remaining high-value risks are P1/P2 work outside the core publication machinery: real-browser integration, account-switch cache isolation, other mixed-version deployment/runtime boundaries, and live-provider/deployment behavior that an emulator cannot prove.
 
 ## Reviewed scope size
 
@@ -114,7 +114,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
 | Global `SaveChangesInterceptor` batching refactor | **DONE + VALIDATED** | Mechanical EntityBase coverage contract plus real-PostgreSQL matrix cover side-effect-free current/original AccountId and Cave/County/Entrance ownership, staged Files, foreign-tenant Added/Modified/Deleted states, mixed-batch atomicity, laundering/smuggling attempts, narrow AccountUser/User invitation exceptions including the unique null-`InvitationSentOn` recovery case, protected global/default writes, and bounded lookup counts. Unchanged Cave→County relationships avoid a redundant ownership SELECT while actual County moves remain validated. |
 | Account Reset rewrite | **DONE, PARTIAL VALIDATION** | The merged destructive-safety package tests the Reset graph, two-tenant noninterference, archive container removal, post-commit storage failures, immediate retry, and reset/archive admission. A transactional cleanup outbox, explicit retry endpoint/UI and PostgreSQL shared/exclusive account-maintenance leases cover API writes and background archives. Independent non-cooperating writers and live Azure smoke tests remain deployment validation boundaries. |
-| Account archive projection compatibility | **DONE, PARTIAL VALIDATION** | Focused projection tests exist. Full `.tar.gz` generation/content/cancellation/pruning/restore semantics are under-tested. |
+| Account archive projection/runtime compatibility | **DONE + VALIDATED** | GAP-010 now covers actual `.tar.gz` generation/content, difficult File/line-plot data, explicit missing-file diagnostics, cancellation/retry, publication conflicts/ambiguity reconciliation, retention, tenant isolation, Reset/delete coordination, and pinned historical old/new publication behavior. Archive remains a current-state export with no restore contract. |
 | Unsaved-change guard | **DONE + VALIDATED** | Edit/Suggest/Revise tests cover blocked navigation, keep-editing, discard, asset-only dirty state, and `beforeunload`. |
 | Detail-page read-only Cave-owned state | **DONE + VALIDATED** | Cave detail exposes File viewing and the map but contains no direct File or line-plot publication path. Source review confirms the obsolete importer/modal wiring is gone; positive map and aggregate-authoring tests cover the behavior that remains supported. |
 | Durable completion docs / final acceptance checklist | **DONE, PARTIAL VALIDATION** | Durable architecture/status docs are refreshed to current implementation truth. The plan remains intentionally marked active pre-merge until the remaining validation gates are completed. |
@@ -167,7 +167,7 @@ Snapshot design is intentionally user/logical-state oriented:
 
 1. The global `SaveChangesInterceptor` remains high-blast-radius infrastructure, but its Cave/account-domain switch coverage is now mechanically classified and the ownership mechanisms have a real-PostgreSQL compatibility/tenant-isolation matrix. Legacy Trip/Lead/Project entities and explicitly global/system records remain deliberately outside the Cave-completion ownership contract.
 2. The production `AzureBlobObjectStorage` adapter now has an automated isolated-Azurite contract covering the relevant byte/metadata, immutable-create, missing/delete, concurrent first-use, normalization, lazy-read race, snapshot, cancellation, and container-recreation semantics. Azurite is still an emulator, so live Azure account policy, retention, networking, and service-specific behavior remain deployment boundaries.
-3. Browser/runtime and full archive-generation behavior are still under-tested end to end. Reset Account now has durable cleanup debt/retry semantics, but independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
+3. Browser/runtime behavior outside the archive subsystem remains under-tested end to end. Archive generation/publication now has generated-content, cancellation/retry, tenant, retention, Reset/delete coordination, and pinned historical old/new storage-algorithm coverage under GAP-010. Independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
 
 ## Code quality
 
@@ -526,7 +526,7 @@ Published and unpublished File cleanup now use explicit durable post-commit resp
 - cleanup-target acknowledgement detaches same-scope persisted tracked targets after set-based deletion so EF state cannot resurrect stale local debt, while unsaved Added debt is never detached;
 - the cleanup migration downgrade fails closed for both `CaveAssetRemoval` and `UnpublishedFileRemoval`.
 
-Archive cleanup remains Azure-specific but no longer falsifies a completed archive when temporary-object deletion or pruning fails. Archive jobs now acquire the shared maintenance lock plus a separate exclusive per-account archive-job lock on one PostgreSQL session/lease, so new-version replicas serialize per account without consuming two long-lived lock-pool connections. Abandoned temporary cleanup additionally requires a conservative seven-day age before deleting another job's temp key, so a rolling deployment cannot let a new replica delete an active temp object owned by an older replica that does not yet take the new archive-job lock. Per-object prune/delete failures are isolated and retried by later jobs. Full generated-archive/copy-state runtime validation remains separately open under GAP-010.
+Archive cleanup remains Azure-specific but no longer falsifies a completed archive when temporary-object deletion or pruning fails. Archive jobs acquire the shared maintenance lock plus a separate exclusive per-account archive-job lock on one PostgreSQL session/lease, so new-version replicas serialize per account without consuming two long-lived lock-pool connections; archive deletion takes the same lease. Abandoned temporary cleanup requires a conservative seven-day age before deleting another job's temp key and will not delete the source of a genuine pending legacy Blob Copy. Per-object prune/delete failures are isolated and retried by later jobs. Full generated-archive/content/publication/cancellation/tenant/mixed-version runtime validation is now resolved under GAP-010.
 
 Final validation on the reviewed working tree includes **40/40** focused cleanup/aggregate/import tests after the final scale hardening, **9/9** archive-cleanup/maintenance-lock tests, **2/2** Reset partial-locator fail-closed regressions, **37/37** migration/PostgreSQL-foundation tests, **417/417** backend unit tests, and **511/511** full PostgreSQL/PostGIS integration tests with no skips. The Release solution build succeeds with **0 warnings / 0 errors**, EF reports no pending model changes, and repository documentation validation plus `git diff --check` pass.
 
@@ -544,7 +544,9 @@ Business-level File tests appropriately continue to use `TestFileBlobStore : IOb
 - canceled create without object publication;
 - container-cache invalidation and recreation after external container deletion.
 
-The standalone production-adapter contract passed **10/10**. After the external-cleanup package was adopted, the combined storage/cleanup/proposal/import/reset/archive/migration matrix passed **81/81** with no skips on the integrated working tree. The shared Azurite fixture is also used by the account File-import integration path, avoiding a second emulator harness.
+The archive/Azurite validation pass additionally exposed and fixed a cross-endpoint initialization-cache hazard: same-named containers on different Blob endpoints can no longer reuse another endpoint's successful initialization state, and cache keys exclude query credentials. A focused unit contract covers the key shape, while the File-import/Azurite regression set exercises the behavior across isolated fixture endpoints.
+
+The standalone production-adapter contract passed **10/10**. After the external-cleanup package was adopted, the combined storage/cleanup/proposal/import/reset/archive/migration matrix passed **81/81** with no skips on the integrated working tree. The same Azurite fixture implementation is also used by the account File-import integration path, avoiding a second emulator harness.
 
 Final merge reconciliation against import-parity completion HEAD `bb45e4a2` found and corrected one stale mixed-batch test assertion that still expected the retired transient `BlobDeletes` result; the test now proves the committed `StorageCleanupTargetIds`/`CaveAssetRemoval` contract and that the updated Cave's live File is not queued. On the exact resolved merge tree, the Release solution build passed **0 warnings / 0 errors**, the focused mixed-batch regression passed **1/1**, the backend unit suite passed **424/424**, and the full PostgreSQL/PostGIS integration suite passed **542/542** with **0 skips**. Repository documentation validation, changed-file formatting, `git diff --check`, `docker compose config -q`, and EF pending-model validation also pass; EF reports no pending model changes.
 
@@ -628,46 +630,21 @@ cannot create late history. The tests include a separately initialized foreign a
 mutations. Cave list/search now explicitly constrains the Cave row by account when bypassing its global
 query filter, matching the data-access architecture's tenant-qualification rule.
 
-## GAP-010 — Full archive generation/content validation
+## GAP-010 — RESOLVED — Full archive generation/content and runtime safety
 
-**Priority: P1**
+The archive runtime now has end-to-end content and coordination coverage against disposable PostgreSQL/PostGIS plus isolated Azurite. `ArchiveGeneratedContentIntegrationTests` calls `ExportService.WriteArchive()`, opens the actual `.tar.gz`, and validates parsed CSV/current-state semantics plus byte-identical File/line-plot payloads using multiple Caves/Entrances/tags, Unicode and multi-dot names, duplicate/path-collision candidates, a `..` path segment, zero-byte/binary/text/PDF-like/large payloads, missing blobs, staged Files, rejected/removed payloads, and a second tenant with overlapping storage keys. The large-payload fixture is above the 8 MiB memory-prefetch threshold, proving the bounded-memory direct Azure-stream path; small prefetch remains capped at eight such buffers, while large blobs are streamed one at a time with ETag protection. Archive listing is also proven not to create an absent account Blob container. Current File rows with a missing BlobKey, missing BlobContainer, or foreign BlobContainer now appear explicitly in `missing-files.csv` instead of being silently omitted or reading another tenant's same-key object.
 
-Current archive tests mostly validate projections rather than a complete generated archive.
+Archive publication/runtime hardening adds job-scoped temp/final keys, eliminating the historical one-second timestamp key collision between rolling-deployment replicas. Current publication no longer relays the completed archive through the Planarian process. It stages source ranges Azure-to-Azure with `StageBlockFromUriAsync`, pins every range to the completed temp blob's ETag, and exposes the final archive only through a conditional `CommitBlockListAsync` with `If-None-Match: *`. Source authorization is a backend-only, exact-blob, read-only service SAS generated fresh per block with a maximum one-hour validity interval; it is never returned to the frontend and does not restore the removed browser-facing SAS access model. The block planner supports archives beyond the single `Put Blob From URL` limit and stays within Azure's 50,000-block / 4,000-MiB-per-block current service limits. If the SDK reports an error after publication may have reached storage, the coordinator compares temp/final bytes: identical content makes the retry idempotently successful, a missing final is a definite failure, different content fails closed, and an unverifiable state preserves the completed temp for later recovery/age-gated cleanup. The old async Blob Copy path is still understood: list/download/delete ignore non-success copy destinations, prune protects genuine pending copies while cleaning failed/aborted legacy destinations best-effort, and stale-temp cleanup will not delete the source of a pending legacy copy.
 
-Add a test that calls `ExportService.WriteArchive()`, opens the resulting `.tar.gz`, and validates actual contents using difficult data:
+Runtime integration coverage proves cancellation cleanup and retry, successful readable publication, publication-conflict non-overwrite plus fresh-key retry, same-account serialization across coordinator instances, different-account concurrency, archive-vs-Reset exclusion, archive-vs-delete exclusion across current-version replicas, retention of four prior archives plus the current fifth, best-effort prune failure, tenant-scoped list/download/delete, and stale/recent/current temp behavior. The mixed-version storage test executes the exact historical timestamp-key + `StartCopyFromUriAsync`/wait algorithm pinned from `78dfce40^` concurrently with the current job-scoped publisher; it does not substitute two current-version coordinator instances.
 
-- Unicode Cave/file names;
-- filenames with multiple dots;
-- path/name collision candidates;
-- multiple Caves;
-- line plots;
-- zero-byte file;
-- missing blob;
-- ordinary binary/text/PDF files;
-- enough Entrances/tags to exercise projections.
+Current exact-source archive-focused validation passes **45/45** unit policy/authorization/runtime tests and **26/26** archive integration tests, including the bounded-memory >8 MiB payload path and non-creating archive-list read. A fresh Release rebuild succeeds with **0 errors**; emitted warnings remain the repository's existing nullable/static-analysis class recorded elsewhere in this ledger, including unchanged `AccountRepository` lines rather than the archive-projection additions. Before the final bounded-memory/read-side-effect corrections, the package full backend unit suite passed **469/469** and the full disposable PostgreSQL/PostGIS + Azurite integration suite passed **558/558** with **0 skipped**; the integrated completion branch is intentionally rerun in full after this package is merged. Provider validation uses Azurite **3.37.0**, which added `Put Block From URL`; the prior 3.36.0 pin returned the expected emulator `APINotImplemented` response for the new publication path and was upgraded in both Compose and the integration fixture. The File-import and production-storage regression slice passes **21/21** after endpoint-scoping the static container-initialization caches, and the dedicated cache-key/archive-policy unit slice passes **39/39**.
 
-Validate:
-
-- `caves.csv` and `entrances.csv` parse and match expected current state;
-- expected file entries are byte-identical;
-- missing-file manifest is correct;
-- current line plots are represented as intended;
-- staged/historical payload is not exported unless explicitly part of the contract;
-- archive paths cannot escape the archive root.
-
-Also test `ArchiveJobCoordinator`:
-
-- cancellation cleans temporary archive;
-- failure leaves no published corrupt archive;
-- pruning retains the correct five;
-- current/newest archive cannot be pruned accidentally;
-- Account A cannot list/remove/download Account B archives;
-- interrupted/stale temporary archive behavior is defined;
-- mixed-version deployment is exercised for old/new concurrent archive generation: the GAP-004 age guard protects temp cleanup, but an older backend does not participate in the new archive-job advisory lock, so final-copy/name collision behavior still needs explicit runtime proof.
+Explicit product boundary: archive generation uses a shared account-maintenance lease, so ordinary Cave authoring is allowed to continue during generation. The export is current-state oriented but is not a transactionally frozen point-in-time snapshot across PostgreSQL and Blob Storage; a payload removed during generation can be reported in `missing-files.csv` rather than silently disappearing. Remaining deployment boundaries are live Azure account policy/networking/throttling/provider timing, and the mixed-version test executes the historical storage algorithm pinned from source rather than launching a compiled historical Planarian server binary.
 
 ## GAP-011 — RESOLVED — Archive is a current-state export, not a disaster-recovery backup
 
-The product/architecture decision is now explicit in `docs/architecture/destructive-operations.md`: the account Archive exports current Cave/Entrance state, current live Cave Files, current line plots, and the missing-file manifest where needed. It does not promise revision/proposal/review history or storage-cleanup-debt recovery, and no restore workflow is defined. Full generated-archive content/cancellation/pruning validation remains under GAP-010.
+The product/architecture decision is explicit in `docs/architecture/destructive-operations.md`: the account Archive exports current Cave/Entrance state, current live Cave Files, current line plots, and the missing-file manifest where needed. It does not promise revision/proposal/review history or storage-cleanup-debt recovery, and no restore workflow is defined. GAP-010 now provides the generated-content and runtime validation for that contract.
 
 ## GAP-012 — RESOLVED — Hidden/disabled feature fields preserve existing data
 
@@ -771,16 +748,16 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 
 ## P1 — Strongly recommended before merge because failures can be silent or cross-cutting
 
-- [x] External-cleanup failure/retry safety for hard Cave/File/staging/proposal/archive-cleanup workflows (GAP-004; full archive runtime remains GAP-010).
+- [x] External-cleanup failure/retry safety for hard Cave/File/staging/proposal/archive-cleanup workflows (GAP-004), with full archive runtime covered by resolved GAP-010.
 - [x] Azurite contract tests for production `AzureBlobObjectStorage`.
 - [x] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
 - [x] Small real-browser smoke suite, including WebKit for critical workflows.
 - [x] Real-browser PDF.js custom-header/range/authentication test.
 - [x] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
 - [x] Read-only GET/authoring-context no-side-effect contract plus fail-closed uninitialized-Cave coverage.
-- [ ] End-to-end archive `.tar.gz` generation/content validation.
-- [ ] Full end-to-end archive runtime cancellation/failure/pruning/account-isolation tests (GAP-010; cleanup-policy/lock failure semantics are covered under GAP-004).
-- [x] Explicit archive-vs-backup product contract (current-state export; full archive runtime validation remains GAP-010).
+- [x] End-to-end archive `.tar.gz` generation/content validation (GAP-010).
+- [x] Full end-to-end archive runtime cancellation/failure/pruning/account-isolation and mixed-version publication tests (GAP-010).
+- [x] Explicit archive-vs-backup product contract (current-state export), with the runtime contract validated under GAP-010.
 - [x] Hidden/disabled feature-field preservation tests.
 - [x] Account-switch/client-cache isolation validation.
 
@@ -848,7 +825,7 @@ Do not mark this branch merge-ready until every applicable item below is true or
 - [x] Post-commit storage failure has truthful user/API semantics (merged destructive-safety package).
 - [x] Fate of stored archives during reset is intentional and documented (merged destructive-safety package).
 - [x] Durable cleanup retry and cross-replica API/archive admission tested; independent write paths still need deployment audit.
-- [x] Hard-delete/external-cleanup failure semantics are safe/retryable; full generated-archive runtime behavior remains tracked under GAP-010.
+- [x] Hard-delete/external-cleanup failure semantics are safe/retryable; generated-archive runtime behavior is validated under resolved GAP-010.
 
 ## Storage/File safety
 
@@ -863,7 +840,7 @@ Do not mark this branch merge-ready until every applicable item below is true or
 - [x] Hidden feature fields survive unrelated edits.
 - [x] Account switching cannot reuse actionable foreign-account UI data.
 - [x] Ordinary reads do not unexpectedly mutate durable state.
-- [x] Archive current-state/backup semantics are explicit; full generated-archive runtime validation remains open under GAP-010.
+- [x] Archive current-state/backup semantics are explicit and the generated-archive/runtime contract is validated under GAP-010.
 
 ## Browser/runtime
 
@@ -906,7 +883,7 @@ Do not begin with a broad refactor.
 Recommended next work order:
 
 1. add the small critical browser/PDF smoke suite;
-2. finish full archive runtime validation and account-switch/cache isolation;
+2. finish account-switch/cache isolation and the remaining read/stale-client validation gaps;
 3. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
 
 
@@ -924,7 +901,6 @@ Remaining merge risk is concentrated in:
 
 - live Azure/provider deployment behavior beyond the isolated Azurite contract;
 - real-browser integration;
-- full archive generation/copy-state runtime behavior;
 - account-switch/client-cache isolation;
 - independent-writer/live-provider deployment boundaries beyond the repository-owned cleanup contracts proven here.
 

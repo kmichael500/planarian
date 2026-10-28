@@ -419,7 +419,8 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(RequestUser.AccountContainerName);
+        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(
+            RequestUser.AccountContainerName, createIfNotExists: false);
         var archiveBlobs = new List<(string BlobKey, DateTimeOffset CreatedAt)>();
         var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
 
@@ -437,7 +438,9 @@ public class AccountService : ServiceBase<AccountRepository>
                     continue;
                 }
 
-                if (!blobItem.Properties.LastModified.HasValue)
+                if (!blobItem.Properties.LastModified.HasValue ||
+                    !ArchiveJobCoordinator.IsArchiveReady(
+                        blobItem.Properties.CopyStatus, blobItem.Properties.CopyId))
                 {
                     continue;
                 }
@@ -452,6 +455,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         var recentArchives = archiveBlobs
             .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.BlobKey, StringComparer.Ordinal)
             .Take(ArchiveJobCoordinator.MaxRetainedArchives)
             .ToList();
 
@@ -475,6 +479,7 @@ public class AccountService : ServiceBase<AccountRepository>
         EnsureValidArchiveBlobKey(blobKey);
         EnsureArchiveBlobIsNotActive(blobKey, "Archive is not available while it is still running.");
 
+        await EnsureArchiveIsReady(blobKey, cancellationToken);
         await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, blobKey);
 
         return await _fileService.CreateBlobResponse(
@@ -490,7 +495,32 @@ public class AccountService : ServiceBase<AccountRepository>
         EnsureValidArchiveBlobKey(blobKey);
         EnsureArchiveBlobIsNotActive(blobKey, "Cannot delete an archive while it is still running.");
 
+        var accountId = RequestUser.AccountId ?? throw ApiExceptionDictionary.NoAccount;
+        await using var archiveLease = await _maintenance.TryAcquireArchiveAsync(accountId, cancellationToken)
+            ?? throw ApiExceptionDictionary.Conflict("An archive is still running.");
+
+        await EnsureArchiveIsReady(blobKey, cancellationToken);
         await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
+    }
+
+    private async Task EnsureArchiveIsReady(string blobKey, CancellationToken cancellationToken)
+    {
+        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(
+            RequestUser.AccountContainerName, createIfNotExists: false);
+        try
+        {
+            var properties = await accountBlobContainerClient.GetBlobClient(blobKey)
+                .GetPropertiesAsync(cancellationToken: cancellationToken);
+            if (!ArchiveJobCoordinator.IsArchiveReady(
+                    properties.Value.CopyStatus, properties.Value.CopyId))
+            {
+                throw ApiExceptionDictionary.BadRequest("Archive is not ready.");
+            }
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            throw ApiExceptionDictionary.NotFound("File");
+        }
     }
 
     private void EnsureValidArchiveBlobKey(string blobKey)

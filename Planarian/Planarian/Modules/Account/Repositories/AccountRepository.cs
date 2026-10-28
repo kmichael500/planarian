@@ -558,6 +558,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ThenBy(e => e.County.DisplayId)
             .ThenBy(e => e.CountyNumber)
             .ThenBy(e => e.Name)
+            .ThenBy(e => e.Id)
             .Select(e => new ArchiveCaveCsvModel
             {
                 PlanarianId = e.Id,
@@ -619,6 +620,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ThenByDescending(e => e.IsPrimary)
             .ThenBy(e => e.ReportedOn)
             .ThenBy(e => e.Name)
+            .ThenBy(e => e.Id)
             .Select(entrance => new ArchiveEntranceByCaveCsvModel
             {
                 CavePlanarianId = entrance.CaveId,
@@ -667,12 +669,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ThenBy(file => file.FileTypeTag.Name)
             .ThenBy(file => file.Name)
             .ThenBy(file => file.Extension)
+            .ThenBy(file => file.Id)
             .Select(file => new ArchiveFileByCaveModel
             {
                 CavePlanarianId = file.CaveId!,
                 Id = file.Id,
                 FileName = file.Name + file.Extension,
                 BlobKey = file.BlobKey,
+                BlobContainer = file.BlobContainer,
                 FileTypeDisplayName = file.FileTypeTag.Name
             })
             .ToListAsync(cancellationToken);
@@ -689,6 +693,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ThenBy(geoJson => geoJson.Cave.County.DisplayId)
             .ThenBy(geoJson => geoJson.Cave.CountyNumber)
             .ThenBy(geoJson => geoJson.Name)
+            .ThenBy(geoJson => geoJson.Id)
             .Select(geoJson => new ArchiveGeoJsonByCaveModel
             {
                 Id = geoJson.Id,

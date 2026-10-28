@@ -60,12 +60,14 @@ and deferred cleanup. Import harnesses may remove wiring while keeping CSV input
 Integration tests require a real PostgreSQL/PostGIS server. By default the fixture starts one with Testcontainers.
 Inside the repository compose stack, `dc-agent-planarian` supplies `PLANARIAN_TEST_POSTGRES_CONNECTION_STRING` pointing
 at the compose PostGIS administrative database; the fixture still creates a unique disposable database for each test
-and never uses the development database as scenario state. Account File-import integration tests also start the same
-Azurite version pinned by Compose so chunk/session behavior exercises the real Azure Blob SDK. Business-level durable
-object-storage workflows continue to use the focused in-memory `IObjectStorage` fake for deterministic failure injection,
+and never uses the development database as scenario state. Account File-import and archive-publication integration tests also
+start the same Azurite version pinned by Compose so chunk/session behavior and server-side block-from-URI publication exercise
+the real Azure Blob SDK. The current pin is Azurite 3.37.0 because that release added `Put Block From URL`, which the archive
+publisher uses for Azure-to-Azure staging. Business-level durable object-storage workflows continue to use the focused in-memory
+`IObjectStorage` fake for deterministic failure injection,
 while a separate production-adapter contract suite runs the real `AzureBlobObjectStorage` implementation against the same
-isolated Azurite fixture to verify provider semantics such as immutable create, metadata/read behavior, deletion, snapshots,
-and container initialization/recreation. Use a focused filter during development:
+isolated Azurite fixture implementation/version to verify provider semantics such as immutable create, metadata/read behavior,
+deletion, snapshots, and container initialization/recreation. Use a focused filter during development:
 
 ```bash
 dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj \
