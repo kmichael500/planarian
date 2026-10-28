@@ -250,6 +250,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         var query = DbContext.Caves
             .IgnoreQueryFilters() // ignoring because it makes the query too slow, we are applying the same filter to it here so we can include a permission type
             .Where(cave =>
+                cave.AccountId == RequestUser.AccountId &&
                 DbContext.UserCavePermissionView.Any(ucp =>
                     ucp.AccountId == RequestUser.AccountId
                     && ucp.UserId == RequestUser.Id &&

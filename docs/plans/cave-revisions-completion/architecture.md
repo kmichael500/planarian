@@ -192,7 +192,7 @@ For Files, the live `File` row remains the source of current metadata and object
 detached live File row or a historical byte locator indefinitely. Instead, queue the exact object address in the shared
 `StorageCleanupTarget` outbox with purpose `CaveAssetRemoval` inside the same relational transaction that deletes the live
 File row and publishes the Cave revision. After commit, attempt object deletion and clear the target only when cleanup is
-safe. External failure leaves durable retryable cleanup debt and emits structured diagnostics. New targets are attempted immediately after commit; later Cave/File authoring processes older debt in bounded batches. No dedicated ordinary-asset background relay is required by this pre-release plan, so inactive-account debt may remain pending.
+safe. External failure leaves durable retryable cleanup debt and emits structured diagnostics. New targets are attempted immediately after commit; later successful Cave saves and File authoring process older debt in bounded batches. No dedicated ordinary-asset background relay is required by this pre-release plan, so inactive-account debt may remain pending.
 
 For line plots, `CaveGeoJson` is already PostgreSQL current-state payload storage, so removal deletes the row atomically in
 the Cave publication transaction. Published history retains stable line-plot ID, historical name, and content hash, not

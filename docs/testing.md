@@ -23,8 +23,11 @@ permission assignments use the typed, interceptor-free `GlobalSystemTestData` se
 do not use that bypass for tenant-owned setup. Dedicated high-volume setup belongs in `ImportScaleSeeder`.
 
 Raw SQL in tests is reserved for provider contracts and observations (catalogs, constraints, PostGIS, locks, `xmin`,
-or exact no-write checks), historical migration setup, and dedicated scale seeding. Routine domain arrangement uses
-typed builders.
+or exact no-write checks), historical migration setup, and dedicated scale seeding. Routine domain arrangement
+uses typed builders. For Cave read-integrity contracts, select domain tables through EF's mapped CLR entity
+metadata (not hard-coded SQL table names), then use a fresh PostgreSQL connection to fingerprint the isolated
+test database's relevant domain tables and `xmin` before/after each read. Do not count legitimate observability
+or authentication activity (including File access throttling or `User.LastActiveOn`) as Cave mutations.
 
 ## Readable test architecture
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
@@ -127,6 +128,10 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
+        // PUT always targets an existing Cave; a partially submitted editor payload
+        // must not silently take the new-Cave path when its ID is missing.
+        if (cave is null || string.IsNullOrWhiteSpace(cave.Id))
+            throw ApiExceptionDictionary.BadRequest("Cave ID is required when updating a Cave.");
         try
         {
             return new JsonResult(await Service.AddCave(cave, cancellationToken));

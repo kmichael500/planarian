@@ -498,10 +498,11 @@ public class CaveService : ServiceBase<CaveRepository>
 
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
-        // Retry cleanup debt from already-committed removals before opening this publication transaction.
-        await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         var result = await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId,
             null, null, null, null, requireOwnedTransaction: true, cancellationToken);
+        // Opportunistic cleanup is a side effect: rejected/stale edits must not execute it.
+        // Both older debt and this publication's new targets are safe to process after commit.
+        await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         await _fileService.CleanupAssetRemovalTargetsAsync(result.StorageCleanupTargetIds, CancellationToken.None);
         return result.Mutation.CaveId;
     }
