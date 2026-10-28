@@ -82,24 +82,33 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     {
         var golden = LoadFixture();
         Assert.Equal(BaselineCommit, golden.BaselineCommit);
-        var difference = Assert.Single(golden.ApprovedSemanticDifferences);
-        Assert.Equal("case-insensitive-tag-creation-deduplication", difference.Id);
-        Assert.Equal(BaselineCommit, difference.BaselineCommit);
-        Assert.Equal(19, golden.Cases.Count);
+        Assert.Equal(
+            new[]
+            {
+                "case-insensitive-tag-creation-deduplication",
+                "sync-optional-cave-narrative-canonicalization",
+                "sync-optional-entrance-text-canonicalization"
+            },
+            golden.ApprovedSemanticDifferences.Select(value => value.Id).Order(StringComparer.Ordinal).ToArray());
+        Assert.All(golden.ApprovedSemanticDifferences, difference =>
+            Assert.Equal(BaselineCommit, difference.BaselineCommit));
+        Assert.Equal(22, golden.Cases.Count);
         var required = new[]
         {
             "required-fields", "invalid-numeric", "optional-date", "state-resolution", "county-creation",
-            "reference-case", "tags-and-insert", "update-and-preserve-relationships", "no-change",
-            "sync-deletion", "required-coordinates", "coordinate-ranges", "elevation-pit-validation",
-            "location-quality-reference-case", "location-quality-tags-geometry", "append-primary-rules", "sync-replacement",
-            "targeted-deletion-scope"
+            "reference-case", "tags-and-insert", "update-and-preserve-relationships",
+            "sync-optional-narrative-canonicalization", "no-change", "sync-deletion", "required-coordinates",
+            "coordinate-ranges", "elevation-pit-validation", "location-quality-reference-case",
+            "location-quality-tags-geometry", "append-primary-rules", "append-blank-optional-text-compatibility",
+            "sync-replacement", "sync-optional-entrance-text-canonicalization", "targeted-deletion-scope"
         };
         foreach (var behavior in required) Assert.Contains(golden.Cases, item => item.Behavior == behavior);
 
         var methods = new[]
             {
                 typeof(CaveImportCompatibilityTests), typeof(EntranceImportCompatibilityTests),
-                typeof(ImportPreviewCommitEquivalenceTests)
+                typeof(ImportPreviewCommitEquivalenceTests), typeof(CaveImportAuthoringParityIntegrationTests),
+                typeof(EntranceImportAuthoringParityIntegrationTests)
             }
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
             .Select(method => method.Name)
@@ -152,7 +161,35 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     }
 
     [Fact]
-    public void SemanticOverrideValidatorAcceptsBaselineAndRegisteredTagCorrections()
+    public void SemanticOverrideValidatorRejectsUnrelatedChangeUnderCaveNarrativeCanonicalizationId()
+    {
+        var golden = LoadFixture();
+        var item = Assert.Single(golden.Cases,
+            value => value.Behavior == "sync-optional-narrative-canonicalization");
+        var original = item.TargetOverride!;
+        var caves = original.Preview.Caves.ToList();
+        caves[0] = caves[0] with { LengthFeet = 999 };
+        var invalid = original with { Preview = original.Preview with { Caves = caves } };
+        Assert.Contains(ValidateOverride(golden, item, invalid),
+            error => error.Contains("unrelated preview semantics", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SemanticOverrideValidatorRejectsUnrelatedChangeUnderEntranceTextCanonicalizationId()
+    {
+        var golden = LoadFixture();
+        var item = Assert.Single(golden.Cases,
+            value => value.Behavior == "sync-optional-entrance-text-canonicalization");
+        var original = item.TargetOverride!;
+        var entrances = original.Preview.Entrances.ToList();
+        entrances[0] = entrances[0] with { Latitude = entrances[0].Latitude + 1 };
+        var invalid = original with { Preview = original.Preview with { Entrances = entrances } };
+        Assert.Contains(ValidateOverride(golden, item, invalid),
+            error => error.Contains("unrelated preview semantics", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SemanticOverrideValidatorAcceptsBaselineAndRegisteredCorrections()
     {
         var golden = LoadFixture();
         Assert.Contains(golden.Cases, value => value.TargetOverride is null);
@@ -271,8 +308,25 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     {
         var errors = new List<string>();
         if (!golden.ApprovedSemanticDifferences.Any(value => value.Id == target.ApprovedDifferenceId))
+        {
             errors.Add($"Override {item.Area}/{item.Behavior} uses unregistered semantic difference '{target.ApprovedDifferenceId}'.");
-        if (target.ApprovedDifferenceId != "case-insensitive-tag-creation-deduplication") return errors;
+            return errors;
+        }
+        if (target.ApprovedDifferenceId == "sync-optional-cave-narrative-canonicalization")
+        {
+            ValidateOptionalCaveNarrativeCanonicalization(item, target, errors);
+            return errors;
+        }
+        if (target.ApprovedDifferenceId == "sync-optional-entrance-text-canonicalization")
+        {
+            ValidateOptionalEntranceTextCanonicalization(item, target, errors);
+            return errors;
+        }
+        if (target.ApprovedDifferenceId != "case-insensitive-tag-creation-deduplication")
+        {
+            errors.Add($"Override {item.Area}/{item.Behavior} has no semantic validator for '{target.ApprovedDifferenceId}'.");
+            return errors;
+        }
 
         var baselinePreview = item.BaselinePreview!;
         var remainingBaselineCreations = baselinePreview.TagCreations.ToList();
@@ -308,6 +362,75 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         if (GoldenJson(permittedCommitted) != GoldenJson(targetCommitted))
             errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated committed semantics.");
         return errors;
+    }
+
+    private static void ValidateOptionalCaveNarrativeCanonicalization(
+        GoldenCase item, GoldenTargetOverride target, ICollection<string> errors)
+    {
+        if (!item.Sync || item.Area != "cave")
+            errors.Add($"Override {item.Area}/{item.Behavior} applies sync Cave Narrative canonicalization outside sync Cave import.");
+
+        var baselinePreview = item.BaselinePreview!;
+        var expectedPreview = baselinePreview with
+        {
+            Caves = baselinePreview.Caves.Select(cave => cave with
+            {
+                Narrative = string.IsNullOrWhiteSpace(cave.Narrative) ? null : cave.Narrative
+            }).ToList()
+        };
+        if (GoldenJson(expectedPreview) == GoldenJson(baselinePreview))
+            errors.Add($"Override {item.Area}/{item.Behavior} does not exercise blank optional Cave Narrative canonicalization.");
+        if (GoldenJson(expectedPreview) != GoldenJson(target.Preview))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated preview semantics.");
+
+        var baselineCommitted = item.BaselineCommitted!.WithExpectedTagTypes(baselinePreview.TagCreations);
+        var expectedCommitted = baselineCommitted with
+        {
+            Caves = baselineCommitted.Caves.Select(cave => cave with
+            {
+                Narrative = string.IsNullOrWhiteSpace(cave.Narrative) ? null : cave.Narrative
+            }).ToList()
+        };
+        var targetCommitted = target.Committed.WithExpectedTagTypes(target.Preview.TagCreations);
+        if (GoldenJson(expectedCommitted) != GoldenJson(targetCommitted))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated committed semantics.");
+    }
+
+    private static void ValidateOptionalEntranceTextCanonicalization(
+        GoldenCase item, GoldenTargetOverride target, ICollection<string> errors)
+    {
+        if (!item.Sync || item.Area != "entrance")
+            errors.Add($"Override {item.Area}/{item.Behavior} applies sync Entrance text canonicalization outside sync Entrance import.");
+
+        var baselinePreview = item.BaselinePreview!;
+        var expectedPreview = baselinePreview with
+        {
+            Entrances = baselinePreview.Entrances.Select(entrance => entrance with
+            {
+                Name = string.IsNullOrWhiteSpace(entrance.Name) ? null : entrance.Name,
+                Description = string.IsNullOrWhiteSpace(entrance.Description) ? null : entrance.Description
+            }).ToList()
+        };
+        if (GoldenJson(expectedPreview) == GoldenJson(baselinePreview))
+            errors.Add($"Override {item.Area}/{item.Behavior} does not exercise blank optional Entrance text canonicalization.");
+        if (GoldenJson(expectedPreview) != GoldenJson(target.Preview))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated preview semantics.");
+
+        var baselineCommitted = item.BaselineCommitted!.WithExpectedTagTypes(baselinePreview.TagCreations);
+        var expectedCommitted = baselineCommitted with
+        {
+            Caves = baselineCommitted.Caves.Select(cave => cave with
+            {
+                Entrances = cave.Entrances.Select(entrance => entrance with
+                {
+                    Name = string.IsNullOrWhiteSpace(entrance.Name) ? null : entrance.Name,
+                    Description = string.IsNullOrWhiteSpace(entrance.Description) ? null : entrance.Description
+                }).ToList()
+            }).ToList()
+        };
+        var targetCommitted = target.Committed.WithExpectedTagTypes(target.Preview.TagCreations);
+        if (GoldenJson(expectedCommitted) != GoldenJson(targetCommitted))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated committed semantics.");
     }
 
     private static IEnumerable<(string Key, string Name)> AssociatedTags(GoldenPreview preview)

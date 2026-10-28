@@ -130,7 +130,11 @@ public sealed class CaveImportPlanner
                     DepthFeet = record.CaveDepthFt,
                     MaxPitDepthFeet = record.MaxPitDepthFt,
                     NumberOfPits = record.NumberOfPits,
-                    Narrative = record.Narrative?.Trim(),
+                    // Preserve characterized insert compatibility (blank CSV Narrative becomes an empty string),
+                    // but existing Cave updates must use the same nullable-text canonicalization as normal authoring.
+                    // Otherwise a row whose preview reports only another field change can silently mutate null Narrative
+                    // to an empty string during commit.
+                    Narrative = existing is null ? record.Narrative?.Trim() : NormalizeOptionalText(record.Narrative),
                     CountyId = county.Id,
                     CountyNumber = record.CountyCaveNumber,
                     StateId = state.Id,

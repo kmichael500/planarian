@@ -263,7 +263,7 @@ public sealed class PostgresTestServer : IAsyncLifetime
     /// endpoint only when the caller did not provide one. Resource-reaper policy
     /// remains owned by Testcontainers or an explicit developer environment setting.
     /// </summary>
-    private static void ConfigureColimaForTestcontainers()
+    internal static void ConfigureColimaForTestcontainers()
     {
         if (!OperatingSystem.IsMacOS()) return;
 

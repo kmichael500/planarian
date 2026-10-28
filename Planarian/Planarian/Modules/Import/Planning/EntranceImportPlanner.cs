@@ -76,8 +76,12 @@ public sealed class EntranceImportPlanner
                 var normalized = new NormalizedEntranceRow(
                     IdGenerator.Generate(), index, record,
                     record.CountyCode, countyCaveNumber,
-                    record.EntranceName?.Trim(), record.IsPrimaryEntrance ?? false,
-                    record.EntranceDescription?.Trim(), record.DecimalLatitude.Value,
+                    // Sync replaces an existing authored Entrance, so blank optional text follows the same null
+                    // canonicalization as normal authoring. Keep append/import-creation behavior characterized from main.
+                    syncExisting ? NormalizeOptionalText(record.EntranceName) : record.EntranceName?.Trim(),
+                    record.IsPrimaryEntrance ?? false,
+                    syncExisting ? NormalizeOptionalText(record.EntranceDescription) : record.EntranceDescription?.Trim(),
+                    record.DecimalLatitude.Value,
                     record.DecimalLongitude.Value, record.EntranceElevationFt.Value,
                     locationQuality, validDate ? reportedOn : null, record.EntrancePitDepth,
                     ResolveMany(tagSets, TagTypeKeyConstant.EntranceStatus, record.EntranceStatuses),
@@ -202,6 +206,9 @@ public sealed class EntranceImportPlanner
 
     private static List<ImportTagLookup> ResolveMany(ImportTagResolutionSet set, string key, string? raw) =>
         ImportTagResolver.ResolveMany(set, key, raw.SplitAndTrim());
+
+    private static string? NormalizeOptionalText(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void ValidateNormalized(NormalizedEntranceRow row, int rowNumber,
         List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords)

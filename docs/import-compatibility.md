@@ -21,10 +21,20 @@ requires an explicit, narrowly documented and regression-tested difference while
 
 ## Approved semantic differences
 
-The only registered import-semantic difference is `case-insensitive-tag-creation-deduplication`. Requested tag names
-are trimmed and compared case-insensitively for deduplication, existence, creation, and resolution. A new tag preserves
-the first trimmed spelling encountered in CSV order; an eligible existing tag retains its stored identity, casing,
-ownership, and default status. Existing case-only duplicates are not rewritten or removed.
+`case-insensitive-tag-creation-deduplication` trims requested tag names and compares them case-insensitively for
+deduplication, existence, creation, and resolution. A new tag preserves the first trimmed spelling encountered in CSV
+order; an eligible existing tag retains its stored identity, casing, ownership, and default status. Existing case-only
+duplicates are not rewritten or removed.
+
+`sync-optional-cave-narrative-canonicalization` applies only to existing-Cave sync updates. Blank Narrative is
+canonicalized to `null`, matching normal authoring and the planner's own blank/absent comparison semantics. New Cave
+imports keep their characterized baseline behavior. This prevents a row whose preview reports only another field change
+from silently converting a previously absent Narrative to an empty string during commit.
+
+`sync-optional-entrance-text-canonicalization` applies only to Entrance sync replacement. Blank optional Entrance name
+and description values are canonicalized to `null`, matching normal authoring clear semantics. Append/import creation
+keeps its characterized baseline behavior. This prevents a sync preview that treats blank and absent text as equivalent
+from committing an otherwise invisible `null` to empty-string mutation.
 
 Tenant/data-integrity corrections also intentionally differ from the baseline: every File is account-owned,
 File/staged-file relationships are tenant-qualified, and migration of unassignable legacy Files fails closed.

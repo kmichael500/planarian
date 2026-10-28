@@ -61,6 +61,31 @@ public sealed class EntranceImportPlannerTests
         Assert.Null(entrance.ReportedOn);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void BlankOptionalTextPreservesAppendCompatibilityAndCanonicalizesSyncReplacement(
+        bool syncExisting, bool expectNull)
+    {
+        var plan = Plan([EntranceRecord(value =>
+        {
+            value.EntranceName = "   ";
+            value.EntranceDescription = "   ";
+        })], sync: syncExisting);
+
+        var entrance = Assert.Single(plan.Entrances);
+        if (expectNull)
+        {
+            Assert.Null(entrance.Name);
+            Assert.Null(entrance.Description);
+        }
+        else
+        {
+            Assert.Equal(string.Empty, entrance.Name);
+            Assert.Equal(string.Empty, entrance.Description);
+        }
+    }
+
     [Fact]
     public void ExistingLocationQualityAndMultiValueTagsAreReusedCaseInsensitively()
     {

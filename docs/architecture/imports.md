@@ -145,6 +145,29 @@ It then:
 
 This avoids routing thousands of Caves through an interactive service loop while keeping historical semantics aligned.
 
+## Authoring parity and identity boundaries
+
+The bulk executors are required to produce the same published aggregate semantics as ordinary authoring for fields both
+workflows own. Integration parity tests therefore exercise full-field create/update/clear/delete lifecycles and compare
+complete `CavePublishedSnapshotV1` values plus revision predecessor/provenance. A few workflow-shape differences are
+intentional and tested explicitly rather than normalized away:
+
+- interactive Cave creation requires a primary Entrance, while Cave CSV and Entrance CSV are independent imports. The
+  equivalent import workflow is therefore Cave creation followed by Entrance publication, producing two Import revisions
+  where direct creation produces one ManagerEdit/Create revision;
+- Cave sync identity is State + County + County number. Moving any part of that identity through ordinary authoring can
+  retain the Cave ID, while sync import represents the move as deleting the old Cave and creating the new identity;
+- Entrance sync has no stable source Entrance ID and replaces represented Entrances. Revision history therefore records
+  remove/add identity changes, while an ordinary edit retains the Entrance ID and records scalar/tag changes;
+- CSV `IsArchived` reaches the same final published state as Archive/Unarchive commands, but import provenance is
+  `Import/Update` rather than `ManagerEdit/Archive` or `ManagerEdit/Unarchive`;
+- existing-Cave Cave sync and Entrance sync replacement canonicalize blank optional authoring text to `null` where normal
+  authoring does. Characterized insert/append compatibility remains unchanged.
+
+Account File import is deliberately different again: after filename-to-Cave resolution and chunk staging it publishes
+through `FileService` and the normal Cave mutation coordinator, so the resulting Cave revision is the ordinary
+ManagerEdit/Update history entry and is not linked to a `CaveImportBatch`.
+
 ## Sync deletion
 
 Sync import can plan Cave deletion.

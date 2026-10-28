@@ -128,6 +128,49 @@ public sealed class CaveImportPlannerTests
         Assert.Contains(plan.CreatePreview(omitNoChange: true), row => row.Action == "delete");
     }
 
+    [Theory]
+    [InlineData("AA", "A01", "Alpha", 8, "state", "county")]
+    [InlineData("AA", "A02", "Beta", 7, "state", "county2")]
+    [InlineData("BB", "B01", "Beta", 7, "state2", "county3")]
+    public void SyncIdentityChangePlansDeleteAndCreate(
+        string stateInput,
+        string countyCode,
+        string countyName,
+        int countyNumber,
+        string expectedStateId,
+        string expectedCountyId)
+    {
+        var record = CaveRecord(countyNumber, value =>
+        {
+            value.State = stateInput;
+            value.CountyCode = countyCode;
+            value.CountyName = countyName;
+        });
+        var planningState = new CaveImportPlanningState(
+            AccountId,
+            [
+                new CaveImportStateLookup("state", "Alpha State", "AA"),
+                new CaveImportStateLookup("state2", "Beta State", "BB")
+            ],
+            new HashSet<string> { "state", "state2" },
+            [
+                new CaveImportCountyLookup("county", "state", "A01", "Alpha"),
+                new CaveImportCountyLookup("county2", "state", "A02", "Beta"),
+                new CaveImportCountyLookup("county3", "state2", "B01", "Beta")
+            ],
+            [],
+            [Existing()],
+            new HashSet<CaveImportUsedCountyNumber>());
+
+        var plan = Plan([record], planningState, sync: true);
+
+        var inserted = Assert.Single(plan.Caves);
+        Assert.Equal(CaveImportAction.Insert, inserted.Action);
+        Assert.Equal((expectedStateId, expectedCountyId, countyNumber),
+            (inserted.StateId, inserted.CountyId, inserted.CountyNumber));
+        Assert.Equal("cave", Assert.Single(plan.Deletions).CaveId);
+    }
+
     [Fact]
     public void MissingAccountStateAndCountyProduceCreationIntents()
     {

@@ -10,6 +10,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Archive.Services;
+using Planarian.Modules.Account.Import.Services;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
@@ -17,6 +18,9 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Import.Data;
+using Planarian.Modules.Import.Parsing;
+using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
@@ -35,11 +39,13 @@ internal sealed class IntegrationTestServices
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly TagReferenceLockRepository _tagLocks;
     private AccountService? _account;
+    private readonly Lazy<ImportService> _imports;
     private readonly ArchiveJobCoordinator _archiveCoordinator;
     private readonly AccountMaintenanceLockRepository _maintenance;
 
     private IntegrationTestServices(PlanarianDbContext db, TestFileBlobStore blobs,
-        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null)
+        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null,
+        string? fileConnectionString = null)
     {
         _db = db;
         _maintenance = new AccountMaintenanceLockRepository(new ServerOptions
@@ -50,19 +56,33 @@ internal sealed class IntegrationTestServices
         var user = db.RequestUser;
         var caves = new CaveRepository(db, user);
         var tags = new TagRepository(db, user);
+        var settings = new SettingsRepository(db, user);
+        var fileRepository = new FileRepository(db, user);
         var snapshots = new CavePublishedSnapshotRepository(db, user);
         var mutations = new CaveMutationCoordinator(new CaveMutationRepository(db, user, snapshots));
         var tagLocks = new TagReferenceLockRepository(db, user);
         var countyLocks = new CountyReferenceLockRepository(db, user);
-        var files = new IntegrationTestFileService(new FileRepository(db, user), user, tags,
-            new FileOptions { ConnectionString = "UseDevelopmentStorage=true" },
-            new SettingsRepository(db, user), caves, CreateThrottle(db), mutations, tagLocks, blobs);
+        var files = new IntegrationTestFileService(fileRepository, user, tags,
+            new FileOptions { ConnectionString = fileConnectionString ?? "UseDevelopmentStorage=true" },
+            settings, caves, CreateThrottle(db), mutations, tagLocks, blobs);
+        var notifications = new NotificationService(new NoOpNotificationHubContext());
 
         Files = files;
         Caves = new CaveService(caves, user, files, new FeatureSettingRepository(db, user),
             new ClientUrlBuilder(new FixedClientRequestOrigin()), mutations, tagLocks, countyLocks);
         CaveChangeRequests = new CaveChangeRequestService(new CaveChangeRequestRepository(db, user), caves, Caves,
             new CaveRevisionQueryRepository(db, user), mutations, files, user);
+        _imports = new Lazy<ImportService>(() =>
+        {
+            var bulkRevisions = new CaveBulkRevisionRepository(db, user);
+            return new ImportService(user, files, tags, settings, notifications, new AccountRepository(db, user), caves,
+                fileRepository, new ChunkedUploadService(user, files, new RequestThrottleOptions()),
+                new CaveImportCsvParser(), new EntranceImportCsvParser(),
+                new CaveImportPlanningRepository(db, user), new EntranceImportPlanningRepository(db, user),
+                new CaveImportPlanner(), new EntranceImportPlanner(),
+                new CaveImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks, countyLocks),
+                new EntranceImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks));
+        });
         _snapshots = snapshots;
         _tagLocks = tagLocks;
     }
@@ -71,10 +91,12 @@ internal sealed class IntegrationTestServices
     public CaveChangeRequestService CaveChangeRequests { get; }
     public CaveService Caves { get; }
     public FileService Files { get; }
+    public ImportService Imports => _imports.Value;
 
     public static IntegrationTestServices For(PlanarianDbContext db, TestFileBlobStore? blobs = null,
-        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null) =>
-        new(db, blobs ?? new TestFileBlobStore(), archiveCoordinator, maintenanceConnectionString);
+        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null,
+        string? fileConnectionString = null) =>
+        new(db, blobs ?? new TestFileBlobStore(), archiveCoordinator, maintenanceConnectionString, fileConnectionString);
 
     public async Task<FileVm> StageRequestFileForTestAsync(string requestId, Stream stream, string fileName,
         string? uuid, CancellationToken cancellationToken)

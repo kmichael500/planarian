@@ -57,7 +57,9 @@ and deferred cleanup. Import harnesses may remove wiring while keeping CSV input
 Integration tests require a real PostgreSQL/PostGIS server. By default the fixture starts one with Testcontainers.
 Inside the repository compose stack, `dc-agent-planarian` supplies `PLANARIAN_TEST_POSTGRES_CONNECTION_STRING` pointing
 at the compose PostGIS administrative database; the fixture still creates a unique disposable database for each test
-and never uses the development database as scenario state. Use a focused filter during development:
+and never uses the development database as scenario state. Account File-import integration tests also start the same
+Azurite version pinned by Compose so chunk/session behavior exercises the real Azure Blob SDK; durable published-object
+behavior continues to use the focused in-memory `IObjectStorage` test boundary. Use a focused filter during development:
 
 ```bash
 dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj \
