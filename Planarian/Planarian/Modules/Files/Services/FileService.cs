@@ -614,14 +614,14 @@ public class FileService : ServiceBase<FileRepository>
 
     private static async Task EnsureContainerExists(BlobContainerClient containerClient)
     {
-        var containerName = containerClient.Name;
+        var initializationKey = GetContainerInitializationKey(containerClient);
         // Azure may still be deleting the previous container immediately after
         // Reset Account. This legacy BlobService path needs the same recreation
         // retry as the provider-neutral upload path.
         for (var attempt = 0; ; attempt++)
         {
             var initializationTask = ContainerInitializationTasks.GetOrAdd(
-                containerName, _ => containerClient.CreateIfNotExistsAsync());
+                initializationKey, _ => containerClient.CreateIfNotExistsAsync());
             try
             {
                 await initializationTask;
@@ -630,16 +630,19 @@ public class FileService : ServiceBase<FileRepository>
             catch (RequestFailedException ex) when (ex.Status == 409 &&
                 ex.ErrorCode == "ContainerBeingDeleted" && attempt < 9)
             {
-                ContainerInitializationTasks.TryRemove(containerName, out _);
+                ContainerInitializationTasks.TryRemove(initializationKey, out _);
                 await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * (attempt + 1), 8)));
             }
             catch
             {
-                ContainerInitializationTasks.TryRemove(containerName, out _);
+                ContainerInitializationTasks.TryRemove(initializationKey, out _);
                 throw;
             }
         }
     }
+
+    internal static string GetContainerInitializationKey(BlobContainerClient containerClient) =>
+        containerClient.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
 
     public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
         CancellationToken cancellationToken)
@@ -771,7 +774,7 @@ public class FileService : ServiceBase<FileRepository>
         {
             // A successful initialization is cached to avoid repeated container-existence checks.
             // Invalidate it even when deletion fails so a later upload can re-establish the container safely.
-            ContainerInitializationTasks.TryRemove(containerClient.Name, out _);
+            ContainerInitializationTasks.TryRemove(GetContainerInitializationKey(containerClient), out _);
             _objectStorage.InvalidateContainer(containerClient.Name);
         }
     }
