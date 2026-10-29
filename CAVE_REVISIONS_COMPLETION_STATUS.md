@@ -1,16 +1,16 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — NEW-CAVE PROPOSAL/PERMISSION PACKAGE COMMITTED + VALIDATED; MERGE PENDING**
-**Ledger last refreshed:** 2026-10-28
-**Completion HEAD reviewed:** `ab6da0e1` (`feat(caves): support new-cave proposals and harden permissions`) is the validated new-Cave proposal/permission package commit. Earlier package evidence remains SHA-pinned to its original source.
-**Package refresh:** 2026-10-28; the completion branch already includes archive-runtime hardening plus browser-E2E/account-switch validation through `d5546088`. The current isolated working-tree package was developed from `70bff4ec`, has been reconciled against `d5546088`, and adds View-authorable new-Cave proposals, destination-scoped review, authoritative County-number allocation, conditional submitter Cave View, account-removal concurrency hardening, null-base proposal migration support, and cross-layer route/UI authorization. Target-side overlap is limited to this ledger; no production/test path in this package conflicts semantically with the newer browser-E2E package.
+**Status:** **ACTIVE PRE-MERGE — NEW-CAVE PROPOSAL/PERMISSION PACKAGE MERGED + VALIDATED**
+**Ledger last refreshed:** 2026-10-29
+**Completion HEAD reviewed:** `f5e40668` (`Merge new-Cave proposal and permission hardening into cave revisions completion`) integrates validated package commit `ab6da0e1` into prior completion HEAD `d5546088`. Earlier package evidence remains SHA-pinned to its original source.
+**Package refresh:** 2026-10-29; merge `f5e40668` combines archive-runtime hardening plus browser-E2E/account-switch validation through `d5546088` with validated new-Cave proposal/permission package `ab6da0e1`. The package adds View-authorable new-Cave proposals, destination-scoped review, authoritative County-number allocation, conditional submitter Cave View, account-removal concurrency hardening, null-base proposal migration support, and cross-layer route/UI authorization. The only merge conflict was this ledger; there were no overlapping production/test paths.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 187 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 610 files changed, 85,872 insertions, 8,013 deletions
+**Branch distance at baseline review:** 197 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 645 files changed, 104,131 insertions, 8,170 deletions
 
 ## Browser-E2E integration validation (2026-10-28)
 
@@ -18,9 +18,9 @@ The `test/cave-revisions-browser-e2e` package adds a small Chromium/WebKit Playw
 
 Validation on 2026-10-28 ran the repository-owned browser-E2E stack from a stopped environment, including production frontend builds and headed Chromium/WebKit acceptance runs. Each acceptance run reset and verified the isolated `e2e` Postgres/Azurite dataset and exercised the real local HTTPS/CORS/CSP topology. The final acceptance run completed **20/20 Playwright tests green** (10 scenarios in both Chromium and WebKit) before clean teardown with exit code 0. Validation exposed and fixed a real account-switch race: the global switch-event listener was registered in a passive React effect, so a sufficiently fast interaction could dispatch before the listener existed; it now registers in `useLayoutEffect`, and the previously failing proposal/account-switch workflows pass in both engines. PDF validation also removed browser-engine-specific assumptions: Chromium may issue byte ranges while WebKit may fetch this small fixture in one response, so the test proves real PDF.js rendering, authenticated cross-origin access/CORS, and the stream-session header in each browser while a deterministic authenticated probe proves exact `206`/`Content-Range` semantics. Chromium's local test hostname is pinned to loopback through Playwright launch options to avoid `.local`/mDNS startup flakiness without changing the production hostname, TLS, CSP, or routing under test. Focused account-isolation tests were **4/4 green**, proposal navigation was **2/2 green**, coordinator unit tests were **4/4 green**, TypeScript checking passed, and the earlier runner active-Compose refusal regression remained green. The reconciled completion package's `CaveReadIntegrityIntegrationTests` plus `CaveStaleClientSafetyIntegrationTests` were **10/10 green** after a documented solution restore. The initial `--no-restore` invocation failed only because local NuGet/.NET 8 reference artifacts were absent and did not execute tests.
 
-## 2026-10-28 — New-Cave proposal and permission package — DONE + VALIDATED, committed
+## 2026-10-28 — New-Cave proposal and permission package — DONE + VALIDATED, merged
 
-The validated package was committed as `ab6da0e1` (`feat(caves): support new-cave proposals and harden permissions`), based on `70bff4ec72b864668f1e4e9c43fe72ea57a9a219` and reconciled against completion HEAD `d5546088` before merge.
+The validated package was committed as `ab6da0e1` (`feat(caves): support new-cave proposals and harden permissions`) and merged into `feature/cave-revisions-completion` as `f5e40668`. It was based on `70bff4ec72b864668f1e4e9c43fe72ea57a9a219` and reconciled against completion HEAD `d5546088` before integration.
 
 Implemented behavior:
 
