@@ -125,14 +125,17 @@ public class RequestUser
                         && e.Permission!.PermissionType == PermissionType.User)
             .Select(e => e.Permission!.Key).ToListAsync();
 
-        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
-        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
+        var satisfyingPermissionKeys = PermissionPolicy.GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = PermissionPolicy.GetSatisfyingCavePermissionKeys(permissionKey);
         var hasUserPermission = userPermissions.Any(satisfyingPermissionKeys.Contains);
 
         if (permissionKey == PermissionPolicyKey.AdminManager)
         {
-            hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin);
-
+            var satisfyingManagerUserPermissionKeys =
+                PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Manager);
+            var satisfyingManagerCavePermissionKeys =
+                PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.Manager);
+            hasUserPermission = userPermissions.Any(satisfyingManagerUserPermissionKeys.Contains);
 
             if (!hasUserPermission)
             {
@@ -144,7 +147,7 @@ public class RequestUser
                         && e.UserId == Id
                         && e.AccountId == AccountId
                         && e.Permission!.PermissionType == PermissionType.Cave
-                        && e.Permission.Key == PermissionPolicyKey.Manager
+                        && satisfyingManagerCavePermissionKeys.Contains(e.Permission.Key)
                     );
             }
         }
@@ -158,7 +161,9 @@ public class RequestUser
 
             if (!hasUserPermission)
             {
-                hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin);
+                var satisfyingAdminUserPermissionKeys =
+                    PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Admin);
+                hasUserPermission = userPermissions.Any(satisfyingAdminUserPermissionKeys.Contains);
             }
         }
 
@@ -199,16 +204,14 @@ public class RequestUser
         // Platform and synthetic account capabilities are not resource grants. Route them
         // through the canonical capability resolver so malformed persisted rows cannot turn
         // PlanarianAdmin/AdminManager/Export into scoped UserPermission authorities.
-        if (permissionKey is PermissionPolicyKey.PlanarianAdmin
-            or PermissionPolicyKey.AdminManager
-            or PermissionPolicyKey.Export)
+        if (PermissionPolicy.BypassesResourceScopeResolution(permissionKey))
             return await HasCavePermission(permissionKey, @throw);
 
         if (string.IsNullOrWhiteSpace(AccountId))
             throw ApiExceptionDictionary.BadRequest("Invalid request. AccountId is required for scoped Cave authorization");
 
-        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
-        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
+        var satisfyingPermissionKeys = PermissionPolicy.GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = PermissionPolicy.GetSatisfyingCavePermissionKeys(permissionKey);
         var hasPermission = await _dbContext.UserPermissions.AnyAsync(e =>
             e.UserId == Id
             && e.AccountId == AccountId
@@ -277,23 +280,5 @@ public class RequestUser
 
         return hasPermission;
     }
-
-    private static string[] GetSatisfyingUserPermissionKeys(string permissionKey) => permissionKey switch
-    {
-        // UserPermission rows represent account/platform administration. Only Account Admin
-        // broadens into Cave View/Manager; same-key rows of PermissionType.User must not.
-        PermissionKey.View => [PermissionPolicyKey.Admin],
-        PermissionKey.Manager => [PermissionPolicyKey.Admin],
-        PermissionKey.Admin => [PermissionPolicyKey.Admin],
-        PermissionKey.PlanarianAdmin => [PermissionPolicyKey.PlanarianAdmin],
-        _ => [permissionKey]
-    };
-
-    private static string[] GetSatisfyingCavePermissionKeys(string permissionKey) => permissionKey switch
-    {
-        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager],
-        PermissionKey.Manager => [PermissionPolicyKey.Manager],
-        _ => []
-    };
 
 }

@@ -90,7 +90,11 @@ public sealed class RequestUserPermissionIntegrationTests(PostgresTestServer fix
         Assert.False(await db.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false));
         Assert.True(await db.RequestUser.HasCavePermission(
             PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, cave.StateId, false));
-        var appPermissions = (await CreateAppService(db).Initialize()).Permissions;
+        var appInitialization = await CreateAppService(db).Initialize();
+        var appPermissions = appInitialization.Permissions;
+        Assert.Equal(PermissionPolicy.ClientProjectionVersion, appInitialization.PermissionProjectionVersion);
+        Assert.Contains(PermissionPolicyKey.View, appPermissions);
+        Assert.Contains(PermissionPolicyKey.Manager, appPermissions);
         Assert.Contains(PermissionPolicyKey.Admin, appPermissions);
         Assert.Contains(PermissionPolicyKey.AdminManager, appPermissions);
         Assert.Contains(PermissionPolicyKey.Export, appPermissions);

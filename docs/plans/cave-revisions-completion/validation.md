@@ -330,13 +330,19 @@ Do not mark the task complete until every applicable item is true:
 - [ ] A new-Cave request reserves its Cave ID without creating a Cave or fake base revision before approval.
 - [ ] County/State Managers can review a new-Cave proposal in an empty County; Cave-only or unrelated Managers cannot,
       and removing destination Manager authority immediately removes review/read/decision access.
-- [x] Malformed persisted permission rows fail closed across Cave visibility, creation-request visibility/review,
-      regional Manager selectors, scoped capability probes, and client projection: Cave roles require
-      `PermissionType.Cave` plus the supported `View`/`Manager` key, Account Admin requires `PermissionType.User`, and
-      global/synthetic capabilities are never trusted from account-scoped persisted role keys.
+- [x] Malformed or unsupported persisted permission rows fail closed across Cave visibility, creation-request
+      visibility/review, regional Manager selectors, scoped capability probes, and client projection: Cave roles require
+      `PermissionType.Cave` plus the supported `View`/`Manager` key, Account Admin requires `PermissionType.User`, unknown
+      semantic keys confer no authority, and global/synthetic capabilities are never trusted from account-scoped rows.
 - [x] Permission-management writes resolve definitions by (`PermissionType`, `Key`) and accept only supported persisted
       roles (`Cave` `View`/`Manager`, account `User` `Admin`); account provisioning selects the User-domain `Admin`
       even when a conflicting Cave-domain `Admin` row exists.
+- [x] `PermissionPolicy` is the executable source of truth for account role inheritance, the account-scoped persisted
+      role vocabulary used by account management, resource-scope bypass classification, and effective client-role
+      projection; RequestUser, proposal access, Settings selectors, and session projection consume it, while contract
+      tests keep the SQL `UserCavePermissions` view and client projection version aligned. The browser uses exact
+      membership for current projections and a version-gated legacy adapter only for independently deployed older API
+      versions.
 - [x] Permission-definition identity is unique within (`PermissionType`, `Key`); migration preserves identical textual
       keys across different domains and fails closed with an explicit migration error if legacy same-domain duplicates
       must be repaired before the unique invariant can be installed.
