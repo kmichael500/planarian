@@ -125,8 +125,10 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
             ("Proposal detail", async () => Assert.NotNull(await contributorReads.ChangeRequests.GetAsync(requestId, default))),
             ("Proposal version detail", async () => Assert.NotNull(
                 await contributorReads.ChangeRequests.GetVersionAsync(requestId, versionId, default))),
-            ("County number lookup", async () => Assert.True(await manager.Services.Caves.GetNextCountyNumber(cave.CountyId) > 0)),
-            ("County number in-use", async () => Assert.True(await manager.Services.Caves.IsCountyNumberInUse(cave.CountyId, cave.CountyNumber))),
+            ("County number lookup", async () => Assert.True(
+                await manager.Services.Caves.GetNextCountyNumber(cave.CountyId, caveId: cave.CaveId) > 0)),
+            ("County number in-use", async () => Assert.False(
+                await manager.Services.Caves.IsCountyNumberInUse(cave.CountyId, cave.CountyNumber, cave.CaveId))),
             ("Tag lookup", async () => Assert.NotEmpty(await repository.GetTagCandidatesByIdsAsync([biology.Id], default))),
             ("Foreign Cave detail", async () => await Assert.ThrowsAsync<ApiException>(() =>
                 manager.Services.Caves.GetCave(foreign.CaveId))),

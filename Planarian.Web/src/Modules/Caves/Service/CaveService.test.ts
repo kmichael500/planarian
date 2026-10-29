@@ -42,6 +42,20 @@ it("loads the dedicated Cave edit authoring context", async () => {
   expect(get).toHaveBeenLastCalledWith("api/caves/cave-a/edit-context");
 });
 
+it("includes existing Cave context in county-number helper requests", async () => {
+  const get = jest.spyOn(HttpClient, "get").mockResolvedValue({ data: 43 });
+
+  await CaveService.GetNextCountyNumber("county-a", true, "cave-a");
+  expect(get).toHaveBeenLastCalledWith(
+    "api/caves/counties/county-a/next-number?useFirstAvailableCountyNumber=true&caveId=cave-a"
+  );
+
+  await CaveService.GetNextCountyNumber("county-a");
+  expect(get).toHaveBeenLastCalledWith(
+    "api/caves/counties/county-a/next-number?useFirstAvailableCountyNumber=false"
+  );
+});
+
 it("stages an authoring file through the generic file endpoint", async () => {
   const post = jest.spyOn(HttpClient, "post").mockResolvedValue({
     data: { id: "file-a", name: "map", extension: ".pdf", fileTypeTagId: "type-a", fileTypeKey: "Map" },

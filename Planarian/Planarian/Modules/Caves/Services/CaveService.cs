@@ -81,13 +81,18 @@ public class CaveService : ServiceBase<CaveRepository>
         return new CaveEditAuthoringContextVm(visible, linePlots);
     }
 
-    public async Task<int> GetNextCountyNumber(string countyId, bool useFirstAvailableCountyNumber = false)
+    public async Task<int> GetNextCountyNumber(
+        string countyId,
+        bool useFirstAvailableCountyNumber = false,
+        string? caveId = null)
     {
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, countyId, null);
         return await Repository.GetNewDisplayId(countyId, useFirstAvailableCountyNumber);
     }
 
     public async Task<bool> IsCountyNumberInUse(string countyId, int countyNumber, string? caveId = null)
     {
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, countyId, null);
         return await Repository.IsCountyNumberInUse(countyId, countyNumber, caveId);
     }
 

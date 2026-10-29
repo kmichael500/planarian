@@ -218,10 +218,18 @@ const CaveService = {
   },
   async GetNextCountyNumber(
     countyId: string,
-    useFirstAvailableCountyNumber: boolean = false
+    useFirstAvailableCountyNumber: boolean = false,
+    caveId?: string
   ): Promise<number> {
+    const params = new URLSearchParams({
+      useFirstAvailableCountyNumber: String(useFirstAvailableCountyNumber),
+    });
+    if (!isNullOrWhiteSpace(caveId)) {
+      params.set("caveId", caveId!);
+    }
+
     const response = await HttpClient.get<number>(
-      `${baseUrl}/counties/${countyId}/next-number?useFirstAvailableCountyNumber=${useFirstAvailableCountyNumber}`
+      `${baseUrl}/counties/${countyId}/next-number?${params.toString()}`
     );
     return response.data;
   },

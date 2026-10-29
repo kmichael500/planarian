@@ -222,7 +222,8 @@ const AddCaveComponent = ({
 
     CaveService.GetNextCountyNumber(
       selectedCountyId,
-      !!useFirstAvailableCountyNumber
+      !!useFirstAvailableCountyNumber,
+      isEditing ? cave?.id : undefined
     )
       .then((nextCountyNumber) => {
         if (!isCurrent) return;
@@ -248,6 +249,7 @@ const AddCaveComponent = ({
     useFirstAvailableCountyNumber,
     isEditing,
     selectedCountyId,
+    cave?.id,
     cave?.countyId,
     cave?.countyNumber,
   ]);
@@ -364,6 +366,7 @@ const AddCaveComponent = ({
           >
             <StateDropdown
               autoSelectFirst={!isEditing}
+              permissionKey={!isEditing ? PermissionKey.Manager : undefined}
               onChange={(e) => {
                 setSelectedStateId(e.toString());
                 if (isInitialLoad) return setIsInitialLoad(false);
@@ -390,6 +393,7 @@ const AddCaveComponent = ({
             {selectedStateId && (
               <CountyDropdown
                 selectedStateId={selectedStateId}
+                permissionKey={!isEditing ? PermissionKey.Manager : undefined}
                 onChange={(value) => {
                   setSelectedCountyId(value);
 

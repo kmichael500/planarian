@@ -29,7 +29,8 @@ export const useLikelyCountyNumber = (preview?: CountyNumberPreview) => {
 
     void CaveService.GetNextCountyNumber(
       preview.proposed.county.id,
-      preview.countyNumberIntent === "FirstAvailable"
+      preview.countyNumberIntent === "FirstAvailable",
+      preview.base.caveId
     ).then(value => {
       if (active) setFallback(value);
     }).catch(() => {

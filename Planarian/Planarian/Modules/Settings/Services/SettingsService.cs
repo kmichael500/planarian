@@ -71,7 +71,7 @@ public class SettingsService : ServiceBase<SettingsRepository>
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
-        return await Repository.GetStates();
+        return await Repository.GetStates(permissionKey);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId,

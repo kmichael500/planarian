@@ -195,7 +195,9 @@ it("falls back to the existing county-number endpoint when an older detail respo
     ] },
   }));
 
-  await waitFor(() => expect(nextCountyNumber).toHaveBeenCalledWith("new-county", false));
+  await waitFor(() =>
+    expect(nextCountyNumber).toHaveBeenCalledWith("new-county", false, "cave")
+  );
   await waitFor(() => expect(document.body).toHaveTextContent("Likely 48 · assigned on approval"));
 });
 
