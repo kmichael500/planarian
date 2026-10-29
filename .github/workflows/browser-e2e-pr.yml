@@ -1,0 +1,89 @@
+name: Browser E2E
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  browser_e2e:
+    name: Chromium + WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect browser-E2E-relevant changes
+        id: browser_changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          should_run=false
+
+          while IFS= read -r changed_path; do
+            case "$changed_path" in
+              Planarian.Web/*|Planarian/*|Contracts/*|tools/Planarian.Dev/*|docker/dev/*|compose.yaml|dev|package.json|scripts/*|.github/workflows/browser-e2e-pr.yml)
+                should_run=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
+
+          echo "run=$should_run" >> "$GITHUB_OUTPUT"
+
+      - name: Explain skipped browser E2E
+        if: steps.browser_changes.outputs.run != 'true'
+        run: echo "Browser E2E skipped because this PR changes no runtime or E2E infrastructure files." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js
+        if: steps.browser_changes.outputs.run == 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ">=22.13.0 <23"
+          cache: npm
+          cache-dependency-path: Planarian.Web/package-lock.json
+
+      - name: Install frontend dependencies
+        if: steps.browser_changes.outputs.run == 'true'
+        run: npm ci
+        working-directory: Planarian.Web
+
+      - name: Install Playwright browsers and Linux dependencies
+        if: steps.browser_changes.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium webkit
+        working-directory: Planarian.Web
+
+      - name: Map local E2E hostnames
+        if: steps.browser_changes.outputs.run == 'true'
+        run: |
+          echo "127.0.0.1 planarian.local viewer.planarian.local repo.planarian.local cert.planarian.local" \
+            | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Run real-browser E2E suite
+        if: steps.browser_changes.outputs.run == 'true'
+        run: npm run test:browser:e2e
+        env:
+          CI: "true"
+
+      - name: Upload Playwright report and failure artifacts
+        if: ${{ !cancelled() && steps.browser_changes.outputs.run == 'true' }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: playwright-browser-e2e-report
+          path: |
+            Planarian.Web/.playwright/report/
+            Planarian.Web/.playwright/test-results/
+          if-no-files-found: ignore
+          retention-days: 30

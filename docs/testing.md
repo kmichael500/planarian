@@ -96,9 +96,9 @@ Migration/model changes require the Migration category and pending-model check; 
 Golden; batching or supported-workload changes require Scale. A full integration invocation already includes ordinary
 PostgreSQL, Migration, Golden, and Scale tests, so do not redundantly append their filtered invocations after it.
 
-The complete cross-stack pull-request workflow also installs/builds/tests the web client, validates generated client routes,
+The primary non-browser pull-request workflow also installs/builds/tests the web client, validates generated client routes,
 and validates the frontend environment example. Treat [`.github/workflows/pr-validation.yml`](../.github/workflows/pr-validation.yml)
-as the canonical CI sequence instead of duplicating every frontend step here.
+as the canonical non-browser PR validation sequence instead of duplicating every frontend step here.
 
 ## Real-browser E2E validation
 
@@ -127,6 +127,8 @@ npm run test:browser:e2e:webkit
 ```
 
 The non-destructive runner safety regression is `node --test scripts/run-browser-e2e.test.mjs` and does not start Docker or alter application data.
+
+Pull requests also expose a separate **Browser E2E / Chromium + WebKit** check from `.github/workflows/browser-e2e-pr.yml`. The workflow intentionally has no top-level path filter so the check is always reported and can safely be required by branch protection. Its job performs a cheap changed-file check first and reports success without provisioning browsers for documentation/test-only changes. Runtime, frontend, backend, shared-contract, E2E-harness, Docker/dev, script, or browser-workflow changes install only the pinned Chromium and WebKit engines plus their Linux dependencies, map the local HTTPS test hostnames to loopback, run the repository-owned `npm run test:browser:e2e` command, and upload `.playwright` reports/artifacts for 30 days when the job is not cancelled. CI keeps one Playwright worker and retries once for browser-level flake tolerance; a Playwright global timeout is shorter than the GitHub job timeout so Playwright can finish its own report before GitHub terminates the job.
 
 Keep this suite intentionally small. Put timing/state-machine matrices in unit/component tests and reserve Playwright for
 contracts that require an actual browser, cookie jar, navigation stack, CORS implementation, CSP enforcement, download,
