@@ -15,6 +15,11 @@ https://planarian.local {
     }
 }
 
+https://planarian.local:8443 {
+    tls internal
+    reverse_proxy backend:8080
+}
+
 https://viewer.planarian.local {
     tls internal
     import /etc/caddy/viewer-auth.caddy

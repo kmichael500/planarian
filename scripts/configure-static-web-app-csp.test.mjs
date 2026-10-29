@@ -19,12 +19,17 @@ function directives(policy) {
   );
 }
 
-test("restricts script execution to the app, PDF WebAssembly, and Umami", () => {
+test("restricts script execution to the app and required trusted script origins", () => {
   const policy = buildContentSecurityPolicy(["https://api.example.test"]);
   const parsed = directives(policy);
 
   assert.deepEqual(parsed.get("default-src"), ["'none'"]);
-  assert.deepEqual(parsed.get("script-src"), ["'self'", "'wasm-unsafe-eval'", "https://cloud.umami.is"]);
+  assert.deepEqual(parsed.get("script-src"), [
+    "'self'",
+    "'wasm-unsafe-eval'",
+    "https://cloud.umami.is",
+    "https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js",
+  ]);
   const scripts = parsed.get("script-src");
   assert.ok(!scripts.includes("'unsafe-eval'"));
   assert.ok(!scripts.includes("'unsafe-inline'"));

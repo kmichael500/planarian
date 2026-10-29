@@ -99,3 +99,36 @@ PostgreSQL, Migration, Golden, and Scale tests, so do not redundantly append the
 The complete cross-stack pull-request workflow also installs/builds/tests the web client, validates generated client routes,
 and validates the frontend environment example. Treat [`.github/workflows/pr-validation.yml`](../.github/workflows/pr-validation.yml)
 as the canonical CI sequence instead of duplicating every frontend step here.
+
+## Real-browser E2E validation
+
+Browser-specific contracts use Playwright against the disposable `e2e` development profile. The harness resets only
+`planarian_dev_e2e` and the E2E-owned blob containers in local Azurite, seeds deterministic local test accounts, builds the
+production web client, serves its generated CSP, and routes the frontend at `https://planarian.local` to the API at
+`https://planarian.local:8443`. Using the same host on a different HTTPS port is intentional: it remains cross-origin
+for CORS while preserving same-site cookie semantics consistently in Chromium and WebKit. This makes authentication cookies,
+credentialed CORS/preflight, PDF.js workers and Range requests, nested routing, unload prompts, concurrent browser sessions,
+and account switching observable in real browsers.
+It never uses development, staging, or production application data. The disposable E2E backend also writes its
+.NET build artifacts under the container's temporary filesystem instead of the bind-mounted source tree, preventing
+host IDE/build activity from racing the browser harness. The E2E profile raises only its local login IP/email throttle
+budgets so repeated real-browser logins across Chromium and WebKit do not exhaust the normal production limits; the
+generic development profile and application defaults remain unchanged.
+
+The runner requires exclusive ownership of the entire Planarian Compose project and refuses to run if any Compose service (including the repo editor, Postgres, or Azurite) is already running. It reports teardown failures rather than silently ignoring them. Stop a stack you intentionally own before using
+it; do not use browser E2E as a way to reset another agent's environment. Install the pinned browser engines once, then
+run either both supported engines or a focused project:
+
+```bash
+npm run test:browser:e2e:install
+npm run test:browser:e2e
+npm run test:browser:e2e:chromium
+npm run test:browser:e2e:webkit
+```
+
+The non-destructive runner safety regression is `node --test scripts/run-browser-e2e.test.mjs` and does not start Docker or alter application data.
+
+Keep this suite intentionally small. Put timing/state-machine matrices in unit/component tests and reserve Playwright for
+contracts that require an actual browser, cookie jar, navigation stack, CORS implementation, CSP enforcement, download,
+or PDF.js renderer. Playwright traces, screenshots, videos, and HTML output are written under
+`Planarian.Web/.playwright/` on failures and are ignored by Git.

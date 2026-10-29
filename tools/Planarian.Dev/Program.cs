@@ -70,12 +70,15 @@ static async Task SeedDatabase(string connectionString, DatasetConfig dataset)
     await new DataGenerator(db).AddOrUpdateDefaultData();
     await EnsureUsers(db, dataset);
     await db.SaveChangesAsync();
+    await RemoveStaleBootstrapPlanarianAdminPermission(options, dataset);
 
     var stateId = await ResolveStateId(db);
     var accountId = await DevelopmentDatasetLocator.FindAccountIdAsync(db, dataset)
         ?? await CreateAccountThroughService(connectionString, dataset, stateId);
 
     await EnsureDatasetDetails(db, dataset, accountId, stateId);
+    if (dataset.Name == "e2e")
+        await EnsureE2ESecondaryAccount(connectionString, dataset, stateId);
     await VerifyBaseline(db, dataset, accountId, stateId);
 }
 
@@ -85,6 +88,21 @@ static async Task<string> ResolveStateId(PlanarianDbContext db) =>
         .Where(state => state.Abbreviation == DevelopmentDatasetBaseline.StateAbbreviation)
         .Select(state => state.Id)
         .SingleAsync();
+
+static async Task RemoveStaleBootstrapPlanarianAdminPermission(
+    DbContextOptions<PlanarianDbContext> options,
+    DatasetConfig dataset)
+{
+    await using var db = new DevelopmentSeedDbContext(options);
+    var bootstrapPermissionId = DevelopmentDatasetBaseline.BootstrapPlanarianAdminPermissionId(dataset);
+    var staleBootstrapPermission = await db.UserPermissions
+        .SingleOrDefaultAsync(row => row.Id == bootstrapPermissionId);
+    if (staleBootstrapPermission == null)
+        return;
+
+    db.UserPermissions.Remove(staleBootstrapPermission);
+    await db.SaveChangesAsync();
+}
 
 static async Task EnsureUsers(PlanarianDbContext db, DatasetConfig dataset)
 {
@@ -103,73 +121,98 @@ static async Task EnsureUsers(PlanarianDbContext db, DatasetConfig dataset)
 }
 
 static async Task<string> CreateAccountThroughService(
-    string connectionString, DatasetConfig dataset, string stateId)
+    string connectionString,
+    DatasetConfig dataset,
+    string stateId,
+    string? accountName = null,
+    string? countyId = null,
+    string? countyName = null,
+    string? countyDisplayId = null,
+    string? countyIdDelimiter = null)
 {
     var options = new DbContextOptionsBuilder<PlanarianDbContext>()
         .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
         .Options;
-    await using var db = new PlanarianDbContext(options);
-    await using var transaction = await db.Database.BeginTransactionAsync();
+    var bootstrapPermissionId = DevelopmentDatasetBaseline.BootstrapPlanarianAdminPermissionId(dataset);
+    var removeBootstrapPermission = false;
 
-    var requestUser = new RequestUser(db);
-    db.RequestUser = requestUser;
-
-    var planarianAdminPermissionId = await db.Permissions
-        .Where(permission => permission.Key == PermissionKey.PlanarianAdmin)
-        .Select(permission => permission.Id)
-        .SingleAsync();
-    var hasPlanarianAdmin = await db.UserPermissions.AnyAsync(row =>
-        row.UserId == dataset.AdminUserId &&
-        row.AccountId == null &&
-        row.PermissionId == planarianAdminPermissionId);
-
-    UserPermission? bootstrapPermission = null;
-    if (!hasPlanarianAdmin)
+    await using (var bootstrapDb = new DevelopmentSeedDbContext(options))
     {
-        bootstrapPermission = new UserPermission
+        var planarianAdminPermissionId = await bootstrapDb.Permissions
+            .Where(permission => permission.Key == PermissionKey.PlanarianAdmin)
+            .Select(permission => permission.Id)
+            .SingleAsync();
+        var hasPlanarianAdmin = await bootstrapDb.UserPermissions.AnyAsync(row =>
+            row.UserId == dataset.AdminUserId &&
+            row.AccountId == null &&
+            row.PermissionId == planarianAdminPermissionId);
+
+        if (!hasPlanarianAdmin)
         {
-            UserId = dataset.AdminUserId,
-            PermissionId = planarianAdminPermissionId
-        };
-        db.UserPermissions.Add(bootstrapPermission);
-        await db.SaveChangesAsync();
+            bootstrapDb.UserPermissions.Add(new UserPermission
+            {
+                Id = bootstrapPermissionId,
+                UserId = dataset.AdminUserId,
+                PermissionId = planarianAdminPermissionId,
+                CreatedOn = DevelopmentDatasetBaseline.CreatedOn
+            });
+            await bootstrapDb.SaveChangesAsync();
+            removeBootstrapPermission = true;
+        }
     }
 
-    await requestUser.Initialize(null, dataset.AdminUserId);
-    if (!requestUser.IsAuthenticated)
-        throw new InvalidOperationException("Seeded development admin could not be initialized for account creation.");
-
-    var repository = new PlanarianSettingsRepository(db, requestUser);
-    var service = new PlanarianSettingsService(repository, requestUser);
-    var accountId = await service.CreateAccount(new CreateAccountVm
+    try
     {
-        Name = DevelopmentDatasetBaseline.AccountName,
-        CountyIdDelimiter = DevelopmentDatasetBaseline.CountyIdDelimiter,
-        DefaultViewAccessAllCaves = DevelopmentDatasetBaseline.DefaultViewAccessAllCaves,
-        ExportEnabled = DevelopmentDatasetBaseline.ExportEnabled,
-        StateIds = [stateId]
-    }, CancellationToken.None);
+        await using var db = new PlanarianDbContext(options);
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
-    await requestUser.Initialize(accountId, dataset.AdminUserId);
-    db.Counties.Add(new County
-    {
-        Id = dataset.CountyId,
-        AccountId = accountId,
-        StateId = stateId,
-        Name = DevelopmentDatasetBaseline.CountyName,
-        DisplayId = DevelopmentDatasetBaseline.CountyDisplayId
-    });
-    await db.SaveChangesAsync();
+        var requestUser = new RequestUser(db);
+        db.RequestUser = requestUser;
+        await requestUser.Initialize(null, dataset.AdminUserId);
+        if (!requestUser.IsAuthenticated)
+            throw new InvalidOperationException("Seeded development admin could not be initialized for account creation.");
 
-    if (bootstrapPermission != null)
-    {
-        db.UserPermissions.Remove(bootstrapPermission);
+        var repository = new PlanarianSettingsRepository(db, requestUser);
+        var service = new PlanarianSettingsService(repository, requestUser);
+        var accountId = await service.CreateAccount(new CreateAccountVm
+        {
+            Name = accountName ?? DevelopmentDatasetBaseline.AccountName,
+            CountyIdDelimiter = countyIdDelimiter ?? DevelopmentDatasetBaseline.CountyIdDelimiter,
+            DefaultViewAccessAllCaves = DevelopmentDatasetBaseline.DefaultViewAccessAllCaves,
+            ExportEnabled = DevelopmentDatasetBaseline.ExportEnabled,
+            StateIds = [stateId]
+        }, CancellationToken.None);
+
+        await requestUser.Initialize(accountId, dataset.AdminUserId);
+        db.Counties.Add(new County
+        {
+            Id = countyId ?? dataset.CountyId,
+            AccountId = accountId,
+            StateId = stateId,
+            Name = countyName ?? DevelopmentDatasetBaseline.CountyName,
+            DisplayId = countyDisplayId ?? DevelopmentDatasetBaseline.CountyDisplayId
+        });
         await db.SaveChangesAsync();
-    }
 
-    await transaction.CommitAsync();
-    Console.WriteLine($"Created '{dataset.Name}' account through PlanarianSettingsService.CreateAccount ({accountId}).");
-    return accountId;
+        await transaction.CommitAsync();
+        Console.WriteLine(
+            $"Created '{accountName ?? DevelopmentDatasetBaseline.AccountName}' account through PlanarianSettingsService.CreateAccount ({accountId}).");
+        return accountId;
+    }
+    finally
+    {
+        if (removeBootstrapPermission)
+        {
+            await using var cleanupDb = new DevelopmentSeedDbContext(options);
+            var bootstrapPermission = await cleanupDb.UserPermissions
+                .SingleOrDefaultAsync(row => row.Id == bootstrapPermissionId);
+            if (bootstrapPermission != null)
+            {
+                cleanupDb.UserPermissions.Remove(bootstrapPermission);
+                await cleanupDb.SaveChangesAsync();
+            }
+        }
+    }
 }
 
 static async Task EnsureDatasetDetails(
@@ -272,6 +315,122 @@ static async Task EnsureDatasetDetails(
     await db.SaveChangesAsync();
 }
 
+static async Task EnsureE2ESecondaryAccount(
+    string connectionString, DatasetConfig dataset, string stateId)
+{
+    var options = new DbContextOptionsBuilder<PlanarianDbContext>()
+        .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
+        .Options;
+
+    await using var lookup = new DevelopmentSeedDbContext(options);
+    var accountId = await lookup.Counties
+        .AsNoTracking()
+        .Where(county => county.Id == DevelopmentDatasetBaseline.E2ESecondaryCountyId)
+        .Select(county => county.AccountId)
+        .SingleOrDefaultAsync();
+
+    if (accountId == null)
+    {
+        accountId = await CreateAccountThroughService(
+            connectionString,
+            dataset,
+            stateId,
+            DevelopmentDatasetBaseline.E2ESecondaryAccountName,
+            DevelopmentDatasetBaseline.E2ESecondaryCountyId,
+            DevelopmentDatasetBaseline.E2ESecondaryCountyName,
+            DevelopmentDatasetBaseline.E2ESecondaryCountyDisplayId,
+            DevelopmentDatasetBaseline.E2ESecondaryCountyIdDelimiter);
+    }
+
+    await using var db = new DevelopmentSeedDbContext(options);
+    var createdOn = DevelopmentDatasetBaseline.CreatedOn;
+
+    if (!await db.AccountStates.AnyAsync(row => row.AccountId == accountId && row.StateId == stateId))
+    {
+        db.AccountStates.Add(new AccountState
+        {
+            Id = DevelopmentDatasetBaseline.E2ESecondaryAccountStateId(dataset),
+            AccountId = accountId,
+            StateId = stateId,
+            CreatedOn = createdOn
+        });
+    }
+
+    foreach (var userSpec in DevelopmentDatasetBaseline.Users(dataset))
+    {
+        if (await db.AccountUsers.AnyAsync(row => row.AccountId == accountId && row.UserId == userSpec.Id))
+            continue;
+
+        db.AccountUsers.Add(new AccountUser
+        {
+            Id = DevelopmentDatasetBaseline.E2ESecondaryAccountUserId(dataset, userSpec.Id),
+            AccountId = accountId,
+            UserId = userSpec.Id,
+            InvitationAcceptedOn = createdOn,
+            CreatedOn = createdOn
+        });
+    }
+
+    var existingFeatureKeys = (await db.FeatureSettings
+        .Where(setting => setting.AccountId == accountId)
+        .Select(setting => setting.Key)
+        .ToListAsync())
+        .ToHashSet();
+    foreach (var key in Enum.GetValues<FeatureKey>())
+    {
+        if (existingFeatureKeys.Contains(key)) continue;
+        db.FeatureSettings.Add(new FeatureSetting
+        {
+            Id = DevelopmentDatasetBaseline.E2ESecondaryFeatureId(dataset, key),
+            AccountId = accountId,
+            Key = key,
+            IsEnabled = AccountFeatureSettingDefaults.IsEnabled(key),
+            IsDefault = false,
+            CreatedOn = createdOn
+        });
+    }
+
+    await db.SaveChangesAsync();
+
+    var alternateNames = await db.FeatureSettings.SingleAsync(setting =>
+        setting.AccountId == accountId &&
+        setting.Key == FeatureKey.EnabledFieldCaveAlternateNames &&
+        !setting.IsDefault);
+    alternateNames.IsEnabled = false;
+
+    var viewPermissionId = await db.Permissions
+        .Where(permission => permission.Key == PermissionKey.View)
+        .Select(permission => permission.Id)
+        .SingleAsync();
+    foreach (var userId in new[] { dataset.ManagerUserId, dataset.ViewerUserId })
+    {
+        if (await HasBroadCavePermission(db, userId, accountId, viewPermissionId)) continue;
+        db.CavePermissions.Add(new CavePermission
+        {
+            Id = DevelopmentDatasetBaseline.E2ESecondaryCavePermissionId(dataset, userId, viewPermissionId),
+            AccountId = accountId,
+            UserId = userId,
+            PermissionId = viewPermissionId,
+            CreatedOn = createdOn
+        });
+    }
+
+    foreach (var spec in DevelopmentDatasetBaseline.E2ESecondaryTags)
+    {
+        var tagId = spec.Id(dataset);
+        if (await db.TagTypes.AnyAsync(row => row.Id == tagId)) continue;
+        db.TagTypes.Add(new TagType(spec.Name, spec.Key)
+        {
+            Id = tagId,
+            AccountId = accountId,
+            IsDefault = false,
+            CreatedOn = createdOn
+        });
+    }
+
+    await db.SaveChangesAsync();
+}
+
 static CavePermission BroadCavePermission(
     DatasetConfig dataset, string accountId, string userId, string permissionId, DateTime createdOn) => new()
 {
@@ -315,6 +474,10 @@ static async Task VerifyBaseline(
     if (!await db.Counties.AnyAsync(row =>
             row.Id == dataset.CountyId && row.AccountId == accountId && row.StateId == stateId))
         failures.Add($"county '{dataset.CountyId}' is missing or not associated with the seeded account/state");
+
+    var bootstrapPermissionId = DevelopmentDatasetBaseline.BootstrapPlanarianAdminPermissionId(dataset);
+    if (await db.UserPermissions.AnyAsync(row => row.Id == bootstrapPermissionId))
+        failures.Add("temporary Planarian-admin bootstrap permission was not cleaned up");
 
     var accountFeatureRows = await db.FeatureSettings
         .AsNoTracking()

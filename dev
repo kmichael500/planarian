@@ -86,12 +86,30 @@ select_dataset() {
       export PLANARIAN_DATABASE=planarian_dev_generic
       export PLANARIAN_APPSETTINGS="$ROOT/docker/dev/appsettings.generic.json"
       export PLANARIAN_AGENT_APPSETTINGS="$ROOT/docker/dev/appsettings.generic.json"
+      export PLANARIAN_FRONTEND_MODE=development
+      export PLANARIAN_FRONTEND_API_ORIGIN_MAPPINGS='{"planarian.local":"https://planarian.local"}'
+      export PLANARIAN_LOGIN_IP_LIMIT=30
+      export PLANARIAN_LOGIN_EMAIL_LIMIT=12
+      export PLANARIAN_BACKEND_HEALTH_START_PERIOD=5s
+      export PLANARIAN_FRONTEND_HEALTH_START_PERIOD=10s
+      export PLANARIAN_STACK_WAIT_TIMEOUT=180
       ;;
     e2e)
       export PLANARIAN_DATASET=e2e
       export PLANARIAN_DATABASE=planarian_dev_e2e
       export PLANARIAN_APPSETTINGS="$ROOT/docker/dev/appsettings.e2e.json"
       export PLANARIAN_AGENT_APPSETTINGS="$ROOT/docker/dev/appsettings.e2e.json"
+      export PLANARIAN_FRONTEND_MODE=production
+      export PLANARIAN_FRONTEND_API_ORIGIN_MAPPINGS='{"planarian.local":"https://planarian.local:8443"}'
+      # Browser E2E intentionally performs many real logins in a short window. Keep
+      # production/generic throttle defaults intact while making this disposable
+      # local profile repeatable across both browser projects and reruns.
+      export PLANARIAN_LOGIN_IP_LIMIT=1000
+      export PLANARIAN_LOGIN_EMAIL_LIMIT=1000
+      # Cold browser-E2E startup builds both the backend and a production frontend before readiness.
+      export PLANARIAN_BACKEND_HEALTH_START_PERIOD=240s
+      export PLANARIAN_FRONTEND_HEALTH_START_PERIOD=360s
+      export PLANARIAN_STACK_WAIT_TIMEOUT=600
       ;;
     *)
       echo "Dataset must be 'generic' or 'e2e'." >&2
@@ -234,7 +252,7 @@ start_local() {
   ensure_mdns
   ensure_dataset
 
-  "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  "${COMPOSE[@]}" up -d --wait --wait-timeout "${PLANARIAN_STACK_WAIT_TIMEOUT:-180}" backend frontend caddy browser agent
   verify_api
   print_ready "$PLANARIAN_DATASET"
 }

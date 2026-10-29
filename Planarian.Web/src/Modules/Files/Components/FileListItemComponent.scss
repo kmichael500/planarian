@@ -9,8 +9,14 @@ body[data-theme-effective="light"] .planarian-file-list-item:hover {
 }
 
 .planarian-file-list-item .ant-typography,
-.planarian-file-list-item .ant-list-item-action a {
+.planarian-file-list-item .ant-list-item-action a,
+.planarian-file-list-item .planarian-file-action {
   color: var(--text-color) !important;
+}
+
+.planarian-file-list-item .planarian-file-action {
+  height: auto;
+  padding: 0;
 }
 
 .planarian-file-list-item .ant-list-item-action {
