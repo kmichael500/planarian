@@ -8,6 +8,7 @@ public sealed record CaveChangeRequestSummaryVm(
     string CaveId,
     string CaveName,
     bool CaveExists,
+    bool IsCreation,
     CaveChangeRequestStatus Status,
     string SubmitterUserId,
     string? SubmitterName,
@@ -17,8 +18,8 @@ public sealed record CaveChangeRequestSummaryVm(
     string? ReviewerUserId,
     string? ReviewerName,
     string? ReviewerNotes,
-    string OriginalBaseRevisionId,
-    string ProposalBaseRevisionId,
+    string? OriginalBaseRevisionId,
+    string? ProposalBaseRevisionId,
     string? CurrentRevisionId,
     string CurrentProposalVersionId,
     bool IsStale,
@@ -66,7 +67,7 @@ public sealed record CaveProposalAuthoringContextVm(
     string ExpectedBaseRevisionId,
     IReadOnlyList<GeoJsonUploadVm> LinePlots);
 
-public sealed record ReviseCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId,
+public sealed record ReviseCaveChangeRequestVm(AddCaveVm Cave, string? ExpectedBaseRevisionId,
     string ExpectedProposalVersionId, bool AgainstCurrent);
 
 public enum CaveProposalAuthoringConflictKind
@@ -79,7 +80,7 @@ public sealed record CaveProposalAuthoringConflictVm(CaveProposalAuthoringConfli
     string ExpectedId, string? ActualId);
 
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
-    string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
+    string? BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
 
 public enum CaveProposalCountyNumberMode
 {
@@ -117,7 +118,7 @@ public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm DiffFromBase,
     CavePublishedSnapshotV1? PreviousProposed, CaveRevisionDiffVm? DiffFromPreviousVersion,
     CaveProposalCountyNumberChangeVm? CountyNumberChange,
-    bool BaseRevisionChanged, string? PreviousBaseRevisionId, string BaseRevisionId,
+    bool BaseRevisionChanged, string? PreviousBaseRevisionId, string? BaseRevisionId,
     CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber, int? LikelyCountyNumber,
     IReadOnlyList<GeoJsonUploadVm> LinePlots,
     IReadOnlyList<string> UnavailableStagedFileIds);

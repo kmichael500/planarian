@@ -70,6 +70,7 @@ beforeAll(() => {
 
 const request = (caveExists: boolean): CaveChangeRequestSummaryVm => ({
   id: "request", caveId: "cave", caveName: "Historical Cave", caveExists,
+  isCreation: false,
   status: "Rejected", submitterUserId: "submitter", submittedOn: "2026-08-11T00:00:00Z",
   originalBaseRevisionId: "revision", proposalBaseRevisionId: "revision",
   currentProposalVersionId: "proposal", isStale: false, canEdit: false, canReview: false,
@@ -89,6 +90,22 @@ it("renders the live Cave as a button while the Cave is available", () => {
   expect(screen.getByRole("button", { name: "Open Cave" })).toBeInTheDocument();
 });
 
+it("identifies a not-yet-published creation without calling it unavailable", () => {
+  render(<MemoryRouter><CaveAvailability request={{ ...request(false), isCreation: true }} /></MemoryRouter>);
+
+  expect(screen.getByText("New Cave proposal")).toBeInTheDocument();
+  expect(screen.queryByText("Cave no longer available")).not.toBeInTheDocument();
+});
+
+it("treats an approved creation whose Cave was later deleted as unavailable", () => {
+  render(<MemoryRouter><CaveAvailability request={{
+    ...request(false), isCreation: true, status: "Approved", approvedRevisionId: "revision-created",
+  }} /></MemoryRouter>);
+
+  expect(screen.getByText("Cave no longer available")).toBeInTheDocument();
+  expect(screen.queryByText("New Cave proposal")).not.toBeInTheDocument();
+});
+
 const snapshot = (name: string, tags: CaveSnapshotVm["tags"] = []): CaveSnapshotVm => ({
   caveId: "cave", accountId: "account", name, alternateNames: [], countyNumber: 1,
   state: { id: "tn", nameAtRevision: "Tennessee", abbreviationAtRevision: "TN" },
@@ -104,6 +121,7 @@ const emptyDiff = (): CaveRevisionDiffVm => ({
 
 const pageRequest = (overrides: Partial<CaveChangeRequestSummaryVm> = {}): CaveChangeRequestSummaryVm => ({
   id: "request0001", caveId: "cave000001", caveName: "Helms Deep Cave", caveExists: true,
+  isCreation: false,
   status: "Pending", submitterUserId: "submitter", submitterName: "Michael Test",
   submittedOn: "2026-08-17T12:00:00", updatedOn: "2026-08-17T13:00:00",
   originalBaseRevisionId: "base000001", proposalBaseRevisionId: "base000001",

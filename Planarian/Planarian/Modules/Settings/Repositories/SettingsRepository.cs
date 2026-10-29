@@ -52,11 +52,13 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
                 DbContext.UserPermissions.Any(permission =>
                     permission.UserId == RequestUser.Id
                     && permission.AccountId == RequestUser.AccountId
-                    && permission.Permission!.Key == PermissionKey.Admin)
+                    && permission.Permission!.PermissionType == PermissionType.User
+                    && permission.Permission.Key == PermissionKey.Admin)
                 || DbContext.CavePermissions.Any(permission =>
                     permission.UserId == RequestUser.Id
                     && permission.AccountId == RequestUser.AccountId
-                    && permission.Permission!.Key == PermissionKey.Manager
+                    && permission.Permission!.PermissionType == PermissionType.Cave
+                    && permission.Permission.Key == PermissionKey.Manager
                     && permission.CaveId == null
                     && (
                         (permission.StateId == null && permission.CountyId == null)
@@ -82,8 +84,24 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
         IQueryable<County> countyQuery;
         if (permissionKey == PermissionKey.Manager)
         {
-            countyQuery = query.Where(e => e.Permission.Key == PermissionKey.Manager)
-                .Select(e => e.County!);
+            // Regional Manager choices come from the grants themselves so empty Counties
+            // remain administrable. Cave-only Managers use the separate Cave picker.
+            countyQuery = DbContext.Counties.Where(county =>
+                county.AccountId == RequestUser.AccountId &&
+                (DbContext.UserPermissions.Any(permission =>
+                     permission.UserId == RequestUser.Id &&
+                     permission.AccountId == RequestUser.AccountId &&
+                     permission.Permission!.PermissionType == PermissionType.User &&
+                     permission.Permission.Key == PermissionKey.Admin) ||
+                 DbContext.CavePermissions.Any(permission =>
+                     permission.UserId == RequestUser.Id &&
+                     permission.AccountId == RequestUser.AccountId &&
+                     permission.Permission!.PermissionType == PermissionType.Cave &&
+                     permission.Permission.Key == PermissionKey.Manager &&
+                     permission.CaveId == null &&
+                     ((permission.StateId == null && permission.CountyId == null) ||
+                      permission.CountyId == county.Id ||
+                      (permission.CountyId == null && permission.StateId == county.StateId)))));
         }
         else if (permissionKey == PermissionKey.View)
         {

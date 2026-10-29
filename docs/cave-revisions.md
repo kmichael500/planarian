@@ -158,10 +158,23 @@ ordinary `CaveVm` reads or the revision API.
   Reported By use People; Biology, Archeology, and every other database-backed Cave/Entrance tag field must reference
   an existing tag of the required type visible to the current account. Alternate Names are canonicalized free-form
   strings, not TagType records.
-- Current View access is sufficient to submit a proposal. Current Cave visibility remains a prerequisite for all
-  request, proposal-version, staged-file, and revision/history access afterward; request ownership does not survive
-  permission revocation. Review requires current Manager permission for the Cave and never relies on historical base
-  State/County metadata.
+- Current Cave `View` access is sufficient to submit a proposal against an existing Cave. Existing-Cave request,
+  proposal-version, staged-file, and revision/history access continues to require current Cave visibility; request
+  ownership does not override later visibility loss. Review requires current Manager permission for the Cave and never
+  relies on historical base State/County metadata.
+- A user with effective `View` capability in the current Account may submit a proposal to create a Cave in any
+  State/County configured for that Account even if no existing Cave there is visible to the submitter. The request
+  reserves the eventual Cave ID; while the Cave does not exist, the submitter may read/revise the request only while
+  they retain effective Cave `View` capability in the Account, and current Managers of the proposed destination may
+  review it independently. `CaveChangeRequest.BaseRevisionId` and each creation proposal
+  version's `BaseRevisionId` are null because no published base exists; no placeholder Cave or fake revision is created.
+- Approval of a new-Cave proposal atomically creates the reserved Cave, allocates/checks its County Cave Number against
+  all Caves in the account+County (not the caller's visibility-filtered set), publishes the first
+  `UserSubmission`/`Create` revision, and marks the request approved. If the submitter is still an Account member at
+  approval time, approval also grants that user an explicit Cave-scoped `View` permission; if the submitter has left the
+  Account, publication still succeeds without recreating access. Rejection creates none of those published records.
+  After publication, request/history access follows
+  normal current Cave visibility.
 - A server-allocated ID for a proposed new Entrance remains that Entrance's identity after successful publication.
 - Mine and review request lists are permission-filtered in their database queries and returned as bounded pages.
 - Published revisions and proposal versions are append-only historical records. Persisted snapshot/proposal V1 is

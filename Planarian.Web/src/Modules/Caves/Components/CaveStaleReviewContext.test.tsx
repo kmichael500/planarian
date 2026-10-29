@@ -32,7 +32,7 @@ const emptyDiff = (): CaveRevisionDiffVm => ({
 const detail = (proposalDiff: CaveRevisionDiffVm, publishedDiff: CaveRevisionDiffVm): CaveChangeRequestDetailVm => {
   const base = snapshot();
   return {
-    request: { id: "request", caveId: "cave", caveName: "Cave", caveExists: true, status: "Pending",
+    request: { id: "request", caveId: "cave", caveName: "Cave", caveExists: true, isCreation: false, status: "Pending",
       submitterUserId: "user", submittedOn: "2026-08-21T00:00:00Z", originalBaseRevisionId: "base",
       proposalBaseRevisionId: "base", currentRevisionId: "current", currentProposalVersionId: "proposal",
       isStale: true, canEdit: true, canReview: true,

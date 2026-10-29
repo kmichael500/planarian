@@ -11,7 +11,7 @@ const CavesPage: React.FC = () => {
 
   useEffect(() => {
     setHeaderButtons([
-      <ShouldDisplay permissionKey={PermissionKey.Manager}>
+      <ShouldDisplay permissionKey={PermissionKey.View}>
         <CaveCreateButtonComponent />
       </ShouldDisplay>,
     ]);

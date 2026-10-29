@@ -33,6 +33,11 @@ public sealed class PlanarianSettingsPermissionIntegrationTests(PostgresTestServ
         });
         await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
         {
+            Id = "badadmprm1", Key = PermissionKey.Admin, Name = "Wrong Type Admin",
+            Description = "Regression-only Cave permission with the Admin key.", PermissionType = PermissionType.Cave
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
             Id = "acctadmprm", Key = PermissionKey.Admin, Name = "Admin",
             Description = "Account administration", PermissionType = PermissionType.User
         });
@@ -58,7 +63,10 @@ public sealed class PlanarianSettingsPermissionIntegrationTests(PostgresTestServ
         await using var verify = database.CreateDbContext("verify", accountId);
         Assert.True(await verify.AccountUsers.AnyAsync(row => row.AccountId == accountId && row.UserId == userId));
         Assert.True(await verify.UserPermissions.AnyAsync(row =>
-            row.AccountId == accountId && row.UserId == userId && row.Permission!.Key == PermissionKey.Admin));
+            row.AccountId == accountId &&
+            row.UserId == userId &&
+            row.Permission!.Key == PermissionKey.Admin &&
+            row.Permission.PermissionType == PermissionType.User));
         Assert.True(await verify.UserPermissions.AnyAsync(row =>
             row.AccountId == null && row.UserId == userId && row.Permission!.Key == PermissionKey.PlanarianAdmin));
     }

@@ -2,14 +2,21 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { CaveService } from "../Service/CaveService";
+import { AppService } from "../../../Shared/Services/AppService";
 import { ReviseCaveChangeRequestPage } from "./ReviseCaveChangeRequestPage";
 
 jest.mock("../Components/AddCaveComponent", () => {
   const { Form, Input } = require("antd");
   return {
-    AddCaveComponent: () => (
+    AddCaveComponent: ({ hideCountyNumberControls }: any) => (
       <>
         <Form.Item name="name" label="Name"><Input /></Form.Item>
+        <Form.Item name="stateId" noStyle><Input type="hidden" /></Form.Item>
+        <Form.Item name="countyId" noStyle><Input type="hidden" /></Form.Item>
+        <Form.Item name="countyNumber" noStyle><Input type="hidden" /></Form.Item>
+        <Form.Item name="isCountyNumberManuallySet" noStyle><Input type="hidden" /></Form.Item>
+        <Form.Item name="useFirstAvailableCountyNumber" noStyle><Input type="hidden" /></Form.Item>
+        <div data-testid="county-number-controls-hidden">{String(!!hideCountyNumberControls)}</div>
         <button type="submit">Review changes</button>
       </>
     ),
@@ -40,8 +47,16 @@ jest.mock("../Helpers/CaveFormMapper", () => ({
     files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
     linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
   }),
-  snapshotToForm: () => ({
-    id: "cave000001", name: "Proposed name", depthFeet: null, biologyTagIds: ["biology-hidden"],
+  snapshotToForm: (snapshot: any, countyNumberIntent: string, requestedCountyNumber?: number) => ({
+    id: snapshot?.caveId ?? "cave000001",
+    name: snapshot?.name ?? "Proposed name",
+    stateId: snapshot?.state?.id,
+    countyId: snapshot?.county?.id,
+    countyNumber: countyNumberIntent === "Manual" ? requestedCountyNumber : snapshot?.countyNumber,
+    isCountyNumberManuallySet: countyNumberIntent === "Manual",
+    useFirstAvailableCountyNumber: countyNumberIntent === "FirstAvailable",
+    depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
     files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
     linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
   }),
@@ -67,6 +82,7 @@ const mockPendingRequest = () => {
   jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
     request: {
       id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true,
+      isCreation: false,
       status: "Pending", submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z",
       originalBaseRevisionId: "revision01", proposalBaseRevisionId: "revision01",
       currentRevisionId: "revision01", currentProposalVersionId: "proposal01",
@@ -101,7 +117,7 @@ it("keeps stale comparisons contextual and loads the latest Cave as the re-revie
     changedEntrances: [], entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
     addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [] };
   jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
-    request: { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, status: "Pending",
+    request: { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, isCreation: false, status: "Pending",
       submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z", originalBaseRevisionId: "revision01",
       proposalBaseRevisionId: "revision01", currentRevisionId: "revision02", currentProposalVersionId: "proposal01",
       isStale: true, canEdit: true, canReview: false,
@@ -146,7 +162,7 @@ it("realigns stale guidance and editor state when the Cave changes while the pag
   const emptyDiff = { scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [],
     changedEntrances: [], entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
     addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [] };
-  const request = { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, status: "Pending" as const,
+  const request = { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, isCreation: false, status: "Pending" as const,
     submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z", originalBaseRevisionId: "revision01",
     proposalBaseRevisionId: "revision01", currentProposalVersionId: "proposal01", isStale: true, canEdit: true, canReview: false,
     changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 },
@@ -238,6 +254,7 @@ it("clears the dirty guard before navigating after a successful revision save", 
 it("saves reviewer-requested edits as a draft without implicitly resubmitting", async () => {
   jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
     request: { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true,
+      isCreation: false,
       status: "ChangesRequested", submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z",
       originalBaseRevisionId: "revision01", proposalBaseRevisionId: "revision01", currentRevisionId: "revision01",
       currentProposalVersionId: "proposal01", isStale: false, canEdit: true, canReview: false,
@@ -295,4 +312,104 @@ it("previews and saves a revision with the same complete draft including unmount
   expect(revise).toHaveBeenCalledWith(
     "request0001", expectedDraft, false, "revision01", "proposal01"
   );
+});
+
+it("sanitizes Manager-only county-number state when a View author revises a new-Cave proposal", async () => {
+  const snapshot = {
+    caveId: "cave000001", accountId: "account", name: "Proposed Cave", alternateNames: [],
+    state: { id: "state", nameAtRevision: "Tennessee" },
+    county: { id: "county", nameAtRevision: "Coffee" }, countyNumber: 0,
+    isArchived: false, tags: [], entrances: [], files: [], linePlots: [],
+  } as any;
+  jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
+    request: {
+      id: "request0001", caveId: "cave000001", caveName: "Proposed Cave",
+      caveExists: false, isCreation: true, status: "ChangesRequested",
+      submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z",
+      currentProposalVersionId: "proposal01", isStale: false, canEdit: true, canReview: false,
+      changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 },
+        files: { added: 0, removed: 0, changed: 0, total: 0 },
+        linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
+    },
+    base: { ...snapshot, name: "" }, proposed: snapshot, current: { ...snapshot, name: "" },
+    diff: {} as any, versions: [], countyNumberIntent: "AutomaticNext",
+    linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [],
+  });
+  jest.spyOn(CaveService, "GetProposalVersion").mockResolvedValue({
+    base: { ...snapshot, name: "" }, proposed: snapshot, diffFromBase: {} as any,
+    baseRevisionChanged: false, baseRevisionId: undefined, countyNumberIntent: "FirstAvailable",
+    linePlots: [], unavailableStagedFileIds: [],
+  });
+  const canManage = jest.spyOn(AppService, "HasCavePermission").mockResolvedValue(false);
+  const preview = jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
+    base: { ...snapshot, name: "" }, proposed: snapshot, diff: {} as any,
+    countyNumberIntent: "AutomaticNext", linePlots: [], hasMeaningfulChanges: true,
+  });
+
+  renderPage();
+  await screen.findByRole("textbox", { name: "Name" });
+  await waitFor(() => expect(canManage).toHaveBeenCalledWith("Manager", null, "county"));
+  expect(screen.getByTestId("county-number-controls-hidden")).toHaveTextContent("true");
+  fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+
+  await waitFor(() => expect(preview).toHaveBeenCalledWith(
+    "request0001",
+    expect.objectContaining({
+      id: "cave000001",
+      countyNumber: null,
+      isCountyNumberManuallySet: false,
+      useFirstAvailableCountyNumber: false,
+    }),
+    false, undefined, "proposal01"));
+});
+
+it("preserves first-available numbering when the creation author still manages the destination", async () => {
+  const snapshot = {
+    caveId: "cave000001", accountId: "account", name: "Proposed Cave", alternateNames: [],
+    state: { id: "state", nameAtRevision: "Tennessee" },
+    county: { id: "county", nameAtRevision: "Coffee" }, countyNumber: 0,
+    isArchived: false, tags: [], entrances: [], files: [], linePlots: [],
+  } as any;
+  jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
+    request: {
+      id: "request0001", caveId: "cave000001", caveName: "Proposed Cave",
+      caveExists: false, isCreation: true, status: "Pending",
+      submitterUserId: "manager", submittedOn: "2026-08-16T00:00:00Z",
+      currentProposalVersionId: "proposal01", isStale: false, canEdit: true, canReview: true,
+      changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 },
+        files: { added: 0, removed: 0, changed: 0, total: 0 },
+        linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
+    },
+    base: { ...snapshot, name: "" }, proposed: snapshot, current: { ...snapshot, name: "" },
+    diff: {} as any, versions: [], countyNumberIntent: "FirstAvailable",
+    linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [],
+  });
+  jest.spyOn(CaveService, "GetProposalVersion").mockResolvedValue({
+    base: { ...snapshot, name: "" }, proposed: snapshot, diffFromBase: {} as any,
+    baseRevisionChanged: false, baseRevisionId: undefined, countyNumberIntent: "FirstAvailable",
+    linePlots: [], unavailableStagedFileIds: [],
+  });
+  const canManage = jest.spyOn(AppService, "HasCavePermission").mockResolvedValue(true);
+  const preview = jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
+    base: { ...snapshot, name: "" }, proposed: snapshot, diff: {} as any,
+    countyNumberIntent: "FirstAvailable", linePlots: [], hasMeaningfulChanges: true,
+  });
+
+  renderPage();
+  await screen.findByRole("textbox", { name: "Name" });
+  await waitFor(() => expect(canManage).toHaveBeenCalledWith("Manager", null, "county"));
+  await waitFor(() =>
+    expect(screen.getByTestId("county-number-controls-hidden")).toHaveTextContent("false")
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+
+  await waitFor(() => expect(preview).toHaveBeenCalledWith(
+    "request0001",
+    expect.objectContaining({
+      id: "cave000001",
+      isCountyNumberManuallySet: false,
+      useFirstAvailableCountyNumber: true,
+    }),
+    false, undefined, "proposal01"));
 });

@@ -215,6 +215,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
+        if (permissionKey is not (PermissionKey.View or PermissionKey.Manager))
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid cave permission.");
+        }
+
         var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
         if (accountUser == null)
         {
@@ -240,32 +245,39 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
         }
 
-        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
-        if (accountUser == null)
+        if (permissionKey is not (PermissionKey.View or PermissionKey.Manager))
         {
-            throw ApiExceptionDictionary.NotFound("User");
+            throw ApiExceptionDictionary.BadRequest("Invalid cave permission.");
         }
 
-        var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
+        var permission = await _permissionRepository.GetPermissionByKey(permissionKey, PermissionType.Cave);
         if (permission == null)
         {
             throw ApiExceptionDictionary.NotFound("Permission");
         }
 
-        if (permission.PermissionType != PermissionType.Cave)
+        if (permission.PermissionType != PermissionType.Cave ||
+            permission.Key is not (PermissionKey.View or PermissionKey.Manager))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
         }
-
-        // Retrieve existing permissions for this user and permission key
-        var existingPermissions =
-            (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
 
         var isExistingTransaction = dbTransaction != null;
         dbTransaction ??= await Repository.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            if (!await Repository.LockAccountUserForPermissionGrantAsync(
+                    userId, RequestUser.AccountId, cancellationToken))
+            {
+                throw ApiExceptionDictionary.NotFound("User");
+            }
+
+            // Read the current grant set only after membership is locked. This keeps the
+            // read/modify/write decision in the same serialization boundary as account revocation.
+            var existingPermissions =
+                (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
+
             // Handle the "all locations" case
             if (vm.HasAllLocations)
             {
@@ -473,10 +485,15 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         if (permissionType == PermissionType.User)
         {
             await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
+            allowedPermissionKeys = [PermissionKey.Admin];
         }
         else if (permissionType == PermissionType.Cave)
         {
             allowedPermissionKeys = [PermissionKey.View, PermissionKey.Manager];
+        }
+        else
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
         }
 
         var permissions = await _permissionRepository.GetPermissionSelectList(permissionType, allowedPermissionKeys);
@@ -502,7 +519,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return permissions;
     }
 
-    public async Task AddUserPermission(string userId, string permissionKey)
+    public async Task AddUserPermission(string userId, string permissionKey,
+        CancellationToken cancellationToken = default, IDbContextTransaction? dbTransaction = null)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -516,43 +534,69 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
         }
 
-        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
-        if (accountUser == null)
+        if (permissionKey == PermissionKey.PlanarianAdmin)
         {
-            throw ApiExceptionDictionary.NotFound("User");
+            throw ApiExceptionDictionary.BadRequest(
+                "Planarian Admin cannot be assigned from account user management.");
         }
 
-        var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
-        if (userHasPermission != null)
+        if (permissionKey != PermissionKey.Admin)
         {
-            throw ApiExceptionDictionary.BadRequest("User already has this permission.");
+            throw ApiExceptionDictionary.BadRequest("Invalid user permission.");
         }
 
-        var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
-        if (permission == null)
+        var isExistingTransaction = dbTransaction != null;
+        dbTransaction ??= await Repository.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            throw ApiExceptionDictionary.NotFound("Permission");
+            if (!await _userRepository.LockAccountUserForPermissionGrantAsync(
+                    userId, RequestUser.AccountId, cancellationToken))
+            {
+                throw ApiExceptionDictionary.NotFound("User");
+            }
+
+            var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+            if (userHasPermission != null)
+            {
+                throw ApiExceptionDictionary.BadRequest("User already has this permission.");
+            }
+
+            var permission = await _permissionRepository.GetPermissionByKey(permissionKey, PermissionType.User);
+            if (permission == null)
+            {
+                throw ApiExceptionDictionary.NotFound("Permission");
+            }
+
+            if (permission.PermissionType != PermissionType.User || permission.Key != PermissionKey.Admin)
+            {
+                throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
+            }
+
+            var entity = new UserPermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                Permission = permission
+            };
+
+            _userRepository.Add(entity);
+            await _userRepository.SaveChangesAsync(cancellationToken);
+
+            if (!isExistingTransaction)
+            {
+                await dbTransaction.CommitAsync(cancellationToken);
+            }
         }
-
-        if (permission.Key == PermissionKey.PlanarianAdmin)
+        catch
         {
-            throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be assigned from account user management.");
+            if (!isExistingTransaction)
+            {
+                await dbTransaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
         }
-
-        if (permission.PermissionType != PermissionType.User)
-        {
-            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
-        }
-
-        var entity = new UserPermission
-        {
-            UserId = userId,
-            AccountId = RequestUser.AccountId,
-            Permission = permission
-        };
-
-        _userRepository.Add(entity);
-        await _userRepository.SaveChangesAsync();
     }
 
     public async Task RemoveUserPermission(string userId, string permissionKey)
@@ -578,6 +622,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         if (permissionKey == PermissionKey.PlanarianAdmin)
         {
             throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be managed from account user management.");
+        }
+
+        if (permissionKey != PermissionKey.Admin)
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid user permission.");
         }
 
         var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);

@@ -790,7 +790,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
     private static readonly DateTime EntranceReportedOn =
         new(2025, 5, 7, 8, 9, 10, DateTimeKind.Utc);
 
-    private static AddCaveVm FullValues(PublishedCaveTestData tenant, ReferenceCatalog references, string stagedFileId) =>
+    internal static AddCaveVm FullValues(PublishedCaveTestData tenant, ReferenceCatalog references, string stagedFileId) =>
         new()
         {
             Id = tenant.CaveId,
@@ -858,7 +858,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
             LinePlots = [new GeoJsonUploadVm { Name = "Main Traverse", GeoJson = FullGeoJson }]
         };
 
-    private static async Task<ReferenceCatalog> CreateReferenceCatalogAsync(
+    internal static async Task<ReferenceCatalog> CreateReferenceCatalogAsync(
         PostgresTestDatabase database, PublishedCaveTestData tenant)
     {
         const string targetStateId = "statefld2";
@@ -992,7 +992,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
         Assert.Equal(expected.Name, tag.NameAtRevision);
     }
 
-    private sealed record ReferenceCatalog(
+    internal sealed record ReferenceCatalog(
         string TargetStateId,
         string TargetCountyId,
         TagType Geology,

@@ -107,6 +107,95 @@ public sealed class SettingsPermissionScopeIntegrationTests(PostgresTestServer f
             .ToList());
     }
 
+    [Fact]
+    public async Task CountyManagerCanSelectAnEmptyCounty()
+    {
+        await using var database =
+            await fixture.CreateDatabaseAsync(nameof(CountyManagerCanSelectAnEmptyCounty));
+        var world = await CavePermissionMatrixTestSupport.CreateWorldAsync(database);
+        await AddAccountStatesAsync(database, world.AccountId, world.Target.StateId);
+        const string emptyCountyId = "emptycty01";
+
+        await using (var seed = database.CreateDbContext("emptyseed", world.AccountId))
+        {
+            seed.Counties.Add(new County
+            {
+                Id = emptyCountyId,
+                AccountId = world.AccountId,
+                StateId = world.Target.StateId,
+                DisplayId = "EMPTY",
+                Name = "Empty County"
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        const string managerId = "emptymgr01";
+        await CavePermissions.GrantCountyManagerAsync(
+            database, world.AccountId, emptyCountyId, managerId);
+        await using var manager = await CaveTestActor.CreateAsync(database, world.AccountId, managerId);
+        var service = CreateService(manager);
+
+        Assert.Contains((await service.GetStates(PermissionKey.Manager)).Select(item => item.Value),
+            stateId => stateId == world.Target.StateId);
+        Assert.Contains((await service.GetStateCounties(world.Target.StateId, PermissionKey.Manager))
+                .Select(item => item.Value),
+            countyId => countyId == emptyCountyId);
+    }
+
+    [Fact]
+    public async Task MalformedCrossFamilyPermissionsDoNotGrantRegionalManagerChoices()
+    {
+        await using var database =
+            await fixture.CreateDatabaseAsync(nameof(MalformedCrossFamilyPermissionsDoNotGrantRegionalManagerChoices));
+        var world = await CavePermissionMatrixTestSupport.CreateWorldAsync(database);
+        var otherStateCave = world.Caves.Single(cave => cave.StateId != world.Target.StateId);
+        await AddAccountStatesAsync(database, world.AccountId, world.Target.StateId, otherStateCave.StateId);
+        const string userId = "badselect1";
+        const string userManagerPermissionId = "badmgr001";
+        const string caveAdminPermissionId = "badadm001";
+
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = userManagerPermissionId,
+            Key = PermissionKey.Manager,
+            Name = "Wrong Type Manager",
+            Description = "Regression-only User permission with a Cave Manager key.",
+            PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = caveAdminPermissionId,
+            Key = PermissionKey.Admin,
+            Name = "Wrong Type Admin",
+            Description = "Regression-only Cave permission with an Account Admin key.",
+            PermissionType = PermissionType.Cave
+        });
+
+        await using (var seed = database.CreateDbContext(userId, world.AccountId))
+        {
+            await CavePermissions.EnsureAccountUserAsync(seed, world.AccountId);
+            seed.CavePermissions.Add(new CavePermission
+            {
+                UserId = seed.RequestUser.Id,
+                AccountId = world.AccountId,
+                PermissionId = userManagerPermissionId
+            });
+            seed.UserPermissions.Add(new UserPermission
+            {
+                UserId = seed.RequestUser.Id,
+                AccountId = world.AccountId,
+                PermissionId = caveAdminPermissionId
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var actor = await CaveTestActor.CreateAsync(database, world.AccountId, userId);
+        var service = CreateService(actor);
+
+        Assert.Empty(await service.GetStates(PermissionKey.Manager));
+        Assert.Empty(await service.GetStateCounties(world.Target.StateId, PermissionKey.Manager));
+    }
+
     private static SettingsService CreateService(CaveTestActor actor) =>
         new(
             new SettingsRepository(actor.Db, actor.Db.RequestUser),

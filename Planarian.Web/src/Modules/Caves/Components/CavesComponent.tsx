@@ -43,6 +43,7 @@ import {
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import {
   CAVE_SEARCH_DISPLAY_FEATURE_LABELS,
   CAVE_SEARCH_DISPLAY_FEATURES,
@@ -72,7 +73,7 @@ const CavesComponent: React.FC = () => {
     Record<string, boolean>
   >({});
 
-  const { currentAccountId: accountId } = useContext(AppContext);
+  const { currentAccountId: accountId, hasPermission } = useContext(AppContext);
   const featureStorageKey = accountId
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";
@@ -517,7 +518,9 @@ const CavesComponent: React.FC = () => {
           <CardGridComponent
             fillHeight
             noDataDescription={"No caves found"}
-            noDataCreateButton={<CaveCreateButtonComponent />}
+            noDataCreateButton={
+              hasPermission(PermissionKey.View) ? <CaveCreateButtonComponent /> : undefined
+            }
             renderItem={(cave) => {
 
               const distanceMilesKey = nameof<CaveSearchVm>("distanceMiles") as NestedKeyOf<CaveSearchVm>;

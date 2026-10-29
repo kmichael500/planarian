@@ -1,16 +1,56 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
+**Status:** **ACTIVE PRE-MERGE — NEW-CAVE PROPOSAL/PERMISSION PACKAGE DONE + VALIDATED; COMMIT PENDING**
 **Ledger last refreshed:** 2026-10-28
-**Completion HEAD reviewed:** `3bdb3146` (`test(caves): prove read-only integrity and stale-client safety`) immediately before archive-runtime integration. Earlier package evidence remains SHA-pinned to its original source rather than being relabeled as a combined full-suite run.
-**Package refresh:** 2026-10-28; the completion branch now combines the read-integrity/stale-client package at `3bdb3146` with archive-runtime package `cc79c062`, which was developed from completion base `cd213c56`. The archive package adds generated-archive content validation, bounded-memory large-File generation, Azure server-side block-from-URI publication for large archives, backend-only source SAS hardening, cancellation/retry, tenant isolation, retention, non-mutating archive-list reads, Reset/delete coordination, endpoint-scoped Blob-container initialization, and pinned historical old/new storage-algorithm coverage. GAP-008/GAP-009 and GAP-010 retain their exact package evidence below; the combined branch is rerun in full after this merge.
+**Completion HEAD reviewed:** `70bff4ec72b864668f1e4e9c43fe72ea57a9a219` is the working branch HEAD immediately before the ready-to-commit new-Cave proposal/permission package. The package commit does not exist yet and its future SHA is intentionally not fabricated. Earlier package evidence remains SHA-pinned to its original source.
+**Package refresh:** 2026-10-28; the completion branch already includes archive-runtime hardening plus browser-E2E/account-switch validation through `d5546088`. The current isolated working-tree package was developed from `70bff4ec`, has been reconciled against `d5546088`, and adds View-authorable new-Cave proposals, destination-scoped review, authoritative County-number allocation, conditional submitter Cave View, account-removal concurrency hardening, null-base proposal migration support, and cross-layer route/UI authorization. Target-side overlap is limited to this ledger; no production/test path in this package conflicts semantically with the newer browser-E2E package.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
-**Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
+**Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 183 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 590 files changed, 81,274 insertions, 7,912 deletions
+**Branch distance at baseline review:** 187 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 610 files changed, 85,872 insertions, 8,013 deletions
+
+## Browser-E2E integration validation (2026-10-28)
+
+The `test/cave-revisions-browser-e2e` package adds a small Chromium/WebKit Playwright suite, disposable E2E dataset provisioning, production frontend/CSP serving, account-switch/cache isolation changes, and file-action `PlanarianButton` compatibility. It was first reconciled with completion HEAD `3bdb3146` on merge commit `16c4ecd3`, then reconciled with archive-runtime completion HEAD `87b093ba` on merge commit `31899b4b` before final integrated validation. GAP-007 and GAP-013 are therefore resolved by executable browser evidence rather than by implementation presence alone.
+
+Validation on 2026-10-28 ran the repository-owned browser-E2E stack from a stopped environment, including production frontend builds and headed Chromium/WebKit acceptance runs. Each acceptance run reset and verified the isolated `e2e` Postgres/Azurite dataset and exercised the real local HTTPS/CORS/CSP topology. The final acceptance run completed **20/20 Playwright tests green** (10 scenarios in both Chromium and WebKit) before clean teardown with exit code 0. Validation exposed and fixed a real account-switch race: the global switch-event listener was registered in a passive React effect, so a sufficiently fast interaction could dispatch before the listener existed; it now registers in `useLayoutEffect`, and the previously failing proposal/account-switch workflows pass in both engines. PDF validation also removed browser-engine-specific assumptions: Chromium may issue byte ranges while WebKit may fetch this small fixture in one response, so the test proves real PDF.js rendering, authenticated cross-origin access/CORS, and the stream-session header in each browser while a deterministic authenticated probe proves exact `206`/`Content-Range` semantics. Chromium's local test hostname is pinned to loopback through Playwright launch options to avoid `.local`/mDNS startup flakiness without changing the production hostname, TLS, CSP, or routing under test. Focused account-isolation tests were **4/4 green**, proposal navigation was **2/2 green**, coordinator unit tests were **4/4 green**, TypeScript checking passed, and the earlier runner active-Compose refusal regression remained green. The reconciled completion package's `CaveReadIntegrityIntegrationTests` plus `CaveStaleClientSafetyIntegrationTests` were **10/10 green** after a documented solution restore. The initial `--no-restore` invocation failed only because local NuGet/.NET 8 reference artifacts were absent and did not execute tests.
+
+## 2026-10-28 — New-Cave proposal and permission package — DONE + VALIDATED, commit pending
+
+This ready-to-commit working-tree package is based on `70bff4ec72b864668f1e4e9c43fe72ea57a9a219`. It has not been committed yet, so no package commit SHA is claimed here.
+
+Implemented behavior:
+
+- Any user with effective Cave `View` capability in the current Account can author a proposal for a new Cave in any configured State/County, even when they cannot view an existing Cave in that destination.
+- Direct creation remains destination-Manager-authorized. A user who manages one destination can still use the same Add Cave surface to propose in another destination they do not manage.
+- A creation request reserves the future Cave ID without creating a placeholder Cave or fake revision; request/proposal `BaseRevisionId` is null until publication.
+- Current Managers of the proposed destination review creation requests, including empty Counties. Submitter rerouting changes the review audience immediately, and loss of destination Manager authority removes review/read/decision access.
+- Automatic and first-available County Cave Number allocation uses authoritative account+County data, including hidden and archived Caves, while the `IgnoreQueryFilters()` lookup remains explicitly account-qualified.
+- Approval atomically creates the Cave, publishes its first `UserSubmission` / `Create` revision, and approves the request. The submitter receives exact Cave `View` only when still an Account member; approval remains valid if the submitter has left.
+- Account removal serializes on the target `AccountUser` row with every account-scoped permission grant path: proposal-approval Cave `View`, ordinary Cave `View`/`Manager`, and Account `Admin`. Grant transactions use `FOR KEY SHARE`; revocation uses `FOR UPDATE`, removes all grants plus membership atomically, and grant paths fail closed if revocation wins first.
+- Creation-proposal rollback is explicit: downgrade across `SupportNewCaveProposals` refuses to proceed while null-base proposal versions exist rather than relying on an incidental NOT NULL failure.
+- The frontend route, empty-state CTA, direct-vs-proposal mode, reviewer wording, and hidden Manager-only County-number controls all match the server authorization model.
+
+Adversarial review fixes in this package included a real Manager-only `/caves/add` route defect, an unconditional empty-state create affordance, unnecessary Manager-only County-number probes from View-only authoring, account-removal/grant races across proposal approval and ordinary Cave/User permission management, missing transaction preconditions, stale durable null-base documentation, gaps in destination-reviewer revocation and County-number tenant-isolation coverage, missing empty-Account View-capability coverage, and fail-open authorization/projection when malformed persisted rows crossed the User/Cave permission-type or reserved role-key families. The final permission-domain hardening covers `RequestUser`, the `UserCavePermissions` SQL view/global Cave filter, creation-request visibility/review/decision queries, regional Manager selectors, scoped capability probes, permission-management writes, account provisioning, and client projection (including rejecting account-scoped `PlanarianAdmin`). Permission definitions are resolved by `(PermissionType, Key)` and a forward migration makes that pair unique while explicitly refusing same-domain legacy duplicates; cross-domain identical textual keys remain valid.
+
+Validation recorded before commit:
+
+- `Planarian.Tests.Unit`: **472/472 passed**.
+- Frontend Jest: **74/74 suites, 373/373 tests passed**, plus client-route generator **6/6** and CSP configuration **5/5**.
+- Frontend production build: **passed**; remaining CRA/Browserslist/React/ESLint messages are existing repository warnings rather than package failures.
+- Focused Cave creation/authorization/permission-management/settings PostgreSQL slice: **54/54 passed** before the final two County-number repository tests were added.
+- Migration + PostgreSQL-foundation slice: **38/38 passed**.
+- Hardened permission matrix: **29/29 passed** after converting the scope/role grids to xUnit theories, including empty-Account View capability and malformed cross-type/cross-role rows failing closed.
+- Final permission-management/settings slice: **52/52 passed**; this includes Cave/User grant-vs-revoke serialization, unsupported-role/domain rejection, and platform account creation selecting the User-domain `Admin`.
+- Permission-domain migration regression slice: **3/3 passed**, including pristine latest migration, cross-domain identical-key preservation, and explicit fail-closed handling of same-domain duplicate definitions.
+- Final full PostgreSQL integration suite for the exact final test assembly: **649/649 passed**, **0 skipped**.
+- EF pending-model check: **passed**; no model changes remain outside the generated permission-domain migration and its updated snapshot.
+- Repository-doc validator plus staged/unstaged `git diff --check`: **passed**.
+
+The exact package commit SHA must be pinned only after the commit exists. Historical evidence below remains attached to the SHAs and package states that actually produced it.
 
 ## Purpose
 
@@ -572,13 +612,11 @@ Validation includes:
 - bounded ownership-query tests for 600 Cave associations, 120 Entrance associations, and 600 County associations;
 - an architecture contract that fails when a current Cave/account `EntityBase` family disappears from the interceptor switch or a newly added entity is not explicitly classified.
 
-## GAP-007 — Small real-browser smoke suite
+## GAP-007 — RESOLVED — Small real-browser smoke suite
 
 **Priority: P1**
 
-No Playwright/Cypress-style browser suite was found in the reviewed completion branch.
-
-Do not create hundreds of browser tests. Add a small set of high-value scenarios, ideally Chromium plus WebKit for the most important paths:
+A deliberately small Playwright suite now covers the high-value browser contracts in both Chromium and WebKit. The final integrated `npm run test:browser:e2e` acceptance run completed 20/20 tests green against the production-built frontend and isolated real backend/database/storage topology:
 
 - authenticated bootstrap using real cookie behavior;
 - frontend/API CORS and preflight;
@@ -593,13 +631,7 @@ Do not create hundreds of browser tests. Add a small set of high-value scenarios
 
 ### PDF smoke scenario
 
-The branch changed PDF streaming so PDF.js sends `X-Planarian-File-Stream-Session` rather than a query parameter.
-
-Prove end to end:
-
-**PDF.js → real browser → custom header → preflight/CORS if applicable → authenticated API → HTTP Range requests → PDF renders successfully.**
-
-Unit tests already prove frontend request-option construction and backend throttling separately. This browser test proves their integration.
+The PDF smoke test proves the changed streaming contract end to end: real PDF.js rendering in Chromium/WebKit, the custom `X-Planarian-File-Stream-Session` header, cross-origin authenticated access/CORS, a deterministic authenticated `206`/`Content-Range` range probe, download behavior, and unauthorized/missing-file responses. It deliberately does not require every browser to issue a Range request for the small fixture; that choice is browser/PDF.js dependent. The corrected test passed in both browsers and in the final 20/20 integrated suite.
 
 ## GAP-008 — RESOLVED — Mixed-version / stale-SPA deployment safety
 
@@ -652,13 +684,11 @@ The product/architecture decision is explicit in `docs/architecture/destructive-
 
 The cave-authoring field-persistence package merged before the current baseline. `AddCaveComponent.form-contract.test.tsx` proves pre-existing feature-gated Cave/Entrance/File/line-plot values remain in the submitted aggregate when controls are hidden. `EditCavePage.test.tsx` proves direct edit submits preserved unmounted values, and Suggest/Revise page tests prove preview/submission use the same complete draft rather than only mounted fields. The backend field-persistence matrix separately exercises full direct/proposal publication state.
 
-## GAP-013 — Account switching and frontend cache isolation
+## GAP-013 — RESOLVED — Account switching and frontend cache isolation
 
 **Priority: P1/P2**
 
-Server-side tenant isolation is strong, but client caches can still show or submit stale account-specific reference/settings data.
-
-Feature settings are keyed by account in the reviewed `AccountService`, which is good. Extend validation to the complete switch workflow:
+Account-dependent settings/reference caches are now scoped to the active account, and account switching refreshes target-account state before committing the new runtime account. Unit/component tests and the Chromium/WebKit browser suite validate the complete switch workflow:
 
 - start in Account A;
 - load feature settings/tags/counties/Cave authoring data;
@@ -667,7 +697,7 @@ Feature settings are keyed by account in the reviewed `AccountService`, which is
 - switch back and verify correct reuse/invalidation;
 - submissions after the switch always carry the current account context.
 
-A real-browser test is preferable because context/provider/cache lifetime matters.
+The real-browser tests additionally prove that dirty Account A authoring state cannot remain actionable during a switch and that submissions after switching use the target account context. Cross-browser validation also exposed and fixed the event-listener timing race by registering the switch coordinator before paint with `useLayoutEffect`.
 
 ## GAP-014 — Abandoned authoring/staging lifecycle
 
@@ -755,15 +785,15 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 - [x] External-cleanup failure/retry safety for hard Cave/File/staging/proposal/archive-cleanup workflows (GAP-004), with full archive runtime covered by resolved GAP-010.
 - [x] Azurite contract tests for production `AzureBlobObjectStorage`.
 - [x] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
-- [ ] Small real-browser smoke suite, including WebKit for critical workflows.
-- [ ] Real-browser PDF.js custom-header/range/authentication test.
-- [ ] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
-- [ ] Read-only GET/authoring-context no-side-effect contract plus fail-closed uninitialized-Cave coverage.
+- [x] Small real-browser smoke suite, including WebKit for critical workflows.
+- [x] Real-browser PDF.js custom-header/range/authentication test.
+- [x] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
+- [x] Read-only GET/authoring-context no-side-effect contract plus fail-closed uninitialized-Cave coverage.
 - [x] End-to-end archive `.tar.gz` generation/content validation (GAP-010).
 - [x] Full end-to-end archive runtime cancellation/failure/pruning/account-isolation and mixed-version publication tests (GAP-010).
 - [x] Explicit archive-vs-backup product contract (current-state export), with the runtime contract validated under GAP-010.
 - [x] Hidden/disabled feature-field preservation tests.
-- [ ] Account-switch/client-cache isolation validation.
+- [x] Account-switch/client-cache isolation validation.
 
 ## P2 — Hardening that can be consciously deferred if documented
 
@@ -818,8 +848,8 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 - [x] Cave detail cannot mutate Files or line plots.
 - [x] Aggregate editor is the only normal interactive Cave-owned asset mutation surface.
-- [ ] Existing-Cave edit without expected revision fails safely.
-- [ ] Stale edits cannot silently overwrite.
+- [x] Existing-Cave edit without expected revision fails safely.
+- [x] Stale edits cannot silently overwrite.
 - [x] No obsolete standalone GeoJSON publication endpoint/control remains.
 
 ## Destructive-operation safety
@@ -842,18 +872,18 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 - [x] Global save-interceptor matrix is green or equivalent evidence exists.
 - [x] Hidden feature fields survive unrelated edits.
-- [ ] Account switching cannot reuse actionable foreign-account UI data.
-- [ ] Ordinary reads do not unexpectedly mutate durable state.
+- [x] Account switching cannot reuse actionable foreign-account UI data.
+- [x] Ordinary reads do not unexpectedly mutate durable state.
 - [x] Archive current-state/backup semantics are explicit and the generated-archive/runtime contract is validated under GAP-010.
 
 ## Browser/runtime
 
-- [ ] Critical authenticated browser smoke test passes.
-- [ ] PDF viewer works through the real custom-header/range-request path.
-- [ ] Nested-route hard refresh works.
-- [ ] Stale-edit conflict UX works.
-- [ ] Unsaved-change browser behavior works.
-- [ ] Critical WebKit/Safari-equivalent smoke path passes if the browser harness supports it.
+- [x] Critical authenticated browser smoke test passes.
+- [x] PDF viewer works through the real custom-header/range-request path.
+- [x] Nested-route hard refresh works.
+- [x] Stale-edit conflict UX works.
+- [x] Unsaved-change browser behavior works.
+- [x] Critical WebKit/Safari-equivalent smoke path passes if the browser harness supports it.
 
 ## Documentation/reporting
 

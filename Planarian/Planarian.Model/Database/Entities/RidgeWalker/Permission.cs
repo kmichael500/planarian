@@ -32,7 +32,7 @@ public class PermissionConfiguration : BaseEntityTypeConfiguration<Permission>
 {
     public override void Configure(EntityTypeBuilder<Permission> builder)
     {
-        builder.HasIndex(p => new { p.PermissionType, p.Key });
+        builder.HasIndex(p => new { p.PermissionType, p.Key }).IsUnique();
         builder.HasIndex(p => p.Key);
         base.Configure(builder);
     }

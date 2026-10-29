@@ -5,7 +5,8 @@
 
 ## Context
 
-A reviewer needs to know exactly what was proposed and exactly which published Cave state the proposal was based on.
+A reviewer needs to know exactly what was proposed and, for an existing Cave, exactly which published Cave state the
+proposal was based on. A proposal that creates a Cave has no published base yet.
 
 If one mutable proposal row were edited in place:
 
@@ -24,7 +25,7 @@ Each CaveProposalVersion is treated as immutable and append-only by application 
 
 A version stores:
 
-- its own BaseRevisionId;
+- its own BaseRevisionId (`null` only for a new-Cave creation proposal);
 - PreviousProposalVersionId;
 - a versioned CaveProposalSnapshotV1 containing exact proposed desired state.
 
@@ -35,8 +36,9 @@ Review transitions update the request/status and append review events; they do n
 Approval requires:
 
 - the expected active proposal version;
-- the version's published base to still be current;
-- current reviewer authorization.
+- for an existing Cave, the version's published base to still be current;
+- for a new Cave, the reserved Cave ID to remain unused;
+- current reviewer authorization for the Cave or proposed destination, respectively.
 
 Approval publishes the exact selected proposal version through normal Cave publication.
 

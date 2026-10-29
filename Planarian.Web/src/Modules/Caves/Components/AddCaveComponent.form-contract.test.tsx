@@ -6,6 +6,7 @@ import utc from "dayjs/plugin/utc";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 import { CaveService } from "../Service/CaveService";
+import { SettingsService } from "../../Setting/Services/SettingsService";
 import { AddCaveComponent } from "./AddCaveComponent";
 
 dayjs.extend(utc);
@@ -244,4 +245,35 @@ it("does not submit a phantom Entrance when a new row is added and removed befor
 
   await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
   expectCompleteSubmission(onFinish.mock.calls[0][0], values);
+});
+
+
+it("does not call Manager-only county-number helpers when creation controls are hidden", async () => {
+  const values = completeValues();
+  values.id = undefined;
+  values.expectedRevisionId = undefined;
+  values.countyNumber = undefined;
+  values.isCountyNumberManuallySet = false;
+
+  const countyMetadata = jest.spyOn(SettingsService, "GetCountyMetadata");
+  const nextCountyNumber = jest.spyOn(CaveService, "GetNextCountyNumber").mockResolvedValue(43);
+
+  const Harness = () => {
+    const [form] = Form.useForm<AddCaveVm>();
+    return (
+      <Form form={form} initialValues={values}>
+        <AddCaveComponent
+          form={form}
+          cave={values}
+          hideCountyNumberControls
+          submitLabel="Review submission"
+        />
+      </Form>
+    );
+  };
+
+  render(<Harness />);
+
+  expect(countyMetadata).not.toHaveBeenCalled();
+  expect(nextCountyNumber).not.toHaveBeenCalled();
 });

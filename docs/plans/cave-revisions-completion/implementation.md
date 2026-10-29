@@ -483,7 +483,25 @@ authoring content through the map rendering endpoint.
 base revision and line-plot bodies are one authoring read; if publication changes afterward, the existing stale-base
 preview/submit check handles it explicitly.
 
-### 7.2 Proposal File identity
+### 7.2 New-Cave proposal identity
+
+Support creation through the same immutable proposal workflow rather than a parallel submission model. Reserve the
+eventual Cave ID when the request is created, but do not create a placeholder Cave or revision. A creation request and
+all of its proposal versions have a null `BaseRevisionId`; existing-Cave proposals retain their immutable published base.
+
+A View-capable account member may submit a creation proposal for any configured State/County. Review authorization is
+resource-based on the current proposed destination grant, not on `UserCavePermissions` expansion through existing Caves,
+so the first proposed Cave in an empty County remains reviewable. Raw grant queries preserve the same permission-domain
+boundary as `RequestUser`: Account Admin comes only from `PermissionType.User`, Cave authority comes only from
+`PermissionType.Cave` `View`/`Manager`, and malformed cross-family or reserved-role rows fail closed. A reviewer may revise
+only to another destination they currently manage; the submitter may change destination and route the request to that
+destination's Managers.
+
+Approval uses the existing new-Cave publication path inside the request approval transaction, allocates County Cave
+Number from authoritative account+County data, creates the first revision, grants the submitter exact Cave `View`
+when they are still an Account member, and then marks the request approved. Rejection publishes nothing.
+
+### 7.3 Proposal File identity
 
 Keep `ProposalFileIntent` as a complete desired-state intent model. A `PublishStaged` intent references the exact immutable
 staged `File.Id`; retained published Files reference their exact existing IDs.
@@ -498,7 +516,7 @@ referenced by any proposal version that the product exposes as reviewable histor
 When request resolution allows rejected/unpublished staged bytes to be cleaned, older proposal metadata remains readable
 but must not present missing bytes as downloadable.
 
-### 7.3 Proposal line plots
+### 7.4 Proposal line plots
 
 Extend `CaveProposalSnapshotV1` with complete desired line plots containing logical ID (where existing), name, and exact
 GeoJSON payload. Update serialization/contract fixture while V1 is still pre-release.
@@ -506,14 +524,14 @@ GeoJSON payload. Update serialization/contract fixture while V1 is still pre-rel
 Preview and proposal-version no-op detection must include line plots. Do not derive an old version's line-plot content
 from mutable current `CaveGeoJson` rows.
 
-### 7.4 Revision of a pending proposal
+### 7.5 Revision of a pending proposal
 
 `snapshotToForm` and `ReviseCaveChangeRequestPage` must reconstruct the selected/current proposal version's exact File and
 line-plot intent. A new version may stage new Files, retain old ones, or remove them; creating the new version never
 mutates the older serialized proposal.
 
 Keep existing `ExpectedBaseRevisionId` and `ExpectedProposalVersionId` conflict behavior.
-### 7.5 Phase exit gate
+### 7.6 Phase exit gate
 
 Prove:
 

@@ -385,11 +385,16 @@ The proposal version no-op rule uses the same authoritative aggregate semantics 
 
 ## 14. Proposal authoring boundary
 
-Current View access remains sufficient to submit a proposal. Direct publication still requires the existing manager/admin
-permission. Do not change those authorization rules while unifying the editor model.
+Current View access remains sufficient to submit a proposal against an existing Cave. Effective View capability in the
+current Account is also sufficient to submit a proposal that creates a new Cave in any State/County configured for that
+Account, even when the submitter has no Cave visibility in that destination. Direct publication still requires
+Manager/admin authority over the destination.
 
 The proposer should author substantially the same desired aggregate as a direct editor, but Submit persists an immutable
-proposal version rather than published Cave state.
+proposal version rather than published Cave state. A new-Cave request reserves its eventual Cave ID without creating a
+placeholder Cave. Its request and proposal versions have `BaseRevisionId = null`; null is the authoritative Create
+invariant and must not be supplemented by a redundant operation flag or fake empty revision. Presentation/diff code may
+construct an in-memory empty base, but that object is never persisted.
 
 A proposal may stage Files before a `CaveChangeRequest` exists. The staging lifecycle therefore cannot require request
 ownership as its fundamental File ownership model.
@@ -440,13 +445,18 @@ implementation for proposal approval.
 Approval must:
 
 1. load the selected immutable proposal version;
-2. verify current request/reviewer authorization and current Cave visibility;
-3. validate stale-base/current-revision rules;
+2. verify current request/reviewer authorization: existing-Cave proposals use current Cave Manager authority; unpublished
+   create proposals use current Manager authority over the proposed destination County/State/account;
+3. for existing-Cave proposals, validate stale-base/current-revision rules; for create proposals, verify the reserved
+   Cave ID still does not exist;
 4. reconstruct the exact desired aggregate, including exact File identities and line-plot bodies;
-5. revalidate current reference/business invariants;
-6. publish normalized Cave state and exactly one `CaveRevision` transactionally;
-7. persist request status/reviewer/provenance linkage in that transaction;
-8. never substitute another proposal version or mutable current line-plot content.
+5. revalidate current reference/business invariants and allocate/check County Cave Number against authoritative
+   account+County data rather than the caller's visible Cave set;
+6. transactionally publish normalized Cave state and exactly one `CaveRevision`; create approval creates the reserved
+   Cave and its first `UserSubmission`/`Create` revision;
+7. for create approval, grant the submitter an explicit Cave-scoped `View` permission in that same transaction only if the submitter is still an Account member;
+8. persist request status/reviewer/provenance linkage in that transaction;
+9. never substitute another proposal version or mutable current line-plot content.
 
 Rejection preserves request/version/reviewer audit data but never mutates published Cave state or creates a revision.
 
@@ -457,9 +467,14 @@ current published revision under the existing architecture.
 
 Every new path preserves the existing rules:
 
-- current View access is enough to propose;
-- current Manager/admin authorization is required for direct published edits and review as currently defined;
-- losing current Cave visibility removes later access to Cave proposal/history/staged resources under the existing model;
+- current View access is enough to propose against an existing Cave, and effective Account View capability is enough
+  to submit a new-Cave proposal in any configured State/County;
+- current Manager/admin authorization is required for direct published edits; create-proposal review follows the current
+  proposed destination, including empty Counties where no Cave row exists to expand;
+- before a proposed Cave exists, its submitter retains request access only while they still have effective Account
+  Cave View capability; destination Managers can review independently, and approval grants submitter Cave View only if
+  the submitter is still an Account member; after publication, request/history access transitions to normal current Cave
+  visibility;
 - staged File IDs are always account-qualified;
 - existing line-plot IDs are validated against both current account and target Cave;
 - `IgnoreQueryFilters()` always has an explicit account predicate and tenant-isolation coverage;

@@ -112,17 +112,21 @@ public class RequestUser
             return await _dbContext.UserPermissions.AnyAsync(e =>
                 e.UserId == Id &&
                 e.AccountId == null &&
-                e.Permission!.Key == PermissionPolicyKey.PlanarianAdmin);
+                e.Permission!.PermissionType == PermissionType.User &&
+                e.Permission.Key == PermissionPolicyKey.PlanarianAdmin);
         }
 
         if (string.IsNullOrWhiteSpace(AccountId))
             return false;
 
         var userPermissions = await _dbContext.UserPermissions
-            .Where(e => e.UserId == Id && e.AccountId == AccountId)
+            .Where(e => e.UserId == Id
+                        && e.AccountId == AccountId
+                        && e.Permission!.PermissionType == PermissionType.User)
             .Select(e => e.Permission!.Key).ToListAsync();
 
-        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
+        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
         var hasUserPermission = userPermissions.Any(satisfyingPermissionKeys.Contains);
 
         if (permissionKey == PermissionPolicyKey.AdminManager)
@@ -139,7 +143,8 @@ public class RequestUser
                         && string.IsNullOrWhiteSpace(e.CountyId)
                         && e.UserId == Id
                         && e.AccountId == AccountId
-                        && e.Permission!.Key == PermissionPolicyKey.Manager
+                        && e.Permission!.PermissionType == PermissionType.Cave
+                        && e.Permission.Key == PermissionPolicyKey.Manager
                     );
             }
         }
@@ -168,7 +173,8 @@ public class RequestUser
             .AnyAsync(e =>
                 e.AccountId == AccountId
                 && e.UserId == Id
-                && satisfyingPermissionKeys.Contains(e.Permission!.Key)
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key)
             );
 
         if (!hasCavePermission && @throw)
@@ -187,14 +193,27 @@ public class RequestUser
     public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId, string? stateId,
         bool @throw = true)
     {
-        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
-            throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated, permissionKey, and AccountId are required");
+        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
+            throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated and permissionKey are required");
 
-        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
+        // Platform and synthetic account capabilities are not resource grants. Route them
+        // through the canonical capability resolver so malformed persisted rows cannot turn
+        // PlanarianAdmin/AdminManager/Export into scoped UserPermission authorities.
+        if (permissionKey is PermissionPolicyKey.PlanarianAdmin
+            or PermissionPolicyKey.AdminManager
+            or PermissionPolicyKey.Export)
+            return await HasCavePermission(permissionKey, @throw);
+
+        if (string.IsNullOrWhiteSpace(AccountId))
+            throw ApiExceptionDictionary.BadRequest("Invalid request. AccountId is required for scoped Cave authorization");
+
+        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
         var hasPermission = await _dbContext.UserPermissions.AnyAsync(e =>
             e.UserId == Id
             && e.AccountId == AccountId
-            && satisfyingPermissionKeys.Contains(e.Permission!.Key));
+            && e.Permission!.PermissionType == PermissionType.User
+            && satisfyingPermissionKeys.Contains(e.Permission.Key));
 
         if (!hasPermission && !string.IsNullOrWhiteSpace(caveId))
         {
@@ -205,17 +224,25 @@ public class RequestUser
                 e.UserId == Id
                 && e.AccountId == AccountId
                 && e.CaveId == caveId
-                && satisfyingPermissionKeys.Contains(e.PermissionKey));
+                && satisfyingCavePermissionKeys.Contains(e.PermissionKey));
         }
         else if (!hasPermission && !string.IsNullOrWhiteSpace(countyId))
         {
-            // County rows in the view are emitted for County, State, and all-location
-            // permissions, but never for Cave-only permissions.
-            hasPermission = await _dbContext.UserCavePermissionView.AnyAsync(e =>
+            // County authority must come from the owning grant rows rather than the expanded
+            // Cave view. An empty County has no Cave rows to expand, but a County/State/account
+            // Manager still owns that resource. Derive State inheritance from the authoritative
+            // County row so a client-supplied StateId can never broaden a mismatched County.
+            hasPermission = await _dbContext.CavePermissions.AnyAsync(e =>
                 e.UserId == Id
                 && e.AccountId == AccountId
-                && e.CountyId == countyId
-                && satisfyingPermissionKeys.Contains(e.PermissionKey));
+                && string.IsNullOrWhiteSpace(e.CaveId)
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key)
+                && (e.CountyId == countyId
+                    || (string.IsNullOrWhiteSpace(e.CountyId) && string.IsNullOrWhiteSpace(e.StateId))
+                    || (string.IsNullOrWhiteSpace(e.CountyId) && !string.IsNullOrWhiteSpace(e.StateId)
+                        && _dbContext.Counties.Any(county =>
+                            county.AccountId == AccountId && county.Id == countyId && county.StateId == e.StateId))));
         }
         else if (!hasPermission && !string.IsNullOrWhiteSpace(stateId))
         {
@@ -228,7 +255,8 @@ public class RequestUser
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && (e.StateId == stateId || string.IsNullOrWhiteSpace(e.StateId))
-                && satisfyingPermissionKeys.Contains(e.Permission!.Key));
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key));
         }
         else if (!hasPermission)
         {
@@ -238,7 +266,8 @@ public class RequestUser
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && string.IsNullOrWhiteSpace(e.StateId)
-                && satisfyingPermissionKeys.Contains(e.Permission!.Key));
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key));
         }
 
         if (!hasPermission && @throw)
@@ -249,13 +278,22 @@ public class RequestUser
         return hasPermission;
     }
 
-    private static string[] GetSatisfyingPermissionKeys(string permissionKey) => permissionKey switch
+    private static string[] GetSatisfyingUserPermissionKeys(string permissionKey) => permissionKey switch
     {
-        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
-        PermissionKey.Manager => [PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
+        // UserPermission rows represent account/platform administration. Only Account Admin
+        // broadens into Cave View/Manager; same-key rows of PermissionType.User must not.
+        PermissionKey.View => [PermissionPolicyKey.Admin],
+        PermissionKey.Manager => [PermissionPolicyKey.Admin],
         PermissionKey.Admin => [PermissionPolicyKey.Admin],
         PermissionKey.PlanarianAdmin => [PermissionPolicyKey.PlanarianAdmin],
         _ => [permissionKey]
+    };
+
+    private static string[] GetSatisfyingCavePermissionKeys(string permissionKey) => permissionKey switch
+    {
+        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager],
+        PermissionKey.Manager => [PermissionPolicyKey.Manager],
+        _ => []
     };
 
 }

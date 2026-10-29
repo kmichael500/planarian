@@ -149,6 +149,21 @@ it("forwards the complete authoring payload when creating a Cave", async () => {
   expect(post).toHaveBeenCalledWith("api/caves", cave);
 });
 
+it("forwards the complete authoring payload when previewing and submitting a new-Cave proposal", async () => {
+  const cave = completeAuthoringPayload();
+  cave.id = undefined;
+  cave.expectedRevisionId = undefined;
+  const post = jest.spyOn(HttpClient, "post")
+    .mockResolvedValueOnce({ data: {} })
+    .mockResolvedValueOnce({ data: "request-a" });
+
+  await CaveService.PreviewNewCave(cave);
+  expect(post).toHaveBeenLastCalledWith("api/cave-change-requests/caves/new/preview", cave);
+
+  await CaveService.SubmitNewCave(cave);
+  expect(post).toHaveBeenLastCalledWith("api/cave-change-requests/caves/new", cave);
+});
+
 it("forwards the complete authoring payload when directly editing a Cave", async () => {
   const cave = completeAuthoringPayload();
   const put = jest.spyOn(HttpClient, "put").mockResolvedValue({ data: undefined });
@@ -202,6 +217,20 @@ it("wraps the complete authoring payload when saving a revised proposal", async 
     cave,
     againstCurrent: false,
     expectedBaseRevisionId: "revision-a",
+    expectedProposalVersionId: "proposal-a",
+  });
+});
+
+it("preserves a null published base when revising a new-Cave proposal", async () => {
+  const cave = completeAuthoringPayload();
+  const post = jest.spyOn(HttpClient, "post").mockResolvedValue({ data: "proposal-b" });
+
+  await CaveService.ReviseChanges("request-a", cave, false, undefined, "proposal-a");
+
+  expect(post).toHaveBeenCalledWith("api/cave-change-requests/request-a/versions", {
+    cave,
+    againstCurrent: false,
+    expectedBaseRevisionId: undefined,
     expectedProposalVersionId: "proposal-a",
   });
 });

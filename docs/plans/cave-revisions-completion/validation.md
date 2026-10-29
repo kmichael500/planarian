@@ -324,7 +324,40 @@ Do not mark the task complete until every applicable item is true:
 
 ### Proposals
 
-- [ ] View permission remains sufficient to author a proposal.
+- [ ] View permission remains sufficient to author a proposal against an existing Cave.
+- [ ] Effective Account View capability can submit a new-Cave proposal in any configured State/County without
+      pre-existing destination Cave visibility.
+- [ ] A new-Cave request reserves its Cave ID without creating a Cave or fake base revision before approval.
+- [ ] County/State Managers can review a new-Cave proposal in an empty County; Cave-only or unrelated Managers cannot,
+      and removing destination Manager authority immediately removes review/read/decision access.
+- [x] Malformed persisted permission rows fail closed across Cave visibility, creation-request visibility/review,
+      regional Manager selectors, scoped capability probes, and client projection: Cave roles require
+      `PermissionType.Cave` plus the supported `View`/`Manager` key, Account Admin requires `PermissionType.User`, and
+      global/synthetic capabilities are never trusted from account-scoped persisted role keys.
+- [x] Permission-management writes resolve definitions by (`PermissionType`, `Key`) and accept only supported persisted
+      roles (`Cave` `View`/`Manager`, account `User` `Admin`); account provisioning selects the User-domain `Admin`
+      even when a conflicting Cave-domain `Admin` row exists.
+- [x] Permission-definition identity is unique within (`PermissionType`, `Key`); migration preserves identical textual
+      keys across different domains and fails closed with an explicit migration error if legacy same-domain duplicates
+      must be repaired before the unique invariant can be installed.
+- [x] Account membership revocation and ordinary Cave/User permission grants serialize on the same `AccountUser` row:
+      grant transactions use `FOR KEY SHARE`, revocation uses `FOR UPDATE`, and both lock orderings are proven against
+      real PostgreSQL so no account-scoped permission can survive or be created after membership removal.
+- [ ] Automatic and first-available County Cave Number allocation uses all account+County Caves, including hidden and
+      archived Caves, while `IgnoreQueryFilters()` remains account-qualified and cannot observe another Account's numbers.
+- [ ] View-only creation proposals cannot select manual or first-available County-number modes; both Manager-only
+      allocation controls are enforced server-side, and View proposals use automatic-next allocation.
+- [ ] Create approval atomically creates the Cave + first revision + approved request, and grants submitter Cave View
+      only when the submitter is still an Account member.
+- [ ] Revoking the submitter's last effective Cave View capability removes pre-publication create-request access; a
+      later approval may still publish the Cave and restores Cave View only for a submitter who remains an Account member.
+- [ ] Removing the submitter from the Account does not block later approval and does not recreate a CavePermission row.
+- [ ] Submitter destination changes reroute the review queue across County/State scopes immediately.
+- [ ] Two independent create proposals that preview the same County number serialize publication and receive distinct
+      authoritative County numbers, with each first revision recording its allocated value.
+- [ ] The complete authoring contract publishes equivalently through direct Manager create and View-proposal approval.
+- [ ] Create rejection creates no Cave, revision, or Cave-View grant.
+- [ ] Create request-changes/revision/resubmit preserves null-base immutable proposal history.
 - [ ] Initial proposal can stage Files before request creation.
 - [ ] Proposal versions preserve exact File identity/intents.
 - [ ] Proposal versions preserve exact proposed line-plot GeoJSON.
@@ -333,6 +366,9 @@ Do not mark the task complete until every applicable item is true:
 - [ ] Empty proposal versions are rejected.
 - [ ] Approval publishes the exact selected immutable proposal version.
 - [ ] Rejection creates no published revision.
+
+- [ ] Downgrade across `SupportNewCaveProposals` fails closed with an explicit compatibility error while any creation
+      proposal version has null `BaseRevisionId`; the failed downgrade leaves both schema and proposal data unchanged.
 
 ### Architecture/security/compatibility
 - [ ] Services/workflow coordinators do not acquire direct DbContext/Npgsql ownership.

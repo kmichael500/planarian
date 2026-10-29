@@ -22,7 +22,7 @@ erDiagram
     CAVE ||--o{ CAVE_CHANGE_REQUEST : "logical CaveId workflow (no FK)"
     CAVE_CHANGE_REQUEST ||--o{ CAVE_PROPOSAL_VERSION : versions
     CAVE_CHANGE_REQUEST ||--o| CAVE_PROPOSAL_VERSION : current_version
-    CAVE_PROPOSAL_VERSION }o--|| CAVE_REVISION : based_on
+    CAVE_PROPOSAL_VERSION }o--o| CAVE_REVISION : based_on
 
     CAVE_CHANGE_REQUEST ||--o{ CAVE_CHANGE_REQUEST_REVIEW_EVENT : audit
     CAVE_CHANGE_REQUEST ||--o{ CAVE_CHANGE_REQUEST_STAGED_FILE : claims
@@ -110,7 +110,7 @@ Important fields:
 
 - AccountId;
 - CaveId;
-- original BaseRevisionId;
+- original BaseRevisionId (null for a new-Cave creation request);
 - CurrentProposalVersionId;
 - ApprovedRevisionId;
 - Status;
@@ -128,12 +128,14 @@ Important fields:
 - AccountId;
 - ChangeRequestId;
 - CaveId;
-- BaseRevisionId;
+- BaseRevisionId (null for a new-Cave proposal version);
 - PreviousProposalVersionId;
 - SchemaVersion;
 - ProposalJson.
 
-Each version independently identifies the published Cave revision it was authored against.
+Each existing-Cave version independently identifies the published Cave revision it was authored against. A new-Cave
+proposal version has `BaseRevisionId = null` because there is no published Cave state yet; the reserved `CaveId` remains
+the future Cave identity.
 
 PreviousProposalVersionId gives the proposal-version history.
 
