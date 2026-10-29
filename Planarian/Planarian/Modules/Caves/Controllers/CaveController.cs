@@ -98,9 +98,10 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [HttpGet("counties/{countyId:length(10)}/next-number")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<int>> GetNextCountyNumber(string countyId,
-        [FromQuery] bool useFirstAvailableCountyNumber = false)
+        [FromQuery] bool useFirstAvailableCountyNumber = false,
+        [FromQuery] string? caveId = null)
     {
-        var countyNumber = await Service.GetNextCountyNumber(countyId, useFirstAvailableCountyNumber);
+        var countyNumber = await Service.GetNextCountyNumber(countyId, useFirstAvailableCountyNumber, caveId);
 
         return new JsonResult(countyNumber);
     }

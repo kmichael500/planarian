@@ -41,7 +41,33 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
-        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
+        var accountStates = DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId);
+
+        if (permissionKey == PermissionKey.Manager)
+        {
+            // Regional permission administration must be based on the scope that was actually
+            // granted, not on a Cave row's descriptive StateId. Cave-only Managers use the
+            // separate individual-Cave picker and must not be offered whole States here.
+            accountStates = accountStates.Where(accountState =>
+                DbContext.UserPermissions.Any(permission =>
+                    permission.UserId == RequestUser.Id
+                    && permission.AccountId == RequestUser.AccountId
+                    && permission.Permission!.PermissionType == PermissionType.User
+                    && permission.Permission.Key == PermissionKey.Admin)
+                || DbContext.CavePermissions.Any(permission =>
+                    permission.UserId == RequestUser.Id
+                    && permission.AccountId == RequestUser.AccountId
+                    && permission.Permission!.PermissionType == PermissionType.Cave
+                    && permission.Permission.Key == PermissionKey.Manager
+                    && permission.CaveId == null
+                    && (
+                        (permission.StateId == null && permission.CountyId == null)
+                        || permission.StateId == accountState.StateId
+                        || (permission.CountyId != null && permission.County!.StateId == accountState.StateId)
+                    )));
+        }
+
+        return await accountStates
             .Select(accountState => new SelectListItem<string>(accountState.State!.Name, accountState.State.Id))
             .ToListAsync();
     }
@@ -58,8 +84,24 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
         IQueryable<County> countyQuery;
         if (permissionKey == PermissionKey.Manager)
         {
-            countyQuery = query.Where(e => e.Permission.Key == PermissionKey.Manager)
-                .Select(e => e.County!);
+            // Regional Manager choices come from the grants themselves so empty Counties
+            // remain administrable. Cave-only Managers use the separate Cave picker.
+            countyQuery = DbContext.Counties.Where(county =>
+                county.AccountId == RequestUser.AccountId &&
+                (DbContext.UserPermissions.Any(permission =>
+                     permission.UserId == RequestUser.Id &&
+                     permission.AccountId == RequestUser.AccountId &&
+                     permission.Permission!.PermissionType == PermissionType.User &&
+                     permission.Permission.Key == PermissionKey.Admin) ||
+                 DbContext.CavePermissions.Any(permission =>
+                     permission.UserId == RequestUser.Id &&
+                     permission.AccountId == RequestUser.AccountId &&
+                     permission.Permission!.PermissionType == PermissionType.Cave &&
+                     permission.Permission.Key == PermissionKey.Manager &&
+                     permission.CaveId == null &&
+                     ((permission.StateId == null && permission.CountyId == null) ||
+                      permission.CountyId == county.Id ||
+                      (permission.CountyId == null && permission.StateId == county.StateId)))));
         }
         else if (permissionKey == PermissionKey.View)
         {

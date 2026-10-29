@@ -115,6 +115,18 @@ const CaveService = {
     );
     return response.data;
   },
+  async PreviewNewCave(cave: AddCaveVm): Promise<CaveChangePreviewVm> {
+    const response = await HttpClient.post<CaveChangePreviewVm>(
+      `${changeRequestUrl}/caves/new/preview`, cave
+    );
+    return response.data;
+  },
+  async SubmitNewCave(cave: AddCaveVm): Promise<string> {
+    const response = await HttpClient.post<string>(
+      `${changeRequestUrl}/caves/new`, cave
+    );
+    return response.data;
+  },
   async PreviewChanges(caveId: string, cave: AddCaveVm, expectedBaseRevisionId: string): Promise<CaveChangePreviewVm> {
     const response = await HttpClient.post<CaveChangePreviewVm>(
       `${changeRequestUrl}/caves/${caveId}/preview`, { cave, expectedBaseRevisionId }
@@ -128,7 +140,7 @@ const CaveService = {
     return response.data;
   },
   async PreviewRevisedChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean,
-    expectedBaseRevisionId: string, expectedProposalVersionId: string): Promise<CaveChangePreviewVm> {
+    expectedBaseRevisionId: string | undefined, expectedProposalVersionId: string): Promise<CaveChangePreviewVm> {
     const response = await HttpClient.post<CaveChangePreviewVm>(
       `${changeRequestUrl}/${requestId}/versions/preview`,
       { cave, againstCurrent, expectedBaseRevisionId, expectedProposalVersionId }
@@ -136,7 +148,7 @@ const CaveService = {
     return response.data;
   },
   async ReviseChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean,
-    expectedBaseRevisionId: string, expectedProposalVersionId: string): Promise<string> {
+    expectedBaseRevisionId: string | undefined, expectedProposalVersionId: string): Promise<string> {
     const response = await HttpClient.post<string>(
       `${changeRequestUrl}/${requestId}/versions`,
       { cave, againstCurrent, expectedBaseRevisionId, expectedProposalVersionId }
@@ -218,10 +230,18 @@ const CaveService = {
   },
   async GetNextCountyNumber(
     countyId: string,
-    useFirstAvailableCountyNumber: boolean = false
+    useFirstAvailableCountyNumber: boolean = false,
+    caveId?: string
   ): Promise<number> {
+    const params = new URLSearchParams({
+      useFirstAvailableCountyNumber: String(useFirstAvailableCountyNumber),
+    });
+    if (!isNullOrWhiteSpace(caveId)) {
+      params.set("caveId", caveId!);
+    }
+
     const response = await HttpClient.get<number>(
-      `${baseUrl}/counties/${countyId}/next-number?useFirstAvailableCountyNumber=${useFirstAvailableCountyNumber}`
+      `${baseUrl}/counties/${countyId}/next-number?${params.toString()}`
     );
     return response.data;
   },

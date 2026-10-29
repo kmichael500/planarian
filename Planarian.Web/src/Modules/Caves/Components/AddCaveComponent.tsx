@@ -49,6 +49,7 @@ export interface AddCaveComponentProps {
   stagedFileRequestId?: string;
   existingRequestStagedFileIds?: readonly string[];
   stickySubmit?: boolean;
+  hideCountyNumberControls?: boolean;
 }
 const AddCaveComponent = ({
   form,
@@ -59,6 +60,7 @@ const AddCaveComponent = ({
   stagedFileRequestId,
   existingRequestStagedFileIds,
   stickySubmit = false,
+  hideCountyNumberControls = false,
 }: AddCaveComponentProps) => {
   const { isFeatureEnabled } = useFeatureEnabled();
   const editingCave = isEditing ? (cave as CaveVm | undefined) : undefined;
@@ -143,6 +145,14 @@ const AddCaveComponent = ({
       return;
     }
 
+    if (hideCountyNumberControls) {
+      setCountyDisplayId(undefined);
+      setCountyIdDelimiter(undefined);
+      setIsCountyMetadataLoading(false);
+      form.setFieldsValue({ countyDisplayId: undefined });
+      return;
+    }
+
     if (
       isEditing &&
       cave?.countyId === selectedCountyId &&
@@ -175,6 +185,7 @@ const AddCaveComponent = ({
   }, [
     form,
     isEditing,
+    hideCountyNumberControls,
     selectedCountyId,
     cave?.countyDisplayId,
     cave?.countyId,
@@ -206,6 +217,14 @@ const AddCaveComponent = ({
       return;
     }
 
+    if (hideCountyNumberControls) {
+      // Hidden Manager-only state is intentionally preserved in the form so a transient
+      // permission lookup cannot erase an authorized Manager's saved proposal intent.
+      // The owning page re-checks destination authority and sanitizes before preview/save.
+      setIsCountyNumberLoading(false);
+      return;
+    }
+
     if (isCountyNumberManuallySet) {
       setIsCountyNumberLoading(false);
       return;
@@ -222,7 +241,8 @@ const AddCaveComponent = ({
 
     CaveService.GetNextCountyNumber(
       selectedCountyId,
-      !!useFirstAvailableCountyNumber
+      !!useFirstAvailableCountyNumber,
+      isEditing ? cave?.id : undefined
     )
       .then((nextCountyNumber) => {
         if (!isCurrent) return;
@@ -247,7 +267,9 @@ const AddCaveComponent = ({
     isCountyNumberManuallySet,
     useFirstAvailableCountyNumber,
     isEditing,
+    hideCountyNumberControls,
     selectedCountyId,
+    cave?.id,
     cave?.countyId,
     cave?.countyNumber,
   ]);
@@ -408,7 +430,7 @@ const AddCaveComponent = ({
           </Form.Item>
         </Col>
       </ShouldDisplay>
-      <ShouldDisplay permissionKey={PermissionKey.Manager}>
+      {!hideCountyNumberControls && <ShouldDisplay permissionKey={PermissionKey.Manager}>
         <Col {...twoColProps}>
           <Form.Item label="County Cave Number">
             <Form.Item
@@ -510,7 +532,7 @@ const AddCaveComponent = ({
             </div>
           </Form.Item>
         </Col>
-      </ShouldDisplay>
+      </ShouldDisplay>}
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
         <Col {...twoColProps}>
           <Form.Item

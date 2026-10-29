@@ -16,6 +16,7 @@ ON c."AccountId"::text = cp."AccountId"::text AND
     cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
     JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
 WHERE p."PermissionType"::text = 'Cave'::text
+  AND p."Key"::text IN ('View'::text, 'Manager'::text)
 UNION
 SELECT cp."AccountId",
        cp."UserId",
@@ -32,6 +33,7 @@ ON ct."AccountId"::text = cp."AccountId"::text AND
     cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
     JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
 WHERE p."PermissionType"::text = 'Cave'::text
+  AND p."Key"::text IN ('View'::text, 'Manager'::text)
 UNION
 SELECT up."AccountId",
        up."UserId",
@@ -46,8 +48,10 @@ ON c."AccountId"::text = up."AccountId"::text
     CROSS JOIN "Permissions" p
 WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
     FROM "Permissions"
-    WHERE "Permissions"."Key"::text = 'Admin'::text))
+    WHERE "Permissions"."Key"::text = 'Admin'::text
+      AND "Permissions"."PermissionType"::text = 'User'::text))
   AND p."PermissionType"::text = 'Cave'::text
+  AND p."Key"::text IN ('View'::text, 'Manager'::text)
 UNION
 SELECT up."AccountId",
        up."UserId",
@@ -62,5 +66,7 @@ ON ct."AccountId"::text = up."AccountId"::text
     CROSS JOIN "Permissions" p
 WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
     FROM "Permissions"
-    WHERE "Permissions"."Key"::text = 'Admin'::text))
-  AND p."PermissionType"::text = 'Cave'::text;
+    WHERE "Permissions"."Key"::text = 'Admin'::text
+      AND "Permissions"."PermissionType"::text = 'User'::text))
+  AND p."PermissionType"::text = 'Cave'::text
+  AND p."Key"::text IN ('View'::text, 'Manager'::text);

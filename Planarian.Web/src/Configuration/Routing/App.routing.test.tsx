@@ -57,3 +57,11 @@ test("keeps platform administration scoped to Planarian Settings", () => {
     PermissionKey.PlanarianAdmin
   );
 });
+
+test("allows View users to author new-Cave proposals while direct editing remains Manager-only", () => {
+  const policies = routePolicies();
+
+  expect(policies.get("/caves/add")).toContain(PermissionKey.View);
+  expect(policies.get("/caves/add")).not.toContain(PermissionKey.Manager);
+  expect(policies.get("/caves/:caveId/edit")).toContain(PermissionKey.Manager);
+});

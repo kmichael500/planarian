@@ -13,6 +13,55 @@ internal static class CavePermissions
     public static Task GrantManagerAsync(PostgresTestDatabase database, PublishedCaveTestData cave, string userId) =>
         GrantAsync(database, cave, userId, "mAnageR000", "Manager", "Manage Caves");
 
+    public static Task GrantCountyManagerAsync(
+        PostgresTestDatabase database,
+        PublishedCaveTestData cave,
+        string userId) => GrantCountyManagerAsync(database, cave.AccountId, cave.CountyId, userId);
+
+    public static async Task GrantCountyManagerAsync(
+        PostgresTestDatabase database,
+        string accountId,
+        string countyId,
+        string userId)
+    {
+        const string permissionId = "mAnageR000";
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId,
+            Key = PermissionKey.Manager,
+            Name = PermissionKey.Manager,
+            Description = "Manage Caves",
+            PermissionType = PermissionType.Cave
+        });
+
+        await using var db = database.CreateDbContext(userId, accountId);
+        await EnsureAccountUserAsync(db, accountId);
+        db.CavePermissions.Add(new CavePermission
+        {
+            UserId = db.RequestUser.Id,
+            AccountId = accountId,
+            CountyId = countyId,
+            PermissionId = permissionId
+        });
+        await db.SaveChangesAsync();
+    }
+
+    public static async Task RevokeCountyManagerAsync(
+        PostgresTestDatabase database,
+        string accountId,
+        string countyId,
+        string userId)
+    {
+        await using var db = database.CreateDbContext("permission-admin", accountId);
+        await using var actor = database.CreateDbContext(userId, accountId);
+        await db.CavePermissions.Where(row =>
+            row.AccountId == accountId &&
+            row.CountyId == countyId &&
+            row.CaveId == null &&
+            row.UserId == actor.RequestUser.Id &&
+            row.PermissionId == "mAnageR000").ExecuteDeleteAsync();
+    }
+
     public static async Task RevokeAllAsync(PostgresTestDatabase database, PublishedCaveTestData cave, string userId)
     {
         await using var db = database.CreateDbContext("permission-admin", cave.AccountId);

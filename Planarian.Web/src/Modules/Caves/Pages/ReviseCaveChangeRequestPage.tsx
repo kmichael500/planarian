@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Alert, Card, Form, message, Space, Spin, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { AppService } from "../../../Shared/Services/AppService";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -18,6 +19,7 @@ import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
 import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 import { AddCaveVm } from "../Models/AddCaveVm";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
 
@@ -36,6 +38,8 @@ export const ReviseCaveChangeRequestPage = () => {
   const [saving, setSaving] = useState(false);
   const [activeFileId, setActiveFileId] = useState<string>();
   const [activeLinePlot, setActiveLinePlot] = useState<NonNullable<CaveChangePreviewVm["linePlots"]>[number]>();
+  const [canManageCreationDestination, setCanManageCreationDestination] = useState<boolean>();
+  const selectedCountyId = Form.useWatch("countyId", form) as string | undefined;
   const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
@@ -87,7 +91,8 @@ export const ReviseCaveChangeRequestPage = () => {
           baseRevisionId = version.baseRevisionId;
         }
 
-        if (!values || !baseRevisionId) throw new Error("ChangeRequestEditorUnavailable");
+        if (!values || (!loaded.request.isCreation && !baseRevisionId))
+          throw new Error("ChangeRequestEditorUnavailable");
         setDetail(loaded);
         setHeaderTitle([loaded.request.status === "ChangesRequested" ? "Revise requested changes" : loaded.request.isStale ? "Re-review changes" : "Revise changes"]);
         setExpectedProposalVersionId(loaded.request.currentProposalVersionId);
@@ -104,6 +109,28 @@ export const ReviseCaveChangeRequestPage = () => {
     };
     void load();
   }, [requestId, form, setHeaderButtons, setHeaderTitle]);
+
+  useEffect(() => {
+    if (!detail?.request.isCreation) {
+      setCanManageCreationDestination(undefined);
+      return;
+    }
+    if (!selectedCountyId) {
+      setCanManageCreationDestination(false);
+      return;
+    }
+
+    let active = true;
+    setCanManageCreationDestination(undefined);
+    void AppService.HasCavePermission(PermissionKey.Manager, null, selectedCountyId)
+      .then(canManage => {
+        if (active) setCanManageCreationDestination(canManage);
+      })
+      .catch(() => {
+        if (active) setCanManageCreationDestination(false);
+      });
+    return () => { active = false; };
+  }, [detail?.request.isCreation, selectedCountyId]);
 
   if (!requestId) return null;
   const isRevisable = detail?.request.status === "Pending" || detail?.request.status === "ChangesRequested";
@@ -143,12 +170,26 @@ export const ReviseCaveChangeRequestPage = () => {
   };
 
   const previewChanges = async (_validatedValues: AddCaveVm) => {
-    const values = getCaveAuthoringSubmissionValues(form);
+    let values = getCaveAuthoringSubmissionValues(form);
     setLoading(true);
     try {
+      if (detail?.request.isCreation && values.countyId) {
+        const canManageDestination = await AppService.HasCavePermission(
+          PermissionKey.Manager, null, values.countyId
+        ).catch(() => false);
+        setCanManageCreationDestination(canManageDestination);
+        if (!canManageDestination) {
+          values = {
+            ...values,
+            countyNumber: null,
+            isCountyNumberManuallySet: false,
+            useFirstAvailableCountyNumber: false,
+          };
+        }
+      }
       setDraft(values);
       setPreview(await CaveService.PreviewRevisedChanges(requestId, values, againstCurrent,
-        expectedBaseRevisionId!, expectedProposalVersionId!));
+        expectedBaseRevisionId, expectedProposalVersionId!));
     } catch (error: any) {
       if (error?.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before continuing.");
@@ -163,7 +204,7 @@ export const ReviseCaveChangeRequestPage = () => {
     setSaving(true);
     try {
       await CaveService.ReviseChanges(requestId, draft, againstCurrent,
-        expectedBaseRevisionId!, expectedProposalVersionId!);
+        expectedBaseRevisionId, expectedProposalVersionId!);
       message.success(detail?.request.status === "ChangesRequested" ? "A new draft proposal version was saved. Resubmit it for review when you are ready." : "A new proposal version was saved.");
       unsaved.markClean();
       navigate(ClientRoutes.caveChangeRequest.get(requestId));
@@ -218,7 +259,9 @@ export const ReviseCaveChangeRequestPage = () => {
       <Form form={form} layout="vertical" onFinish={previewChanges} onValuesChange={unsaved.markDirty}>
         <AddCaveComponent isEditing form={form} cave={editorValues} submitLabel="Review changes"
           onAuthoringChange={unsaved.markDirty} stagedFileRequestId={requestId}
-          existingRequestStagedFileIds={detail.activeStagedFiles.map(file => file.id)} stickySubmit />
+          existingRequestStagedFileIds={detail.activeStagedFiles.map(file => file.id)}
+          hideCountyNumberControls={detail.request.isCreation && canManageCreationDestination !== true}
+          stickySubmit />
       </Form>
     </Card>}
     <FileViewer open={!!activeFile} onCancel={() => setActiveFileId(undefined)}

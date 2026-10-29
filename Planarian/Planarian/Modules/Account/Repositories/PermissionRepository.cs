@@ -13,9 +13,10 @@ public class PermissionRepository : RepositoryBase
     {
     }
 
-    public async Task<Permission?> GetPermissionByKey(string permissionKey)
+    public async Task<Permission?> GetPermissionByKey(string permissionKey, string permissionType)
     {
-        return await DbContext.Permissions.FirstOrDefaultAsync(e => e.Key.Equals(permissionKey));
+        return await DbContext.Permissions.SingleOrDefaultAsync(e =>
+            e.Key == permissionKey && e.PermissionType == permissionType);
     }
 
     public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>

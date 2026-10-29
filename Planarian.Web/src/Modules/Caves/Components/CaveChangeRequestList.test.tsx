@@ -12,7 +12,7 @@ beforeAll(() => {
 });
 
 const summary = (status: CaveChangeRequestSummaryVm["status"] = "Pending"): CaveChangeRequestSummaryVm => ({
-  id: "request001", caveId: "cave000001", caveName: "Helms Deep Cave", caveExists: true,
+  id: "request001", caveId: "cave000001", caveName: "Helms Deep Cave", caveExists: true, isCreation: false,
   status, submitterUserId: "user000001", submitterName: "Michael Test",
   submittedOn: "2026-08-19T12:00:00Z", updatedOn: "2026-08-19T12:10:00Z",
   originalBaseRevisionId: "revision01", proposalBaseRevisionId: "revision01",

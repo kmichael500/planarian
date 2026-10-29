@@ -19,6 +19,16 @@ public sealed class CaveChangeRequestController : ControllerBase
 
     public CaveChangeRequestController(CaveChangeRequestService service) => _service = service;
 
+    [HttpPost("caves/new/preview")]
+    public async Task<ActionResult<CaveChangePreviewVm>> PreviewNew(AddCaveVm cave,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await _service.PreviewNewAsync(cave, cancellationToken));
+
+    [HttpPost("caves/new")]
+    public async Task<ActionResult<string>> CreateNew(AddCaveVm cave,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await _service.CreateNewAsync(cave, cancellationToken));
+
     [HttpPost("caves/{caveId:length(10)}")]
     public async Task<ActionResult<string>> Create(string caveId, CreateCaveChangeRequestVm request,
         CancellationToken cancellationToken)

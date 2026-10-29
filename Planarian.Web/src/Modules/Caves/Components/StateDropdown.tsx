@@ -1,44 +1,56 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Select, Spin } from "antd";
 import { SelectProps } from "antd/lib/select";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 const { Option } = Select;
 
 export interface StateDropdownProps extends SelectProps<string> {
   onChange?: (value: string) => void;
   autoSelectFirst?: boolean;
+  permissionKey?: PermissionKey;
 }
 
 const StateDropdown = ({
   onChange,
   autoSelectFirst,
+  permissionKey,
   ...rest
 }: StateDropdownProps) => {
   const [states, setStates] = useState<SelectListItem<string>[]>([]);
   const [defaultValue, setDefaultValue] = useState<string>("");
-
   const [isLoading, setIsLoading] = useState(true);
-
-  if (autoSelectFirst === undefined) {
-    autoSelectFirst = false;
-  }
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const shouldAutoSelectFirst = autoSelectFirst ?? false;
 
   useEffect(() => {
-    SettingsService.GetStates().then((data) => {
-      setIsLoading(true);
-      setStates(data);
-      if (data.length === 1 && autoSelectFirst) {
-        setDefaultValue(data[0].value);
+    let isCurrent = true;
+    setIsLoading(true);
 
-        if (onChange) {
-          onChange(data[0].value);
+    SettingsService.GetStates(permissionKey)
+      .then((data) => {
+        if (!isCurrent) return;
+
+        setStates(data);
+        setDefaultValue("");
+        if (data.length === 1 && shouldAutoSelectFirst) {
+          setDefaultValue(data[0].value);
+          onChangeRef.current?.(data[0].value);
         }
-      }
-      setIsLoading(false);
-    });
-  }, []);
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [permissionKey, shouldAutoSelectFirst]);
 
   const selectProps = {
     loading: isLoading,

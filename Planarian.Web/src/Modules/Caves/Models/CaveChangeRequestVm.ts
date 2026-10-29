@@ -26,6 +26,7 @@ export interface CaveChangeRequestSummaryVm {
   caveId: string;
   caveName: string;
   caveExists: boolean;
+  isCreation: boolean;
   status: CaveChangeRequestStatus;
   submitterUserId: string;
   submitterName?: string;
@@ -35,8 +36,8 @@ export interface CaveChangeRequestSummaryVm {
   reviewerUserId?: string;
   reviewerName?: string;
   reviewerNotes?: string;
-  originalBaseRevisionId: string;
-  proposalBaseRevisionId: string;
+  originalBaseRevisionId?: string;
+  proposalBaseRevisionId?: string;
   currentRevisionId?: string;
   currentProposalVersionId: string;
   isStale: boolean;
@@ -49,7 +50,7 @@ export interface CaveChangeRequestSummaryVm {
 export interface CaveProposalVersionVm {
   id: string;
   previousProposalVersionId?: string;
-  baseRevisionId: string;
+  baseRevisionId?: string;
   createdByUserId?: string;
   createdByName?: string;
   createdOn: string;
@@ -76,7 +77,7 @@ export interface CaveProposalVersionDetailVm {
   countyNumberChange?: CaveProposalCountyNumberChangeVm;
   baseRevisionChanged: boolean;
   previousBaseRevisionId?: string;
-  baseRevisionId: string;
+  baseRevisionId?: string;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
   likelyCountyNumber?: number;

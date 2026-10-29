@@ -274,13 +274,29 @@ public class UserRepository : RepositoryBase
 
     public async Task<IEnumerable<string>> GetPermissions(string userId, string accountId)
     {
+        // Permission has one generic FK target, so malformed rows can technically cross role
+        // families. Keep persisted User/Admin and Cave roles separate before flattening keys for
+        // the client; synthetic policies are derived below rather than trusted from stored rows.
         var userPermissions = await DbContext.UserPermissions
-            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .Where(e => e.UserId == userId
+                        && e.AccountId == accountId
+                        && e.Permission!.PermissionType == PermissionType.User
+                        && e.Permission.Key != PermissionPolicyKey.View
+                        && e.Permission.Key != PermissionPolicyKey.Manager
+                        && e.Permission.Key != PermissionPolicyKey.PlanarianAdmin
+                        && e.Permission.Key != PermissionPolicyKey.AdminManager
+                        && e.Permission.Key != PermissionPolicyKey.Export)
             .Select(e => e.Permission!.Key)
             .ToListAsync();
 
         var cavePermissions = await DbContext.CavePermissions
-            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .Where(e => e.UserId == userId
+                        && e.AccountId == accountId
+                        && e.Permission!.PermissionType == PermissionType.Cave
+                        && e.Permission.Key != PermissionPolicyKey.Admin
+                        && e.Permission.Key != PermissionPolicyKey.PlanarianAdmin
+                        && e.Permission.Key != PermissionPolicyKey.AdminManager
+                        && e.Permission.Key != PermissionPolicyKey.Export)
             .Select(e => e.Permission!.Key)
             .Distinct()
             .ToListAsync();
@@ -292,7 +308,8 @@ public class UserRepository : RepositoryBase
                 && string.IsNullOrWhiteSpace(e.StateId)
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
-                && e.Permission!.Key == PermissionPolicyKey.Manager
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && e.Permission.Key == PermissionPolicyKey.Manager
             )
             .AnyAsync();
         if (isAdminManger == false)
@@ -301,7 +318,8 @@ public class UserRepository : RepositoryBase
                 .AnyAsync(e =>
                     e.UserId == userId
                     && e.AccountId == accountId
-                    && PermissionKey.Admin == e.Permission!.Key
+                    && e.Permission!.PermissionType == PermissionType.User
+                    && PermissionKey.Admin == e.Permission.Key
                 );
         }
 
@@ -393,7 +411,8 @@ public class UserRepository : RepositoryBase
     {
         return await DbContext.UserPermissions
             .Where(e => e.UserId == userId && e.AccountId == RequestUser.AccountId &&
-                        e.Permission!.PermissionType == PermissionType.User)
+                        e.Permission!.PermissionType == PermissionType.User &&
+                        e.Permission.Key == PermissionKey.Admin)
             .Select(e => new UserPermissionVm(e.Id, e.Permission!.Key, e.Permission.Name, e.Permission!.Description))
             .ToListAsync();
     }
@@ -402,13 +421,46 @@ public class UserRepository : RepositoryBase
     {
         return await DbContext.UserPermissions
             .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey &&
+                        e.Permission.PermissionType == PermissionType.User &&
                         e.AccountId == RequestUser.AccountId)
-            .FirstOrDefaultAsync();
+            .SingleOrDefaultAsync();
+    }
+
+    public async Task<bool> LockAccountUserForPermissionGrantAsync(string userId, string accountId,
+        CancellationToken cancellationToken = default)
+    {
+        if (DbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Permission grants require an active PostgreSQL transaction.");
+
+        // Grant workflows hold a key-share lock on membership for the whole transaction. This
+        // conflicts with RevokeAccess's FOR UPDATE lock, so either the grant commits first and
+        // revoke removes it, or revoke commits first and the grant observes that membership is gone.
+        var accountUser = await DbContext.AccountUsers.FromSqlInterpolated($"""
+                SELECT * FROM "AccountUsers"
+                WHERE "AccountId" = {accountId} AND "UserId" = {userId}
+                FOR KEY SHARE
+                """)
+            .IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+        return accountUser is not null;
     }
 
     public async Task<bool> DeleteAccountUserAccess(string userId, string accountId,
         CancellationToken cancellationToken = default)
     {
+        if (DbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Account access revocation requires an active PostgreSQL transaction.");
+
+        // RevokeAccess owns the transaction. Lock membership before deleting any grants so
+        // concurrent workflows that conditionally create permissions from current membership
+        // serialize on the same row instead of leaving a grant behind after removal.
+        var accountUser = await DbContext.AccountUsers.FromSqlInterpolated($"""
+                SELECT * FROM "AccountUsers"
+                WHERE "AccountId" = {accountId} AND "UserId" = {userId}
+                FOR UPDATE
+                """)
+            .IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+        if (accountUser is null) return false;
+
         await DbContext.CavePermissions
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .ExecuteDeleteAsync(cancellationToken);

@@ -81,13 +81,18 @@ public class CaveService : ServiceBase<CaveRepository>
         return new CaveEditAuthoringContextVm(visible, linePlots);
     }
 
-    public async Task<int> GetNextCountyNumber(string countyId, bool useFirstAvailableCountyNumber = false)
+    public async Task<int> GetNextCountyNumber(
+        string countyId,
+        bool useFirstAvailableCountyNumber = false,
+        string? caveId = null)
     {
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, countyId, null);
         return await Repository.GetNewDisplayId(countyId, useFirstAvailableCountyNumber);
     }
 
     public async Task<bool> IsCountyNumberInUse(string countyId, int countyNumber, string? caveId = null)
     {
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, countyId, null);
         return await Repository.IsCountyNumberInUse(countyId, countyNumber, caveId);
     }
 
@@ -499,7 +504,7 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
         var result = await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId,
-            null, null, null, null, requireOwnedTransaction: true, cancellationToken);
+            null, null, null, null, reservedNewCaveId: null, requireOwnedTransaction: true, cancellationToken);
         // Opportunistic cleanup is a side effect: rejected/stale edits must not execute it.
         // Both older debt and this publication's new targets are safe to process after commit.
         await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
@@ -513,7 +518,15 @@ public class CaveService : ServiceBase<CaveRepository>
         CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
-            requireOwnedTransaction: false, cancellationToken);
+            reservedNewCaveId: null, requireOwnedTransaction: false, cancellationToken);
+
+    internal Task<CaveSaveResult> ApproveNewCaveChangeRequestAsync(AddCaveVm values, string reservedCaveId,
+        string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
+        IReadOnlySet<string> authorizedNewEntranceIds, IReadOnlySet<string> authorizedNewLinePlotIds,
+        CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
+        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, expectedRevisionId: null,
+            stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
+            reservedNewCaveId: reservedCaveId, requireOwnedTransaction: false, cancellationToken);
 
     // Transaction-joining overload used by the approval workflow and integration rollback coverage.
     // It is intentionally not part of CaveService's public application API.
@@ -523,7 +536,8 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         var result = await SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, new HashSet<string>(StringComparer.Ordinal),
-            new HashSet<string>(StringComparer.Ordinal), null, requireOwnedTransaction: false, cancellationToken);
+            new HashSet<string>(StringComparer.Ordinal), null, reservedNewCaveId: null,
+            requireOwnedTransaction: false, cancellationToken);
         return result.Mutation;
     }
 
@@ -532,12 +546,15 @@ public class CaveService : ServiceBase<CaveRepository>
         IReadOnlyList<StagedCaveFilePublication>? stagedFilePublications,
         IReadOnlySet<string>? authorizedNewEntranceIds,
         IReadOnlySet<string>? authorizedNewLinePlotIds,
-        CavePeoplePublicationContext? peoplePublicationContext, bool requireOwnedTransaction,
-        CancellationToken cancellationToken)
+        CavePeoplePublicationContext? peoplePublicationContext, string? reservedNewCaveId,
+        bool requireOwnedTransaction, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-        var isNew = string.IsNullOrWhiteSpace(values.Id);
+        var isNew = !string.IsNullOrWhiteSpace(reservedNewCaveId) || string.IsNullOrWhiteSpace(values.Id);
+        if (!string.IsNullOrWhiteSpace(reservedNewCaveId) &&
+            !string.IsNullOrWhiteSpace(values.Id) && values.Id != reservedNewCaveId)
+            throw ApiExceptionDictionary.BadRequest("The proposed Cave identity does not match this request.");
         if (isNew)
             await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
         else
@@ -571,7 +588,9 @@ public class CaveService : ServiceBase<CaveRepository>
         var cleanupTargets = new List<StorageCleanupTarget>();
         async Task<CaveMutationResult> PublishAsync(CancellationToken _)
         {
-            var entity = isNew ? new Cave { Id = IdGenerator.Generate() } : await Repository.GetAsync(values.Id);
+            var entity = isNew
+                ? new Cave { Id = reservedNewCaveId ?? IdGenerator.Generate() }
+                : await Repository.GetAsync(values.Id);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
@@ -609,7 +628,9 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (values.IsCountyNumberManuallySet)
             {
-                countyNumber = values.CountyNumber;
+                if (values.CountyNumber is not > 0)
+                    throw ApiExceptionDictionary.BadRequest("Enter a county number greater than 0.");
+                countyNumber = values.CountyNumber.Value;
 
                 var countyNumberInUse =
                     await Repository.IsCountyNumberInUse(values.CountyId, countyNumber.Value, values.Id);

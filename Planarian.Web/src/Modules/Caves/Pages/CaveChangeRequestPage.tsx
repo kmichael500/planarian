@@ -23,10 +23,14 @@ import { CaveService } from "../Service/CaveService";
 
 export const CaveAvailability = ({ request }: { request: CaveChangeRequestSummaryVm }) => {
   const navigate = useNavigate();
-  return request.caveExists
-    ? <PlanarianButton icon={<FolderOpenOutlined />} alwaysShowChildren aria-label="Open Cave"
-      onClick={() => navigate(`/caves/${request.caveId}`)}>Open Cave</PlanarianButton>
-    : <Typography.Text type="secondary">Cave no longer available</Typography.Text>;
+  if (request.caveExists)
+    return <PlanarianButton icon={<FolderOpenOutlined />} alwaysShowChildren aria-label="Open Cave"
+      onClick={() => navigate(`/caves/${request.caveId}`)}>Open Cave</PlanarianButton>;
+  return <Typography.Text type="secondary">
+    {request.isCreation && request.status !== "Approved"
+      ? "New Cave proposal"
+      : "Cave no longer available"}
+  </Typography.Text>;
 };
 
 export const UnavailableProposalFilesAlert = ({ fileIds, snapshots }: {
@@ -134,7 +138,8 @@ export const CaveChangeRequestPage = () => {
       else if (decision.kind === "requestChanges")
         await CaveService.RequestChangeRequestChanges(requestId, expectedProposalVersionId, decision.message);
       else await CaveService.RejectChangeRequest(requestId, expectedProposalVersionId, decision.reason);
-      message.success(decision.kind === "approve" ? "Changes approved and published."
+      message.success(decision.kind === "approve"
+        ? detail.request.isCreation ? "New Cave approved and published." : "Changes approved and published."
         : decision.kind === "requestChanges" ? "Changes sent back to the submitter." : "Change request rejected.");
       setDetail(await CaveService.GetChangeRequest(requestId));
       setDecisionDialog(undefined);
@@ -263,6 +268,7 @@ export const CaveChangeRequestPage = () => {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
             gap: token.marginSM, flexWrap: "wrap" }}>
             <Space wrap size="small" align="center">
+              {request.isCreation && <Tag color="blue">New Cave</Tag>}
               {request.status !== "Pending" && <Tag color={statusColor}>{statusLabel}</Tag>}
               {request.isStale && <Tag color="warning">Needs re-review</Tag>}
               <Typography.Text type="secondary">{formatChangeScopeSummary(request.changeSummary)}</Typography.Text>
@@ -407,7 +413,9 @@ export const CaveChangeRequestPage = () => {
       ]}>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          This will publish the requested changes to the Cave record. Review the changes above before continuing.
+          {request.isCreation
+            ? "This will create the Cave and publish its first revision. If the submitter is still an account member, they will receive View access."
+            : "This will publish the requested changes to the Cave record."} Review the proposal above before continuing.
         </Typography.Paragraph>
         <div>
           <label htmlFor="approval-note"><Typography.Text>Reviewer note (optional)</Typography.Text></label>

@@ -193,6 +193,217 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
 
 
     [Fact]
+    public async Task NewCaveProposalMigrationRefusesDowngradeWhileCreationProposalExists()
+    {
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, nameof(NewCaveProposalMigrationRefusesDowngradeWhileCreationProposalExists));
+        var migrations = database.GetMigrationNames().ToList();
+        var supportIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_SupportNewCaveProposals", StringComparison.Ordinal));
+        Assert.True(supportIndex > 0);
+
+        await database.MigrateAsync(migrations[supportIndex]);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "CaveChangeRequests"
+                    ("Id","AccountId","CaveId","BaseRevisionId","Status","CreatedOn")
+                values ('newreq0001','mainacct01','future0001',null,'Pending',now());
+
+                insert into "CaveProposalVersions"
+                    ("Id","AccountId","ChangeRequestId","CaveId","BaseRevisionId","SchemaVersion","ProposalJson","CreatedOn")
+                values ('newprop001','mainacct01','newreq0001','future0001',null,1,'{}'::jsonb,now());
+
+                update "CaveChangeRequests"
+                set "CurrentProposalVersionId"='newprop001'
+                where "Id"='newreq0001';
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
+            database.MigrateAsync(migrations[supportIndex - 1]));
+        Assert.Equal(PostgresErrorCodes.RaiseException, exception.SqlState);
+        Assert.Contains("Cannot downgrade SupportNewCaveProposals", exception.MessageText);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select
+                (select is_nullable='YES'
+                 from information_schema.columns
+                 where table_name='CaveProposalVersions' and column_name='BaseRevisionId'),
+                exists(select 1 from "CaveProposalVersions"
+                       where "Id"='newprop001' and "BaseRevisionId" is null),
+                exists(select 1 from "__EFMigrationsHistory"
+                       where "MigrationId" like '%_SupportNewCaveProposals')
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.True(reader.GetBoolean(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.True(reader.GetBoolean(2));
+    }
+
+
+    [Fact]
+    public async Task PermissionDomainMigrationRemovesMalformedAdminExpansionWithoutBreakingRealAdmin()
+    {
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, nameof(PermissionDomainMigrationRemovesMalformedAdminExpansionWithoutBreakingRealAdmin));
+        var migrations = database.GetMigrationNames().ToList();
+        var supportIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_SupportNewCaveProposals", StringComparison.Ordinal));
+        var hardeningIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_HardenPermissionDomainProjection", StringComparison.Ordinal));
+        var identityIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_EnforcePermissionDomainIdentity", StringComparison.Ordinal));
+        Assert.True(supportIndex >= 0);
+        Assert.Equal(supportIndex + 1, hardeningIndex);
+        Assert.Equal(hardeningIndex + 1, identityIndex);
+
+        await database.MigrateAsync(migrations[supportIndex]);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "Users"("Id","FirstName","LastName","EmailAddress","SessionVersion","IsTemporary","CreatedOn")
+                values
+                  ('badmigr001','Bad','Migration','bad-migration@example.test',0,false,now()),
+                  ('goodmigr01','Good','Migration','good-migration@example.test',0,false,now());
+
+                insert into "AccountUsers"
+                    ("AccountId","UserId","Id","InvitationAcceptedOn","CreatedOn")
+                values
+                  ('mainacct01','badmigr001','badacct001',now(),now()),
+                  ('mainacct01','goodmigr01','goodacct01',now(),now());
+
+                insert into "Permissions"
+                    ("Id","Name","Description","IsHidden","Key","SortOrder","PermissionType","CreatedOn")
+                values
+                  ('badadm003','Wrong Type Admin','Regression-only Cave Admin',false,'Admin',99,'Cave',now()),
+                  ('goodadm003','Account Admin','Regression-only valid Account Admin',false,'Admin',99,'User',now()),
+                  ('migview001','View','Regression-only valid Cave View',false,'View',0,'Cave',now()),
+                  ('migmgr0001','Manager','Regression-only valid Cave Manager',false,'Manager',1,'Cave',now());
+
+                insert into "UserPermissions"
+                    ("Id","UserId","PermissionId","AccountId","CreatedOn")
+                values
+                  ('baduperm01','badmigr001','badadm003','mainacct01',now()),
+                  ('gooduperm1','goodmigr01','goodadm003','mainacct01',now());
+
+                insert into "CavePermission"
+                    ("Id","UserId","PermissionId","AccountId","CreatedOn")
+                values ('badcperm01','badmigr001','badadm003','mainacct01',now());
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+
+            await using var before = new NpgsqlCommand("""
+                select
+                  (select count(*) from "UserCavePermissions"
+                   where "AccountId"='mainacct01' and "UserId"='badmigr001' and "CaveId" is not null),
+                  (select count(*) from "UserCavePermissions"
+                   where "AccountId"='mainacct01' and "UserId"='goodmigr01' and "CaveId" is not null)
+                """, connection);
+            await using var beforeReader = await before.ExecuteReaderAsync();
+            Assert.True(await beforeReader.ReadAsync());
+            Assert.True(beforeReader.GetInt64(0) > 0);
+            Assert.True(beforeReader.GetInt64(1) > 0);
+        }
+
+        await database.MigrateAsync(migrations[hardeningIndex]);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var after = new NpgsqlCommand("""
+            select
+              (select count(*) from "UserCavePermissions"
+               where "AccountId"='mainacct01' and "UserId"='badmigr001'),
+              (select count(*) from "UserCavePermissions"
+               where "AccountId"='mainacct01' and "UserId"='goodmigr01' and "CaveId" is not null)
+            """, verify);
+        await using var afterReader = await after.ExecuteReaderAsync();
+        Assert.True(await afterReader.ReadAsync());
+        Assert.Equal(0, afterReader.GetInt64(0));
+        Assert.True(afterReader.GetInt64(1) > 0);
+        await afterReader.DisposeAsync();
+
+        await database.MigrateAsync(migrations[identityIndex]);
+
+        await using var identityVerify = new NpgsqlConnection(database.ConnectionString);
+        await identityVerify.OpenAsync();
+        await using var identity = new NpgsqlCommand("""
+            select
+              (select count(*) from "Permissions"
+               where "Key"='Admin' and "PermissionType" in ('Cave','User')),
+              exists (
+                select 1
+                from pg_indexes
+                where schemaname='public'
+                  and tablename='Permissions'
+                  and indexname='IX_Permissions_PermissionType_Key'
+                  and indexdef like 'CREATE UNIQUE INDEX%'
+              )
+            """, identityVerify);
+        await using var identityReader = await identity.ExecuteReaderAsync();
+        Assert.True(await identityReader.ReadAsync());
+        Assert.Equal(2, identityReader.GetInt64(0));
+        Assert.True(identityReader.GetBoolean(1));
+    }
+
+    [Fact]
+    public async Task PermissionDomainIdentityMigrationFailsClosedOnLegacySameDomainDuplicates()
+    {
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, nameof(PermissionDomainIdentityMigrationFailsClosedOnLegacySameDomainDuplicates));
+        var migrations = database.GetMigrationNames().ToList();
+        var hardeningIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_HardenPermissionDomainProjection", StringComparison.Ordinal));
+        var identityIndex = migrations.FindIndex(migration =>
+            migration.EndsWith("_EnforcePermissionDomainIdentity", StringComparison.Ordinal));
+        Assert.True(hardeningIndex >= 0);
+        Assert.Equal(hardeningIndex + 1, identityIndex);
+
+        await database.MigrateAsync(migrations[hardeningIndex]);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "Permissions"
+                    ("Id","Name","Description","IsHidden","Key","SortOrder","PermissionType","CreatedOn")
+                values
+                  ('dupadmin01','Duplicate Admin One','Legacy duplicate',false,'DuplicateRole',1,'User',now()),
+                  ('dupadmin02','Duplicate Admin Two','Legacy duplicate',false,'DuplicateRole',2,'User',now());
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var failure = await Assert.ThrowsAsync<PostgresException>(
+            () => database.MigrateAsync(migrations[identityIndex]));
+        Assert.Equal("P0001", failure.SqlState);
+        Assert.Contains("duplicate (PermissionType, Key) rows exist", failure.MessageText);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var index = new NpgsqlCommand("""
+            select exists (
+              select 1
+              from pg_indexes
+              where schemaname='public'
+                and tablename='Permissions'
+                and indexname='IX_Permissions_PermissionType_Key'
+                and indexdef like 'CREATE UNIQUE INDEX%'
+            )
+            """, verify);
+        Assert.False((bool)(await index.ExecuteScalarAsync())!);
+    }
+
+
+    [Fact]
     public async Task StorageCleanupMigrationPreservesResetDebtAndConvertsRetainedFilesToAssetCleanupDebt()
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(

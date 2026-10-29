@@ -33,6 +33,7 @@ public class PlanarianSettingsRepository : RepositoryBase
     public async Task<Permission?> GetPermissionByKey(string permissionKey, CancellationToken cancellationToken)
     {
         return await DbContext.Permissions
-            .FirstOrDefaultAsync(e => e.Key == permissionKey, cancellationToken);
+            .SingleOrDefaultAsync(e =>
+                e.Key == permissionKey && e.PermissionType == PermissionType.User, cancellationToken);
     }
 }

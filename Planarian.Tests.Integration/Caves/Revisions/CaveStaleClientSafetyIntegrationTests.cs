@@ -264,6 +264,31 @@ public sealed class CaveStaleClientSafetyIntegrationTests(PostgresTestServer fix
     }
 
     [Fact]
+    public async Task CaveScopedManagerCannotCreateAnotherCaveInTheCounty()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(CaveScopedManagerCannotCreateAnotherCaveInTheCounty));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "qual00000a");
+        await CavePermissions.GrantManagerAsync(database, cave, "manager");
+        await using var actor = await CaveTestActor.CreateAsync(database, cave.AccountId, "manager");
+
+        var newCave = PublishableValues(cave, quality.Id, "Unauthorized new Cave");
+        newCave.Id = null;
+        newCave.ExpectedRevisionId = null;
+        newCave.IsCountyNumberManuallySet = false;
+        newCave.CountyNumber = null;
+
+        await using var verify = database.CreateDbContext("verify-cave-manager-create", cave.AccountId);
+        var before = await CaveDurableStateFingerprint.CaptureAsync(verify);
+        var failure = await Assert.ThrowsAsync<ApiException>(() => actor.Services.Caves.AddCave(newCave, default));
+
+        Assert.Equal(403, failure.StatusCode);
+        await CaveDurableStateFingerprint.AssertUnchangedAsync(verify, before);
+    }
+
+    [Fact]
     public async Task CurrentRevisionAndNewCaveWithoutTokenCanPublishButNewCaveWithTokenCannot()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -271,7 +296,7 @@ public sealed class CaveStaleClientSafetyIntegrationTests(PostgresTestServer fix
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "qual00000a");
-        await CavePermissions.GrantManagerAsync(database, cave, "manager");
+        await CavePermissions.GrantCountyManagerAsync(database, cave, "manager");
         await using var actor = await CaveTestActor.CreateAsync(database, cave.AccountId, "manager");
         var current = PublishableValues(cave, quality.Id, "Current-client update");
         Assert.Equal(cave.CaveId, await actor.Services.Caves.AddCave(current, default));

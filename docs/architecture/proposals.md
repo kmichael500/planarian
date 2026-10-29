@@ -11,7 +11,8 @@ Instead:
 - CaveChangeRequest is the workflow envelope;
 - CaveProposalVersion is an immutable version of proposed desired state;
 - application/persistence code enforces that immutability by creating new version rows rather than updating prior ProposalJson;
-- each proposal version points to the exact CaveRevision it was authored against;
+- an existing-Cave proposal version points to the exact CaveRevision it was authored against;
+- a new-Cave proposal version has a null published base and reserves the future Cave ID instead of creating a placeholder Cave;
 - CurrentProposalVersionId selects the active version;
 - approval publishes the selected immutable version through the normal Cave mutation boundary.
 
@@ -116,7 +117,7 @@ sequenceDiagram
     Workflow->>Requests: Load current request/version/base/current revision
     Workflow->>Workflow: Verify reviewer permission and request state
     Workflow->>Workflow: Verify expected proposal version
-    Workflow->>Workflow: Verify published base is still current
+    Workflow->>Workflow: Verify published base is still current, or reserved Cave still does not exist
     Workflow->>Requests: Plan staged File publications
     Workflow->>Files: Verify external objects exist
     Workflow->>Mutation: ExecuteOwnedTransaction
@@ -138,7 +139,8 @@ External object deletion is outside that transaction and occurs only after commi
 Approval checks both:
 
 1. **Expected proposal version** — prevents a reviewer from approving an older proposal version after someone created a newer one.
-2. **Published base revision** — prevents applying a proposal that was authored against a Cave state that is no longer current.
+2. **Published base / reserved identity** — existing-Cave proposals require the authored base revision to still be current;
+   new-Cave proposals require the reserved Cave ID to remain unused.
 
 Cave xmin concurrency remains an additional protection if another write races after those checks.
 
@@ -167,13 +169,17 @@ Resubmit:
 
 ## Permissions
 
-Current Cave visibility remains required to access request/version/staged-file/history data.
+Existing-Cave request/version/staged-file/history access follows current Cave visibility.
 
-Current View permission is sufficient to propose.
+For a new-Cave request before publication, the submitter may access and revise it only while retaining effective Cave
+`View` capability somewhere in the current Account. Current Managers of the proposal's destination may review it even
+though no Cave exists there yet.
 
-Review/approval requires current Manager authority for the Cave.
+Current View permission is sufficient to propose. Existing-Cave review/approval requires Manager authority for the Cave;
+new-Cave review/approval requires Manager authority for the current proposed destination.
 
-Request ownership does not become a permanent bypass if the submitter later loses visibility.
+Request ownership does not become a permanent bypass if the submitter later loses View capability. On create approval,
+the submitter receives explicit Cave View only if they are still an Account member.
 
 See [Authorization](../authorization.md) for the durable permission model.
 

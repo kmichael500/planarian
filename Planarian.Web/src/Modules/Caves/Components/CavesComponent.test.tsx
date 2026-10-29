@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import React from "react";
+import { waitFor } from "@testing-library/react";
 import { CaveService } from "../Service/CaveService";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CavesComponent } from "./CavesComponent";
 
 let mockHasFilters = false;
@@ -58,7 +60,7 @@ jest.mock("../../../Shared/Components/CardGrid/GridCard", () => {
 jest.mock("../../../Shared/Components/CardGrid/CardGridComponent", () => {
   const React = jest.requireActual("react");
   return {
-    CardGridComponent: ({ pagedItems, renderItem }: any) =>
+    CardGridComponent: ({ pagedItems, renderItem, noDataCreateButton }: any) =>
       React.createElement(
         React.Fragment,
         null,
@@ -68,10 +70,17 @@ jest.mock("../../../Shared/Components/CardGrid/CardGridComponent", () => {
             { key: item.id },
             renderItem(item)
           )
-        )
+        ),
+        ...(pagedItems?.results?.length === 0 && noDataCreateButton
+          ? [React.createElement(React.Fragment, { key: "empty-create" }, noDataCreateButton)]
+          : [])
       ),
   };
 });
+
+jest.mock("./CaveCreateButtonComponent", () => ({
+  CaveCreateButtonComponent: () => <button type="button">Add Cave</button>,
+}));
 
 jest.mock("../../../Shared/Scroll/useScrollRevealVisibility", () => ({
   useScrollRevealVisibility: () => ({
@@ -187,4 +196,35 @@ it("keeps search primary and moves filters, display, and sort into one compact t
   expect(screen.getByRole("button", { name: "Sort" })).toBeInTheDocument();
   expect(screen.queryByText("Display Attributes")).not.toBeInTheDocument();
   expect(await screen.findByText("1 result")).toBeInTheDocument();
+});
+
+
+it("only offers Cave creation from an empty result set when the user has effective View capability", async () => {
+  getCavesMock.mockResolvedValue({
+    pageNumber: 1,
+    pageSize: 10,
+    totalCount: 0,
+    totalPages: 0,
+    results: [],
+  });
+
+  const contextValue = (canView: boolean) => ({
+    currentAccountId: "account0001",
+    hasPermission: () => canView,
+  } as any);
+
+  const view = render(
+    <AppContext.Provider value={contextValue(false)}>
+      <CavesComponent />
+    </AppContext.Provider>
+  );
+  await waitFor(() => expect(getCavesMock).toHaveBeenCalled());
+  expect(screen.queryByRole("button", { name: "Add Cave" })).not.toBeInTheDocument();
+
+  view.rerender(
+    <AppContext.Provider value={contextValue(true)}>
+      <CavesComponent />
+    </AppContext.Provider>
+  );
+  expect(await screen.findByRole("button", { name: "Add Cave" })).toBeInTheDocument();
 });

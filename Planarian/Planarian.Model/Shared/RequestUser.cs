@@ -94,12 +94,14 @@ public class RequestUser
     public string AccountContainerName => AccountUploadFileChunkName;
 
     /// <summary>
-    /// Determines if the user has a specific permission, but not if they have permission for a specific cave, county, or all
+    /// Determines whether the user has the effective capability anywhere in the current Account.
+    /// This is appropriate for named policy/account-level capability checks; it does not authorize
+    /// a particular Cave, County, or State. Use the scoped overload for resource authorization.
     /// </summary>
-    /// <param name="permissionKey"></param>
-    /// <param name="throw"></param>
-    /// <returns></returns>
-    /// <exception cref="ApiException"></exception>
+    /// <param name="permissionKey">The semantic permission/capability to evaluate.</param>
+    /// <param name="throw">Whether to throw Forbidden when the capability is absent.</param>
+    /// <returns>True when the user has the effective capability in the current Account.</returns>
+    /// <exception cref="ApiException">Thrown for a denied capability when <paramref name="throw"/> is true.</exception>
     public async Task<bool> HasCavePermission(string permissionKey, bool @throw = true)
     {
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
@@ -110,17 +112,21 @@ public class RequestUser
             return await _dbContext.UserPermissions.AnyAsync(e =>
                 e.UserId == Id &&
                 e.AccountId == null &&
-                e.Permission!.Key == PermissionPolicyKey.PlanarianAdmin);
+                e.Permission!.PermissionType == PermissionType.User &&
+                e.Permission.Key == PermissionPolicyKey.PlanarianAdmin);
         }
 
         if (string.IsNullOrWhiteSpace(AccountId))
             return false;
 
         var userPermissions = await _dbContext.UserPermissions
-            .Where(e => e.UserId == Id && e.AccountId == AccountId)
+            .Where(e => e.UserId == Id
+                        && e.AccountId == AccountId
+                        && e.Permission!.PermissionType == PermissionType.User)
             .Select(e => e.Permission!.Key).ToListAsync();
 
-        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
+        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
         var hasUserPermission = userPermissions.Any(satisfyingPermissionKeys.Contains);
 
         if (permissionKey == PermissionPolicyKey.AdminManager)
@@ -137,15 +143,18 @@ public class RequestUser
                         && string.IsNullOrWhiteSpace(e.CountyId)
                         && e.UserId == Id
                         && e.AccountId == AccountId
-                        && e.Permission!.Key == permissionKey
+                        && e.Permission!.PermissionType == PermissionType.Cave
+                        && e.Permission.Key == PermissionPolicyKey.Manager
                     );
             }
         }
 
         if (permissionKey == PermissionPolicyKey.Export)
         {
-            hasUserPermission = _dbContext.Accounts.Where(e => e.Id == AccountId).Select(e => e.ExportEnabled)
-                .FirstOrDefault();
+            hasUserPermission = await _dbContext.Accounts
+                .Where(e => e.Id == AccountId)
+                .Select(e => e.ExportEnabled)
+                .FirstOrDefaultAsync();
 
             if (!hasUserPermission)
             {
@@ -156,11 +165,16 @@ public class RequestUser
         if (hasUserPermission)
             return true;
 
-        var hasCavePermission = await _dbContext.UserCavePermissionView
+        // This overload answers whether the user has the capability anywhere in
+        // the current Account, not whether a particular resource currently exists inside
+        // the granted scope. Use the grant rows directly so an all-location or State grant
+        // remains effective even when that scope contains no Counties or Caves yet.
+        var hasCavePermission = await _dbContext.CavePermissions
             .AnyAsync(e =>
                 e.AccountId == AccountId
                 && e.UserId == Id
-                && satisfyingPermissionKeys.Contains(e.PermissionKey)
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key)
             );
 
         if (!hasCavePermission && @throw)
@@ -171,44 +185,90 @@ public class RequestUser
         return hasCavePermission;
     }
 
+    /// <summary>
+    /// Authorizes a concrete resource scope. When multiple identifiers are supplied, the most
+    /// specific scope wins: Cave, then County, then State, then Account-wide. Broader grants may
+    /// satisfy narrower checks, but narrower grants never broaden upward or sideways.
+    /// </summary>
     public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId, string? stateId,
         bool @throw = true)
     {
-        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
-            throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated, permissionKey, and AccountId are required");
+        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
+            throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated and permissionKey are required");
 
-        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
-        var hasPermission = false;
-        if (string.IsNullOrWhiteSpace(caveId) && string.IsNullOrWhiteSpace(countyId) &&
-            string.IsNullOrWhiteSpace(stateId))
-        {
-            hasPermission = await _dbContext.CavePermissions
-                .AnyAsync(e =>
-                    string.IsNullOrWhiteSpace(e.StateId)
-                    && string.IsNullOrWhiteSpace(e.CaveId)
-                    && string.IsNullOrWhiteSpace(e.CountyId)
-                    && e.UserId == Id
-                    && e.AccountId == AccountId
-                    && satisfyingPermissionKeys.Contains(e.Permission!.Key)
-                );
-            if (!hasPermission)
-            {
-                hasPermission = await HasCavePermission(PermissionPolicyKey.Admin);
-            }
-        }
-        else
-        {
-            hasPermission = await _dbContext.UserCavePermissionView
-                .AnyAsync(e =>
-                    e.UserId == Id
-                    && e.AccountId == AccountId
-                    && satisfyingPermissionKeys.Contains(e.PermissionKey)
-                    && ((!string.IsNullOrWhiteSpace(caveId) && e.CaveId == caveId) ||
-                        (!string.IsNullOrWhiteSpace(countyId) && e.CountyId == countyId) ||
-                        (!string.IsNullOrWhiteSpace(stateId) && e.StateId == stateId))
-                );
-        }
+        // Platform and synthetic account capabilities are not resource grants. Route them
+        // through the canonical capability resolver so malformed persisted rows cannot turn
+        // PlanarianAdmin/AdminManager/Export into scoped UserPermission authorities.
+        if (permissionKey is PermissionPolicyKey.PlanarianAdmin
+            or PermissionPolicyKey.AdminManager
+            or PermissionPolicyKey.Export)
+            return await HasCavePermission(permissionKey, @throw);
 
+        if (string.IsNullOrWhiteSpace(AccountId))
+            throw ApiExceptionDictionary.BadRequest("Invalid request. AccountId is required for scoped Cave authorization");
+
+        var satisfyingPermissionKeys = GetSatisfyingUserPermissionKeys(permissionKey);
+        var satisfyingCavePermissionKeys = GetSatisfyingCavePermissionKeys(permissionKey);
+        var hasPermission = await _dbContext.UserPermissions.AnyAsync(e =>
+            e.UserId == Id
+            && e.AccountId == AccountId
+            && e.Permission!.PermissionType == PermissionType.User
+            && satisfyingPermissionKeys.Contains(e.Permission.Key));
+
+        if (!hasPermission && !string.IsNullOrWhiteSpace(caveId))
+        {
+            // The view expands County, State, and all-location CavePermission rows to each
+            // affected Cave. Matching only CaveId therefore honors broader scopes without
+            // allowing an unrelated Cave row's County/State metadata to broaden access.
+            hasPermission = await _dbContext.UserCavePermissionView.AnyAsync(e =>
+                e.UserId == Id
+                && e.AccountId == AccountId
+                && e.CaveId == caveId
+                && satisfyingCavePermissionKeys.Contains(e.PermissionKey));
+        }
+        else if (!hasPermission && !string.IsNullOrWhiteSpace(countyId))
+        {
+            // County authority must come from the owning grant rows rather than the expanded
+            // Cave view. An empty County has no Cave rows to expand, but a County/State/account
+            // Manager still owns that resource. Derive State inheritance from the authoritative
+            // County row so a client-supplied StateId can never broaden a mismatched County.
+            hasPermission = await _dbContext.CavePermissions.AnyAsync(e =>
+                e.UserId == Id
+                && e.AccountId == AccountId
+                && string.IsNullOrWhiteSpace(e.CaveId)
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key)
+                && (e.CountyId == countyId
+                    || (string.IsNullOrWhiteSpace(e.CountyId) && string.IsNullOrWhiteSpace(e.StateId))
+                    || (string.IsNullOrWhiteSpace(e.CountyId) && !string.IsNullOrWhiteSpace(e.StateId)
+                        && _dbContext.Counties.Any(county =>
+                            county.AccountId == AccountId && county.Id == countyId && county.StateId == e.StateId))));
+        }
+        else if (!hasPermission && !string.IsNullOrWhiteSpace(stateId))
+        {
+            // StateId is descriptive metadata on Cave/County view rows, so querying the
+            // view by StateId alone would incorrectly promote narrower Cave/County grants.
+            // Check the owning permission rows directly for State or all-location scope.
+            hasPermission = await _dbContext.CavePermissions.AnyAsync(e =>
+                e.UserId == Id
+                && e.AccountId == AccountId
+                && string.IsNullOrWhiteSpace(e.CaveId)
+                && string.IsNullOrWhiteSpace(e.CountyId)
+                && (e.StateId == stateId || string.IsNullOrWhiteSpace(e.StateId))
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key));
+        }
+        else if (!hasPermission)
+        {
+            hasPermission = await _dbContext.CavePermissions.AnyAsync(e =>
+                e.UserId == Id
+                && e.AccountId == AccountId
+                && string.IsNullOrWhiteSpace(e.CaveId)
+                && string.IsNullOrWhiteSpace(e.CountyId)
+                && string.IsNullOrWhiteSpace(e.StateId)
+                && e.Permission!.PermissionType == PermissionType.Cave
+                && satisfyingCavePermissionKeys.Contains(e.Permission.Key));
+        }
 
         if (!hasPermission && @throw)
         {
@@ -218,13 +278,22 @@ public class RequestUser
         return hasPermission;
     }
 
-    private static string[] GetSatisfyingPermissionKeys(string permissionKey) => permissionKey switch
+    private static string[] GetSatisfyingUserPermissionKeys(string permissionKey) => permissionKey switch
     {
-        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
-        PermissionKey.Manager => [PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
+        // UserPermission rows represent account/platform administration. Only Account Admin
+        // broadens into Cave View/Manager; same-key rows of PermissionType.User must not.
+        PermissionKey.View => [PermissionPolicyKey.Admin],
+        PermissionKey.Manager => [PermissionPolicyKey.Admin],
         PermissionKey.Admin => [PermissionPolicyKey.Admin],
         PermissionKey.PlanarianAdmin => [PermissionPolicyKey.PlanarianAdmin],
         _ => [permissionKey]
+    };
+
+    private static string[] GetSatisfyingCavePermissionKeys(string permissionKey) => permissionKey switch
+    {
+        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager],
+        PermissionKey.Manager => [PermissionPolicyKey.Manager],
+        _ => []
     };
 
 }
