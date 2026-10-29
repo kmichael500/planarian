@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useLayoutEffect, useRef, useState } from "react";
 import { message, Spin } from "antd";
 import { useNavigate } from "react-router-dom";
 import { AppContext } from "./AppContext";
@@ -20,7 +20,7 @@ export const AccountSwitchCoordinator: React.FC<AccountSwitchCoordinatorProps> =
   const latestSequence = useRef(0);
   const switchQueue = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleAccountSwitch = (event: Event) => {
       const request = (event as CustomEvent<AccountSwitchRequest>).detail;
       if (!request?.accountId) {

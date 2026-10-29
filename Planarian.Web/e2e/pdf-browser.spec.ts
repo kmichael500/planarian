@@ -8,7 +8,7 @@ import {
   login,
 } from "./support";
 
-test("PDF.js renders an authenticated ranged PDF through real CORS and production CSP", async ({ browser, page }) => {
+test("PDF.js renders an authenticated PDF through real CORS/CSP and the file endpoint supports ranges", async ({ browser, page }) => {
   const requests: Array<{ method: string; url: string; headers: Record<string, string> }> = [];
   const statuses: Array<{ url: string; status: number; headers: Record<string, string> }> = [];
   const cspErrors: string[] = [];
@@ -68,8 +68,6 @@ test("PDF.js renders an authenticated ranged PDF through real CORS and productio
   expect(fileRequests.some((request) =>
     Boolean(request.headers["x-planarian-file-stream-session"])
   )).toBeTruthy();
-  expect(fileRequests.some((request) => Boolean(request.headers["range"]))).toBeTruthy();
-
   // Playwright does not surface browser-managed CORS preflights as page
   // requests, and request.headers() omits some browser-owned headers such as
   // Origin. The PDF request is demonstrably cross-origin and carries a
@@ -78,12 +76,10 @@ test("PDF.js renders an authenticated ranged PDF through real CORS and productio
   expect(new URL(fileRequests[0].url).origin).toBe(API_ORIGIN);
   expect(new URL(page.url()).origin).not.toBe(API_ORIGIN);
 
-  // PDF.js may cancel a browser range fetch after receiving its response
-  // headers when the initial request has already supplied enough data. An
-  // aborted fetch can be present in the browser network trace without
-  // Playwright emitting a page `response` event for it. Prove browser CORS
-  // from the response that did complete, and probe the same authenticated
-  // endpoint deterministically for byte-range semantics.
+  // PDF.js is free to fetch a small document in one response or use byte
+  // ranges depending on the browser. Prove browser CORS from the response
+  // that completed, then probe the same authenticated endpoint
+  // deterministically for byte-range semantics.
   const browserFileResponse = statuses.find((response) =>
     response.url.includes("/api/files/" + fileId + "/view")
   );

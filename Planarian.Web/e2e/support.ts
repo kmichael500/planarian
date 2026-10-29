@@ -249,18 +249,27 @@ export async function switchAccount(
   accountId?: string
 ) {
   const initialized = accountId
-    ? page.waitForResponse((response) =>
-        response.url().includes("/api/app/initialize") &&
-        response.request().headers()["x-account"] === accountId &&
-        response.ok()
-      )
-    : Promise.resolve();
+    ? page.waitForResponse(async (response) => {
+        if (!response.url().includes("/api/app/initialize") || !response.ok()) {
+          return false;
+        }
+
+        const session = await response.json() as AppInitialize;
+        return session.currentUser?.currentAccountId === accountId;
+      })
+    : Promise.resolve(undefined);
 
   await page.locator(".ant-avatar").click();
   await page.getByText("Switch Account", { exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Switch Accounts" });
   await expect(modal).toBeVisible();
+  const switching = page.getByRole("status", { name: "Switching accounts" });
   await modal.getByText(accountName, { exact: true }).click();
-  await initialized;
-  await expect(page.getByRole("status", { name: "Switching accounts" })).toBeHidden();
+
+  const response = await initialized;
+  if (response && accountId) {
+    const session = await response.json() as AppInitialize;
+    expect(session.currentUser?.currentAccountId).toBe(accountId);
+  }
+  await expect(switching).toBeHidden();
 }
