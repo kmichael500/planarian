@@ -10,6 +10,11 @@ namespace Planarian.Modules.Settings.Repositories;
 
 public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
+    private static readonly string[] UserManagerSatisfyingPermissionKeys =
+        PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Manager);
+    private static readonly string[] CaveManagerSatisfyingPermissionKeys =
+        PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.Manager);
+
     public SettingsRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
@@ -53,12 +58,12 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
                     permission.UserId == RequestUser.Id
                     && permission.AccountId == RequestUser.AccountId
                     && permission.Permission!.PermissionType == PermissionType.User
-                    && permission.Permission.Key == PermissionKey.Admin)
+                    && UserManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key))
                 || DbContext.CavePermissions.Any(permission =>
                     permission.UserId == RequestUser.Id
                     && permission.AccountId == RequestUser.AccountId
                     && permission.Permission!.PermissionType == PermissionType.Cave
-                    && permission.Permission.Key == PermissionKey.Manager
+                    && CaveManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key)
                     && permission.CaveId == null
                     && (
                         (permission.StateId == null && permission.CountyId == null)
@@ -92,12 +97,12 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
                      permission.UserId == RequestUser.Id &&
                      permission.AccountId == RequestUser.AccountId &&
                      permission.Permission!.PermissionType == PermissionType.User &&
-                     permission.Permission.Key == PermissionKey.Admin) ||
+                     UserManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key)) ||
                  DbContext.CavePermissions.Any(permission =>
                      permission.UserId == RequestUser.Id &&
                      permission.AccountId == RequestUser.AccountId &&
                      permission.Permission!.PermissionType == PermissionType.Cave &&
-                     permission.Permission.Key == PermissionKey.Manager &&
+                     CaveManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key) &&
                      permission.CaveId == null &&
                      ((permission.StateId == null && permission.CountyId == null) ||
                       permission.CountyId == county.Id ||

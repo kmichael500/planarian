@@ -155,6 +155,7 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
         var clientPermissions = (await new UserRepository(actor.Db, actor.Db.RequestUser)
                 .GetPermissions(actor.Db.RequestUser.Id, accountId))
             .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(PermissionPolicyKey.View, clientPermissions);
         Assert.Contains(PermissionPolicyKey.Manager, clientPermissions);
         Assert.Contains(PermissionPolicyKey.AdminManager, clientPermissions);
     }
@@ -214,16 +215,19 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
     }
 
     [Fact]
-    public async Task AuthorizationProjectionRejectsCrossTypeAndCrossRolePermissionRows()
+    public async Task AuthorizationRejectsCrossTypeCrossRoleAndUnsupportedPermissionRows()
     {
         await using var database =
             await fixture.CreateDatabaseAsync(
-                nameof(AuthorizationProjectionRejectsCrossTypeAndCrossRolePermissionRows));
+                nameof(AuthorizationRejectsCrossTypeCrossRoleAndUnsupportedPermissionRows));
         const string accountId = "wrongtype1";
         const string userId = "wrongtype1";
         const string malformedManagerPermissionId = "wrongtype2";
         const string caveManagerPermissionId = "wrongtype3";
         const string malformedCaveAdminPermissionId = "wrongtype4";
+        const string unsupportedUserPermissionId = "wrongtype5";
+        const string unsupportedCavePermissionId = "wrongtype6";
+        const string unsupportedPermissionKey = "FutureRole";
 
         await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
         {
@@ -249,6 +253,22 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
             Description = "Regression-only Cave permission with an account-admin key.",
             PermissionType = PermissionType.Cave
         });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = unsupportedUserPermissionId,
+            Key = unsupportedPermissionKey,
+            Name = "Unsupported User Role",
+            Description = "Regression-only unsupported User permission.",
+            PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = unsupportedCavePermissionId,
+            Key = unsupportedPermissionKey,
+            Name = "Unsupported Cave Role",
+            Description = "Regression-only unsupported Cave permission.",
+            PermissionType = PermissionType.Cave
+        });
 
         await using (var seed = database.CreateDbContext(userId, accountId))
         {
@@ -263,7 +283,7 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
             await CavePermissions.EnsureAccountUserAsync(seed, accountId);
 
             // Deliberately bypass normal permission-management invariants. Authorization must
-            // reject both the opposite PermissionType and reserved role keys on the wrong grant family.
+            // reject the opposite PermissionType, cross-domain role keys, and unsupported future roles.
             seed.CavePermissions.AddRange(
                 new CavePermission
                 {
@@ -276,6 +296,12 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
                     UserId = seed.RequestUser.Id,
                     AccountId = accountId,
                     PermissionId = malformedCaveAdminPermissionId
+                },
+                new CavePermission
+                {
+                    UserId = seed.RequestUser.Id,
+                    AccountId = accountId,
+                    PermissionId = unsupportedCavePermissionId
                 });
             seed.UserPermissions.AddRange(
                 new UserPermission
@@ -289,6 +315,12 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
                     UserId = seed.RequestUser.Id,
                     AccountId = accountId,
                     PermissionId = malformedManagerPermissionId
+                },
+                new UserPermission
+                {
+                    UserId = seed.RequestUser.Id,
+                    AccountId = accountId,
+                    PermissionId = unsupportedUserPermissionId
                 });
             await seed.SaveChangesAsync();
         }
@@ -299,14 +331,19 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
         Assert.False(await actor.Db.RequestUser.HasCavePermission(PermissionPolicyKey.Manager, false));
         Assert.False(await actor.Db.RequestUser.HasCavePermission(
             PermissionPolicyKey.Manager, null, null, null, false));
+        Assert.False(await actor.Db.RequestUser.HasCavePermission(unsupportedPermissionKey, false));
+        Assert.False(await actor.Db.RequestUser.HasCavePermission(
+            unsupportedPermissionKey, null, null, null, false));
 
         var clientPermissions = (await new UserRepository(actor.Db, actor.Db.RequestUser)
                 .GetPermissions(actor.Db.RequestUser.Id, accountId))
             .ToHashSet(StringComparer.Ordinal);
 
+        Assert.DoesNotContain(PermissionPolicyKey.View, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.Manager, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.Admin, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.AdminManager, clientPermissions);
+        Assert.DoesNotContain(unsupportedPermissionKey, clientPermissions);
     }
 
     [Fact]
@@ -411,6 +448,8 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
         var clientPermissions = (await new UserRepository(actor.Db, actor.Db.RequestUser)
                 .GetPermissions(actor.Db.RequestUser.Id, world.AccountId))
             .ToHashSet(StringComparer.Ordinal);
+        Assert.DoesNotContain(PermissionPolicyKey.View, clientPermissions);
+        Assert.DoesNotContain(PermissionPolicyKey.Manager, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.Admin, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.PlanarianAdmin, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.AdminManager, clientPermissions);
@@ -468,6 +507,7 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
                 .GetPermissions(actor.Db.RequestUser.Id, world.AccountId))
             .ToHashSet(StringComparer.Ordinal);
 
+        Assert.Contains(PermissionPolicyKey.View, clientPermissions);
         Assert.Contains(PermissionPolicyKey.Manager, clientPermissions);
         Assert.Contains(PermissionPolicyKey.AdminManager, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.Admin, clientPermissions);
@@ -493,6 +533,7 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
                 .GetPermissions(actor.Db.RequestUser.Id, world.AccountId))
             .ToHashSet(StringComparer.Ordinal);
 
+        Assert.Contains(PermissionPolicyKey.View, clientPermissions);
         Assert.Contains(PermissionPolicyKey.Manager, clientPermissions);
         Assert.DoesNotContain(PermissionPolicyKey.AdminManager, clientPermissions);
         Assert.False(await actor.Db.RequestUser.HasCavePermission(PermissionPolicyKey.AdminManager, false));
@@ -530,6 +571,8 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
                 .GetPermissions(actor.Db.RequestUser.Id, world.AccountId))
             .ToHashSet(StringComparer.Ordinal);
 
+        Assert.Contains(PermissionPolicyKey.View, clientPermissions);
+        Assert.Contains(PermissionPolicyKey.Manager, clientPermissions);
         Assert.Contains(PermissionPolicyKey.Admin, clientPermissions);
         Assert.Contains(PermissionPolicyKey.AdminManager, clientPermissions);
         Assert.Contains(PermissionPolicyKey.Export, clientPermissions);

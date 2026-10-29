@@ -113,6 +113,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [permissions, setPermissions] =
     useState<FeaturePermissions>(defaultFeaturePermissions);
   const [permissionKeys, setPermissionKeys] = useState<PermissionKey[]>([]);
+  const [permissionProjectionVersion, setPermissionProjectionVersion] =
+    useState<number | undefined>(undefined);
   const [currentUser, setCurrentUser] =
     useState<AppInitializeCurrentUserVm | null>(null);
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
@@ -150,6 +152,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setCurrentAccountId(null);
     setAccountIds([]);
     setPermissionKeys([]);
+    setPermissionProjectionVersion(undefined);
     setPermissions(defaultFeaturePermissions);
     setPendingInvitationCount(0);
     AuthenticationService.ClearRuntimeSession();
@@ -214,6 +217,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setCurrentAccountId(resolvedCurrentAccountId);
       setAccountIds(appOptions.accountIds);
       setPermissionKeys(appOptions.permissions);
+      setPermissionProjectionVersion(appOptions.permissionProjectionVersion);
       setPermissions({ visibleFields: featureSettings });
       setPendingInvitationCount(pendingInvitations.length);
 
@@ -323,8 +327,9 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, [currentAccountId, currentUser]);
 
   const hasCurrentPermission = useCallback(
-    (permission: PermissionKey) => hasPermission(permissionKeys, permission),
-    [permissionKeys]
+    (permission: PermissionKey) =>
+      hasPermission(permissionKeys, permission, permissionProjectionVersion),
+    [permissionKeys, permissionProjectionVersion]
   );
 
   const isAuthenticated = currentUser != null;

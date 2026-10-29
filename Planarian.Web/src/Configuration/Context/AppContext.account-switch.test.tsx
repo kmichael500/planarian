@@ -2,12 +2,17 @@ import React, { useContext } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { UserService } from "../../Modules/User/UserService";
 import { AppInitializeVm, AppService } from "../../Shared/Services/AppService";
 import { AppContext, AppProvider } from "./AppContext";
 
-const session = (accountId: string): AppInitializeVm => ({
+const session = (
+  accountId: string,
+  permissions: PermissionKey[] = [],
+  permissionProjectionVersion?: number
+): AppInitializeVm => ({
   apiBaseUrl: "https://api.planarian.local",
   signalrBaseUrl: "https://api.planarian.local",
   supportName: "Support",
@@ -16,7 +21,8 @@ const session = (accountId: string): AppInitializeVm => ({
     { value: "account-a", display: "Account A" },
     { value: "account-b", display: "Account B" },
   ],
-  permissions: [],
+  permissions,
+  permissionProjectionVersion,
   currentUser: {
     id: "user-1",
     fullName: "Test User",
@@ -33,6 +39,9 @@ const Probe = () => {
     <div>
       <span data-testid="account">{latestContext.currentAccountId ?? "none"}</span>
       <span data-testid="loading">{latestContext.isLoading ? "loading" : "ready"}</span>
+      <span data-testid="manager">
+        {latestContext.hasPermission(PermissionKey.Manager) ? "yes" : "no"}
+      </span>
     </div>
   );
 };
@@ -46,7 +55,11 @@ describe("AppProvider account refresh atomicity", () => {
   });
 
   const renderInitializedAccountA = async () => {
-    jest.spyOn(AppService, "InitializeApp").mockResolvedValue(session("account-a"));
+    // Deliberately omit Manager from the v2 payload so any accidental fallback
+    // to legacy client-side inheritance is observable.
+    jest
+      .spyOn(AppService, "InitializeApp")
+      .mockResolvedValue(session("account-a", [PermissionKey.Admin], 2));
     jest.spyOn(AccountService, "GetFeatureSettings").mockResolvedValue([]);
     jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
 
@@ -62,6 +75,7 @@ describe("AppProvider account refresh atomicity", () => {
     await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("ready"));
     expect(AuthenticationService.GetAccountId()).toBe("account-a");
     expect(AuthenticationService.GetStoredAccountId("user-1")).toBe("account-a");
+    expect(screen.getByTestId("manager")).toHaveTextContent("no");
   };
 
   test.each(["feature-settings", "pending-invitations"] as const)(
@@ -69,7 +83,9 @@ describe("AppProvider account refresh atomicity", () => {
     async (failurePoint) => {
       await renderInitializedAccountA();
 
-      (AppService.InitializeApp as jest.Mock).mockResolvedValue(session("account-b"));
+      (AppService.InitializeApp as jest.Mock).mockResolvedValue(
+        session("account-b", [PermissionKey.Admin])
+      );
       if (failurePoint === "feature-settings") {
         (AccountService.GetFeatureSettings as jest.Mock).mockRejectedValueOnce(
           new Error("feature load failed")
@@ -88,6 +104,7 @@ describe("AppProvider account refresh atomicity", () => {
       expect(screen.getByTestId("account")).toHaveTextContent("account-a");
       expect(AuthenticationService.GetAccountId()).toBe("account-a");
       expect(AuthenticationService.GetStoredAccountId("user-1")).toBe("account-a");
+      expect(screen.getByTestId("manager")).toHaveTextContent("no");
     }
   );
 
@@ -105,5 +122,22 @@ describe("AppProvider account refresh atomicity", () => {
     expect(screen.getByTestId("account")).toHaveTextContent("account-b");
     expect(AuthenticationService.GetAccountId()).toBe("account-b");
     expect(AuthenticationService.GetStoredAccountId("user-1")).toBe("account-b");
+  });
+
+  test("uses legacy hierarchy only after an older-API session is committed", async () => {
+    await renderInitializedAccountA();
+
+    (AppService.InitializeApp as jest.Mock).mockResolvedValue(
+      session("account-b", [PermissionKey.Admin])
+    );
+    (AccountService.GetFeatureSettings as jest.Mock).mockResolvedValueOnce([]);
+    (UserService.GetPendingInvitations as jest.Mock).mockResolvedValueOnce([]);
+
+    await act(async () => {
+      await latestContext.refreshSession("account-b");
+    });
+
+    expect(screen.getByTestId("account")).toHaveTextContent("account-b");
+    expect(screen.getByTestId("manager")).toHaveTextContent("yes");
   });
 });

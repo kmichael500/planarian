@@ -16,6 +16,7 @@ public class AppInitializeVm
     public IEnumerable<SelectListItem<string>> AccountIds { get; set; } = new HashSet<SelectListItem<string>>();
     public string ApiBaseUrl { get; set; }
     public IEnumerable<string> Permissions { get; set; } = Array.Empty<string>();
+    public int PermissionProjectionVersion { get; set; } = PermissionPolicy.ClientProjectionVersion;
     public AppInitializeCurrentUserVm? CurrentUser { get; set; }
     public string? AntiforgeryRequestToken { get; set; }
     public string SupportName { get; set; }

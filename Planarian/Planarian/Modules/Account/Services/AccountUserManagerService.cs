@@ -215,7 +215,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        if (permissionKey is not (PermissionKey.View or PermissionKey.Manager))
+        if (!PermissionPolicy.IsAccountManagementPermission(PermissionType.Cave, permissionKey))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid cave permission.");
         }
@@ -245,7 +245,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
         }
 
-        if (permissionKey is not (PermissionKey.View or PermissionKey.Manager))
+        if (!PermissionPolicy.IsAccountManagementPermission(PermissionType.Cave, permissionKey))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid cave permission.");
         }
@@ -257,7 +257,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         }
 
         if (permission.PermissionType != PermissionType.Cave ||
-            permission.Key is not (PermissionKey.View or PermissionKey.Manager))
+            !PermissionPolicy.IsAccountManagementPermission(permission.PermissionType, permission.Key))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
         }
@@ -481,19 +481,15 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        IEnumerable<string>? allowedPermissionKeys = null;
+        var allowedPermissionKeys = PermissionPolicy.GetAccountScopedPersistedRoleKeys(permissionType);
+        if (allowedPermissionKeys.Length == 0)
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
+        }
+
         if (permissionType == PermissionType.User)
         {
             await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
-            allowedPermissionKeys = [PermissionKey.Admin];
-        }
-        else if (permissionType == PermissionType.Cave)
-        {
-            allowedPermissionKeys = [PermissionKey.View, PermissionKey.Manager];
-        }
-        else
-        {
-            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
         }
 
         var permissions = await _permissionRepository.GetPermissionSelectList(permissionType, allowedPermissionKeys);
@@ -540,7 +536,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                 "Planarian Admin cannot be assigned from account user management.");
         }
 
-        if (permissionKey != PermissionKey.Admin)
+        if (!PermissionPolicy.IsAccountManagementPermission(PermissionType.User, permissionKey))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid user permission.");
         }
@@ -568,7 +564,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                 throw ApiExceptionDictionary.NotFound("Permission");
             }
 
-            if (permission.PermissionType != PermissionType.User || permission.Key != PermissionKey.Admin)
+            if (permission.PermissionType != PermissionType.User ||
+                !PermissionPolicy.IsAccountManagementPermission(permission.PermissionType, permission.Key))
             {
                 throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
             }
@@ -624,7 +621,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be managed from account user management.");
         }
 
-        if (permissionKey != PermissionKey.Admin)
+        if (!PermissionPolicy.IsAccountManagementPermission(PermissionType.User, permissionKey))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid user permission.");
         }

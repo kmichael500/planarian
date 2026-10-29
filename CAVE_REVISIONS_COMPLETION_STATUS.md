@@ -1,16 +1,37 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — NEW-CAVE PROPOSAL/PERMISSION PACKAGE MERGED + VALIDATED**
+**Status:** **ACTIVE PRE-MERGE — PERMISSION POLICY CENTRALIZATION VALIDATED**
 **Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `f5e40668` (`Merge new-Cave proposal and permission hardening into cave revisions completion`) integrates validated package commit `ab6da0e1` into prior completion HEAD `d5546088`. Earlier package evidence remains SHA-pinned to its original source.
-**Package refresh:** 2026-10-29; merge `f5e40668` combines archive-runtime hardening plus browser-E2E/account-switch validation through `d5546088` with validated new-Cave proposal/permission package `ab6da0e1`. The package adds View-authorable new-Cave proposals, destination-scoped review, authoritative County-number allocation, conditional submitter Cave View, account-removal concurrency hardening, null-base proposal migration support, and cross-layer route/UI authorization. The only merge conflict was this ledger; there were no overlapping production/test paths.
+**Completion HEAD reviewed:** `e0b90a60` (`refactor(auth): centralize permission policy semantics`). This package is based directly on completion HEAD `d07458ee`; earlier package evidence remains SHA-pinned to the source that produced it.
+**Permission-policy refresh:** 2026-10-29; `e0b90a60` centralizes Account/Cave role semantics, hardens unsupported-key handling, moves current browser authorization to a versioned server-effective projection, and retains a version-gated compatibility adapter for independently deployed older APIs.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 197 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 645 files changed, 104,131 insertions, 8,170 deletions
+**Branch distance at baseline review:** 199 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 648 files changed, 104,544 insertions, 8,189 deletions
+
+## 2026-10-29 — Permission-policy centralization — DONE + VALIDATED
+
+The validated package is commit `e0b90a60` (`refactor(auth): centralize permission policy semantics`), based directly on completion HEAD `d07458ee`.
+
+Implemented behavior:
+
+- `Planarian.Model.Shared.PermissionPolicy` is the executable source of truth for the persisted Account/Cave role vocabulary, Account Admin → Manager → View inheritance, Cave Manager → View inheritance, resource-scope bypass classification, and server-effective client role projection.
+- `RequestUser`, account permission management, creation-request visibility/review queries, Settings regional selectors, and session projection consume that shared policy while retaining their feature-specific tenant/resource-scope queries.
+- Unknown semantic permission keys now fail closed. A malformed or future same-named persisted `UserPermission` cannot authorize either the coarse capability check or the public scoped-capability probe.
+- Client projection version 2 returns effective coarse capabilities from the server; the browser performs exact membership checks for v2 sessions. A narrowly isolated version-1 adapter preserves rolling deployment/rollback compatibility with older APIs that returned persisted roles rather than effective capabilities.
+- Account-scoped projection uses an explicit supported-role allowlist, so malformed cross-domain, reserved synthetic/platform, and future persisted keys do not leak into browser authorization state. Global `PlanarianAdmin` remains separately validated and does not imply Account/Cave authority.
+- The PostgreSQL `UserCavePermissions` view necessarily repeats persisted role names in SQL. A source contract test compares its Cave-role/Admin semantics with `PermissionPolicy` so SQL and C# policy cannot silently drift.
+- Account-switch session application keeps the projection version atomic with account identity, permissions, feature settings, and pending-invitation state; a failed switch cannot partially activate the target account's legacy/current projection semantics.
+
+Validation evidence:
+
+- Before the final fail-closed review hardening, the frozen refactor tree passed the full backend unit suite **496/496**, full disposable PostgreSQL/PostGIS integration suite **649/649** with **0 skipped**, frontend Jest **78/78 suites / 394/394 tests**, route-generator **6/6**, CSP configuration **5/5**, Release solution build, production React build, EF pending-model check, repository-doc validation, and `git diff --check`.
+- The final review then found and fixed the reachable unknown-key authorization gap above and strengthened AppService/account-switch/SQL-contract tests. The affected final tree passed **27/27** permission-policy unit tests, **7/7** targeted real-PostgreSQL integration tests, and **15/15** targeted frontend tests; frontend pretest also reran route-generator **6/6** and CSP **5/5**.
+- Per the requested validation scope, the long-running full integration suite was not redundantly rerun after that narrow final hardening. The final review changes are directly exercised by the focused PostgreSQL and frontend tests above.
+- Repository documentation validation and staged/unstaged `git diff --check` pass. Focused formatting passes for the new/refactored policy and matrix files; the remaining `RequestUserPermissionIntegrationTests` formatter findings are unchanged pre-existing whitespace debt also present on untouched completion HEAD.
 
 ## Browser-E2E integration validation (2026-10-28)
 

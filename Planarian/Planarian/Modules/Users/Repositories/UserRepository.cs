@@ -277,30 +277,37 @@ public class UserRepository : RepositoryBase
         // Permission has one generic FK target, so malformed rows can technically cross role
         // families. Keep persisted User/Admin and Cave roles separate before flattening keys for
         // the client; synthetic policies are derived below rather than trusted from stored rows.
+        var supportedUserPermissionKeys =
+            PermissionPolicy.GetAccountScopedPersistedRoleKeys(PermissionType.User);
         var userPermissions = await DbContext.UserPermissions
             .Where(e => e.UserId == userId
                         && e.AccountId == accountId
                         && e.Permission!.PermissionType == PermissionType.User
-                        && e.Permission.Key != PermissionPolicyKey.View
-                        && e.Permission.Key != PermissionPolicyKey.Manager
-                        && e.Permission.Key != PermissionPolicyKey.PlanarianAdmin
-                        && e.Permission.Key != PermissionPolicyKey.AdminManager
-                        && e.Permission.Key != PermissionPolicyKey.Export)
+                        && supportedUserPermissionKeys.Contains(e.Permission.Key))
             .Select(e => e.Permission!.Key)
             .ToListAsync();
 
+        var supportedCavePermissionKeys =
+            PermissionPolicy.GetAccountScopedPersistedRoleKeys(PermissionType.Cave);
         var cavePermissions = await DbContext.CavePermissions
             .Where(e => e.UserId == userId
                         && e.AccountId == accountId
                         && e.Permission!.PermissionType == PermissionType.Cave
-                        && e.Permission.Key != PermissionPolicyKey.Admin
-                        && e.Permission.Key != PermissionPolicyKey.PlanarianAdmin
-                        && e.Permission.Key != PermissionPolicyKey.AdminManager
-                        && e.Permission.Key != PermissionPolicyKey.Export)
+                        && supportedCavePermissionKeys.Contains(e.Permission.Key))
             .Select(e => e.Permission!.Key)
             .Distinct()
             .ToListAsync();
 
+        var projectedPermissions = userPermissions
+            .Concat(cavePermissions)
+            .ToHashSet(StringComparer.Ordinal);
+        projectedPermissions.UnionWith(
+            PermissionPolicy.GetEffectiveAccountRoleCapabilities(userPermissions, cavePermissions));
+
+        var satisfyingManagerCavePermissionKeys =
+            PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.Manager);
+        var satisfyingManagerUserPermissionKeys =
+            PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Manager);
         var isAdminManger = await DbContext.CavePermissions
             .Where(e =>
                 e.UserId == userId
@@ -309,7 +316,7 @@ public class UserRepository : RepositoryBase
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && e.Permission!.PermissionType == PermissionType.Cave
-                && e.Permission.Key == PermissionPolicyKey.Manager
+                && satisfyingManagerCavePermissionKeys.Contains(e.Permission.Key)
             )
             .AnyAsync();
         if (isAdminManger == false)
@@ -319,28 +326,28 @@ public class UserRepository : RepositoryBase
                     e.UserId == userId
                     && e.AccountId == accountId
                     && e.Permission!.PermissionType == PermissionType.User
-                    && PermissionKey.Admin == e.Permission.Key
+                    && satisfyingManagerUserPermissionKeys.Contains(e.Permission.Key)
                 );
         }
 
         if (isAdminManger)
         {
-            cavePermissions.Add(PermissionPolicyKey.AdminManager);
+            projectedPermissions.Add(PermissionPolicyKey.AdminManager);
         }
 
-        var exportEnabled = userPermissions.Contains(PermissionPolicyKey.Admin) ||
+        var satisfyingAdminUserPermissionKeys =
+            PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Admin);
+        var exportEnabled = userPermissions.Any(satisfyingAdminUserPermissionKeys.Contains) ||
                             await DbContext.Accounts
                                 .Where(e => e.Id == accountId)
                                 .Select(e => e.ExportEnabled)
                                 .FirstOrDefaultAsync();
         if (exportEnabled)
         {
-            cavePermissions.Add(PermissionPolicyKey.Export);
+            projectedPermissions.Add(PermissionPolicyKey.Export);
         }
 
-        userPermissions.AddRange(cavePermissions);
-
-        return userPermissions.Distinct();
+        return projectedPermissions;
     }
 
     #endregion
@@ -409,10 +416,11 @@ public class UserRepository : RepositoryBase
     public async Task<List<UserPermissionVm>> GetUserPermissions(
         string userId)
     {
+        var supportedUserPermissionKeys = PermissionPolicy.GetAccountScopedPersistedRoleKeys(PermissionType.User);
         return await DbContext.UserPermissions
             .Where(e => e.UserId == userId && e.AccountId == RequestUser.AccountId &&
                         e.Permission!.PermissionType == PermissionType.User &&
-                        e.Permission.Key == PermissionKey.Admin)
+                        supportedUserPermissionKeys.Contains(e.Permission.Key))
             .Select(e => new UserPermissionVm(e.Id, e.Permission!.Key, e.Permission.Name, e.Permission!.Description))
             .ToListAsync();
     }

@@ -34,8 +34,14 @@ public sealed record CaveChangeRequestReviewEventReadRow(CaveChangeRequestReview
 public sealed class CaveChangeRequestRepository
 {
     private const int CleanupLookupBatchSize = 500;
+    private static readonly string[] UserViewSatisfyingPermissionKeys =
+        PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.View);
     private static readonly string[] CaveViewSatisfyingPermissionKeys =
-        [PermissionPolicyKey.View, PermissionPolicyKey.Manager];
+        PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.View);
+    private static readonly string[] UserManagerSatisfyingPermissionKeys =
+        PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.Manager);
+    private static readonly string[] CaveManagerSatisfyingPermissionKeys =
+        PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.Manager);
     private readonly PlanarianDbContext _db;
     private readonly RequestUser _user;
     private readonly AccountExecutionScope _scope;
@@ -730,7 +736,7 @@ public sealed class CaveChangeRequestRepository
         var existingReviewer = visible && await _db.UserCavePermissionView.AnyAsync(permission =>
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId &&
-            permission.PermissionKey == PermissionPolicyKey.Manager,
+            CaveManagerSatisfyingPermissionKeys.Contains(permission.PermissionKey),
             cancellationToken);
         return (visible, existingReviewer);
     }
@@ -740,7 +746,7 @@ public sealed class CaveChangeRequestRepository
         if (await _db.UserPermissions.AnyAsync(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.User &&
-                permission.Permission.Key == PermissionPolicyKey.Admin, cancellationToken))
+                UserViewSatisfyingPermissionKeys.Contains(permission.Permission.Key), cancellationToken))
             return true;
 
         return await _db.CavePermissions.AnyAsync(permission =>
@@ -755,13 +761,13 @@ public sealed class CaveChangeRequestRepository
         if (await _db.UserPermissions.AnyAsync(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.User &&
-                permission.Permission.Key == PermissionPolicyKey.Admin, cancellationToken))
+                UserManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key), cancellationToken))
             return true;
 
         return await _db.CavePermissions.AnyAsync(permission =>
             permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
             permission.Permission!.PermissionType == PermissionType.Cave &&
-            permission.Permission.Key == PermissionPolicyKey.Manager &&
+            CaveManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key) &&
             permission.CaveId == null &&
             ((permission.StateId == null && permission.CountyId == null) ||
              permission.CountyId == request.ProposedCountyId ||
@@ -804,12 +810,12 @@ public sealed class CaveChangeRequestRepository
         let canManageExistingCave = cave != null && _db.UserCavePermissionView.Any(permission =>
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId &&
-            permission.PermissionKey == PermissionPolicyKey.Manager)
+            CaveManagerSatisfyingPermissionKeys.Contains(permission.PermissionKey))
         let hasCurrentViewCapability =
             _db.UserPermissions.Any(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.User &&
-                permission.Permission.Key == PermissionPolicyKey.Admin) ||
+                UserViewSatisfyingPermissionKeys.Contains(permission.Permission.Key)) ||
             _db.CavePermissions.Any(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.Cave &&
@@ -818,11 +824,11 @@ public sealed class CaveChangeRequestRepository
             _db.UserPermissions.Any(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.User &&
-                permission.Permission.Key == PermissionPolicyKey.Admin) ||
+                UserManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key)) ||
             _db.CavePermissions.Any(permission =>
                 permission.UserId == _user.Id && permission.AccountId == _scope.AccountId &&
                 permission.Permission!.PermissionType == PermissionType.Cave &&
-                permission.Permission.Key == PermissionPolicyKey.Manager &&
+                CaveManagerSatisfyingPermissionKeys.Contains(permission.Permission.Key) &&
                 permission.CaveId == null &&
                 ((permission.StateId == null && permission.CountyId == null) ||
                  permission.CountyId == request.ProposedCountyId ||
