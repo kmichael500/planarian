@@ -1,10 +1,10 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — TYPED IDENTIFIER HARDENING VALIDATED**
+**Status:** **ACTIVE PRE-MERGE — TYPED IDENTIFIER POST-MERGE VALIDATION COMPLETE**
 **Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `dc34b128` (`refactor: harden typed identifier contracts`). This package is based directly on completion HEAD `499f255f`; earlier package evidence remains SHA-pinned to the source that produced it.
-**Typed-identifier refresh:** 2026-10-29; `dc34b128` replaces fragile CLR/EF member-name strings with typed/model-derived metadata, hardens finite cross-stack string contracts, and preserves intentionally open-ended or external identifiers as strings.
+**Completion HEAD reviewed:** `455386de` (`fix(caves): preserve revision diff wire contracts`), following typed-identifier merge `4328ad55`; earlier package evidence remains SHA-pinned to the source that produced it.
+**Typed-identifier refresh:** 2026-10-29; the original `dc34b128` package is merged, then post-merge adversarial review fixed serialized revision-diff path coupling and aligned the raw-member architecture guard with the documented exact-`nameof` exception in `455386de`.
 **Permission-policy refresh:** 2026-10-29; `e0b90a60` centralizes Account/Cave role semantics, hardens unsupported-key handling, moves current browser authorization to a versioned server-effective projection, and retains a version-gated compatibility adapter for independently deployed older APIs.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
@@ -12,6 +12,32 @@
 **Merge base:** current `main` above
 **Branch distance at baseline review:** 199 commits ahead of `main`, 0 behind
 **Three-dot diff at baseline review:** 648 files changed, 104,544 insertions, 8,189 deletions
+
+## 2026-10-29 — Typed identifier post-merge adversarial validation — DONE + VALIDATED
+
+The typed package was merged into `feature/cave-revisions-completion` as `4328ad55`. A fresh adversarial review of that actual merged completion tree found no runtime, authorization, tenant-isolation, migration, or data-preservation regression, but did find two maintainability/compatibility issues worth fixing before the package was considered closed. Those follow-up fixes are commit `455386de` (`fix(caves): preserve revision diff wire contracts`).
+
+Review findings fixed:
+
+- Reference-metadata diff paths such as `State`, `County`, `Tags/...`, `Entrances/...`, and `Files/.../FileType` are serialized API values parsed independently by the frontend. The original package had mechanically derived several of those path segments with `nameof(...)`, which would have coupled a future CLR rename to an otherwise stable wire contract. They now use explicit `CaveRevisionDiffWireContract` constants with literal compatibility-sentinel coverage; the serialized values themselves are unchanged.
+- `TypedIdentifierUsageContractTests` originally rejected both raw-string CLR member lookups and exact-contract `nameof(...)` lookups. That was stricter than `docs/data-access-architecture.md`, which deliberately permits `nameof` for a known exact CLR contract while requiring generic relationship code to use EF model metadata. The architecture guard now rejects duplicated raw member strings, while the generic ownership paths remain directly covered by EF-metadata unit tests and the real-PostgreSQL ownership matrix.
+
+Broad validation on the merged `4328ad55` tree before the narrow follow-up:
+
+- Full backend unit suite: **521/521 passed**, **0 skipped**.
+- Full disposable PostgreSQL/PostGIS integration suite: **651/651 passed**, **0 skipped**. This included the 10,000-Cave reference merge/rename scale tests as well as the full permission, revision, storage, import, concurrency, migration, and tenant-isolation matrix.
+- Full frontend Jest suite: **78/78 suites, 395/395 tests passed**.
+- Client-route generator: **6/6 passed**; CSP configuration: **5/5 passed**.
+- TypeScript `tsc --noEmit`: **passed**.
+- Production React build and CSP postbuild: **passed**. Remaining CRA/Browserslist/ESLint output is existing repository warning debt rather than a package failure.
+
+Focused validation after `455386de`:
+
+- Revision metadata/scope, typed-identifier architecture, and cross-stack contract unit slice: **16/16 passed**.
+- Real PostgreSQL reference-rename integration slice: **22/22 passed**.
+- Frontend revision-diff/presentation slice: **2/2 suites, 26/26 tests passed**, with route-generator **6/6** and CSP **5/5** rerun by the frontend pretest.
+- Official EF Core guidance confirms that relationships are represented by foreign keys in the EF model with navigations layered over them, matching the model-metadata approach used by the generic ownership code. Official Azure Storage error documentation also confirms `ContainerBeingDeleted` as the typed 409 condition used by the Blob adapter.
+- Repository documentation validation and `git diff --check` passed after this ledger update.
 
 ## 2026-10-29 — Typed identifier and cross-stack contract hardening — DONE + VALIDATED
 
