@@ -1,9 +1,9 @@
 # Cave revision and proposal architecture
 
 > [!IMPORTANT]
-> `docs/plans/cave-revisions-completion/README.md` records the target-state implementation plan and validation gates for
-> this pre-release architecture. This document is the durable architecture contract. Temporary pre-merge implementation
-> gaps do not weaken its invariants; the SHA-pinned live status is tracked in [`../CAVE_REVISIONS_COMPLETION_STATUS.md`](../CAVE_REVISIONS_COMPLETION_STATUS.md).
+> `docs/plans/cave-revisions-completion/README.md` preserves the completed feature's target-state plan and
+> acceptance criteria. This is the authoritative durable architecture contract. The final integration evidence and
+> deliberate post-merge limitations are recorded in [`../CAVE_REVISIONS_COMPLETION_STATUS.md`](../CAVE_REVISIONS_COMPLETION_STATUS.md).
 
 ## Published state
 
@@ -124,6 +124,8 @@ discard, expiration, proposal rejection, and unused staged Files discarded durin
 row and queue the exact object address before that relational result commits. External deletion happens afterward;
 provider failure leaves durable retryable debt instead of an untracked object. Later Cave/File authoring retries a
 bounded ordinary-cleanup batch, and Reset Account absorbs both unpublished and published File cleanup debt.
+Expiration discovery is opportunistic: a completely inactive account can retain expired, unlinked staging until
+another upload/discard/cleanup opportunity. There is intentionally no periodic inactive-account sweeper in this release.
 
 Browser downloads for proposal Files use the same API-origin-aware, account-qualified URL construction as published
 File downloads. Request, version, revision, and staged-File access remains permission-filtered and tenant-qualified,

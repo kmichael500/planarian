@@ -280,55 +280,69 @@ specific reason.
 
 ## 14. Final acceptance checklist
 
-These checkboxes are acceptance criteria, not a live status board. Use the SHA-pinned status ledger for current evidence.
-Do not mark the task complete until every applicable item is true:
+These checkboxes are acceptance criteria, not a live status board. The final architecture/safety acceptance review at
+`52f2c593` classified the applicable criteria as proven from source and executable tests; the follow-on GAP-015 integration
+adds focused PostgreSQL evidence for duplicate approvals, staged-File claim races, lost object-create responses, and lost
+database-commit/save acknowledgements. No criterion in this section requires the deferred GAP-014 periodic inactive-account
+sweeper. A completed checkbox reflects this evidence, not a claim that every broad suite reran on the final docs commit.
+The status ledger separates final focused runs from historical SHA-pinned broad validation.
+
+Key falsifiable suites: `CaveAggregateAssetIntegrationTests`, `CaveChangeRequestConcurrencyIntegrationTests`,
+`CaveChangeRequestStagedFileIntegrationTests`, `ExternalFileCleanupIntegrationTests`,
+`CaveChangeRequestCreateIntegrationTests`, `CaveRevisionRolloutScaleIntegrationTests`,
+`ImportScaleBenchmarkTests`, `MigrationUpgradeIntegrationTests`,
+`CurrentMainDatabasePreservationMigrationIntegrationTests`, `ArchiveGeneratedContentIntegrationTests`,
+the architecture/contract tests, frontend authoring tests, and Chromium/WebKit `npm run test:browser:e2e`.
+See `CAVE_REVISIONS_COMPLETION_STATUS.md` for the exact run provenance and accepted residual limitations.
+
+Acceptance conditions verified:
 
 ### Concurrency and aggregate publication
 
-- [ ] Existing direct edits submit the client-loaded `ExpectedRevisionId`.
-- [ ] Missing/stale expected revision cannot silently publish over newer Cave state.
-- [ ] Stale direct edit returns explicit 409/conflict UX.
-- [ ] One aggregate direct edit creates at most one `CaveRevision`.
-- [ ] One aggregate approved proposal creates at most one `CaveRevision`.
-- [ ] Complete semantic no-op creates no published revision and no proposal version.
+- [x] Existing direct edits submit the client-loaded `ExpectedRevisionId`.
+- [x] Missing/stale expected revision cannot silently publish over newer Cave state.
+- [x] Stale direct edit returns explicit 409/conflict UX.
+- [x] One aggregate direct edit creates at most one `CaveRevision`.
+- [x] One aggregate approved proposal creates at most one `CaveRevision`.
+- [x] Complete semantic no-op creates no published revision and no proposal version.
 
 ### File authoring and storage
 
-- [ ] Cave editor can stage/add, edit metadata, and remove Files.
-- [ ] Cave detail page is read-only for published File mutation.
-- [ ] A new staged Cave File is uploaded once to one immutable object identity.
-- [ ] Publication associates the same File/object; no staging→published byte copy remains.
-- [ ] Failed publication leaves the staged File recoverable/expiring and Cave unchanged.
-- [ ] Ordinary removal of a once-published File queues `CaveAssetRemoval` cleanup, deletes the live `File` row, publishes
+- [x] Cave editor can stage/add, edit metadata, and remove Files.
+- [x] Cave detail page is read-only for published File mutation.
+- [x] A new staged Cave File is uploaded once to one immutable object identity.
+- [x] Publication associates the same File/object; no staging→published byte copy remains.
+- [x] Failed publication leaves the staged File recoverable/expiring and Cave unchanged.
+- [x] Ordinary removal of a once-published File queues `CaveAssetRemoval` cleanup, deletes the live `File` row, publishes
       history metadata, and physically deletes bytes only after commit.
-- [ ] Failed object deletion leaves durable retryable cleanup debt without blocking unrelated account writes.
+- [x] Failed object deletion leaves durable retryable cleanup debt without blocking unrelated account writes.
 - [x] Mixed cleanup batches independently acknowledge successful/already-missing objects while retaining only failed debt.
 - [x] A post-delete cleanup-target acknowledgement failure is idempotently recoverable on a later retry.
-- [ ] Removed historical File content does not keep a live FileTypeTag relationship in use.
-- [ ] Expired never-published staging is physically cleaned up without creating historical retention state.
-- [ ] Affected application logic depends on provider-neutral storage types, not Azure SDK types.
-- [ ] Published File snapshot does not expose object-storage locators or promise historical payload recovery.
-- [ ] Cross-account/unowned staged File attachment is rejected.
+- [x] Removed historical File content does not keep a live FileTypeTag relationship in use.
+- [x] Expired never-published staging is physically cleaned up without creating historical retention state.
+- [x] Affected application logic depends on provider-neutral storage types, not Azure SDK types.
+- [x] Published File snapshot does not expose object-storage locators or promise historical payload recovery.
+- [x] Cross-account/unowned staged File attachment is rejected.
 
 ### Line plots
 
-- [ ] Cave editor can add, rename, replace, and remove line plots.
-- [ ] Existing line-plot IDs remain stable across rename/content replacement.
-- [ ] Cave detail page cannot directly persist GeoJSON.
-- [ ] No standalone published GeoJSON mutation path bypasses Cave revisions.
-- [ ] Current `CaveGeoJson` `jsonb` storage remains in place.
-- [ ] Current map line-plot retrieval/rendering remains in place and functional.
-- [ ] Published snapshot contains line-plot ID/name/content hash, not raw GeoJSON.
-- [ ] Line-plot Added/Removed/Renamed/ContentChanged diffs are readable and deterministic.
-- [ ] No GeoJSON recovery table/blob/rollback system was added.
+- [x] Cave editor can add, rename, replace, and remove line plots.
+- [x] Existing line-plot IDs remain stable across rename/content replacement.
+- [x] Cave detail page cannot directly persist GeoJSON.
+- [x] No standalone published GeoJSON mutation path bypasses Cave revisions.
+- [x] Current `CaveGeoJson` `jsonb` storage remains in place.
+- [x] Current map line-plot retrieval/rendering remains in place and functional.
+- [x] Published snapshot contains line-plot ID/name/content hash, not raw GeoJSON.
+- [x] Line-plot Added/Removed/Renamed/ContentChanged diffs are readable and deterministic.
+- [x] No GeoJSON recovery table/blob/rollback system was added.
 
 ### Proposals
 
-- [ ] View permission remains sufficient to author a proposal against an existing Cave.
-- [ ] Effective Account View capability can submit a new-Cave proposal in any configured State/County without
+- [x] View permission remains sufficient to author a proposal against an existing Cave.
+- [x] Effective Account View capability can submit a new-Cave proposal in any configured State/County without
       pre-existing destination Cave visibility.
-- [ ] A new-Cave request reserves its Cave ID without creating a Cave or fake base revision before approval.
-- [ ] County/State Managers can review a new-Cave proposal in an empty County; Cave-only or unrelated Managers cannot,
+- [x] A new-Cave request reserves its Cave ID without creating a Cave or fake base revision before approval.
+- [x] County/State Managers can review a new-Cave proposal in an empty County; Cave-only or unrelated Managers cannot,
       and removing destination Manager authority immediately removes review/read/decision access.
 - [x] Malformed or unsupported persisted permission rows fail closed across Cave visibility, creation-request
       visibility/review, regional Manager selectors, scoped capability probes, and client projection: Cave roles require
@@ -349,57 +363,57 @@ Do not mark the task complete until every applicable item is true:
 - [x] Account membership revocation and ordinary Cave/User permission grants serialize on the same `AccountUser` row:
       grant transactions use `FOR KEY SHARE`, revocation uses `FOR UPDATE`, and both lock orderings are proven against
       real PostgreSQL so no account-scoped permission can survive or be created after membership removal.
-- [ ] Automatic and first-available County Cave Number allocation uses all account+County Caves, including hidden and
+- [x] Automatic and first-available County Cave Number allocation uses all account+County Caves, including hidden and
       archived Caves, while `IgnoreQueryFilters()` remains account-qualified and cannot observe another Account's numbers.
-- [ ] View-only creation proposals cannot select manual or first-available County-number modes; both Manager-only
+- [x] View-only creation proposals cannot select manual or first-available County-number modes; both Manager-only
       allocation controls are enforced server-side, and View proposals use automatic-next allocation.
-- [ ] Create approval atomically creates the Cave + first revision + approved request, and grants submitter Cave View
+- [x] Create approval atomically creates the Cave + first revision + approved request, and grants submitter Cave View
       only when the submitter is still an Account member.
-- [ ] Revoking the submitter's last effective Cave View capability removes pre-publication create-request access; a
+- [x] Revoking the submitter's last effective Cave View capability removes pre-publication create-request access; a
       later approval may still publish the Cave and restores Cave View only for a submitter who remains an Account member.
-- [ ] Removing the submitter from the Account does not block later approval and does not recreate a CavePermission row.
-- [ ] Submitter destination changes reroute the review queue across County/State scopes immediately.
-- [ ] Two independent create proposals that preview the same County number serialize publication and receive distinct
+- [x] Removing the submitter from the Account does not block later approval and does not recreate a CavePermission row.
+- [x] Submitter destination changes reroute the review queue across County/State scopes immediately.
+- [x] Two independent create proposals that preview the same County number serialize publication and receive distinct
       authoritative County numbers, with each first revision recording its allocated value.
-- [ ] The complete authoring contract publishes equivalently through direct Manager create and View-proposal approval.
-- [ ] Create rejection creates no Cave, revision, or Cave-View grant.
-- [ ] Create request-changes/revision/resubmit preserves null-base immutable proposal history.
-- [ ] Initial proposal can stage Files before request creation.
-- [ ] Proposal versions preserve exact File identity/intents.
-- [ ] Proposal versions preserve exact proposed line-plot GeoJSON.
-- [ ] New proposal versions do not mutate old versions.
-- [ ] File-only and line-plot-only proposals are valid.
-- [ ] Empty proposal versions are rejected.
-- [ ] Approval publishes the exact selected immutable proposal version.
-- [ ] Rejection creates no published revision.
+- [x] The complete authoring contract publishes equivalently through direct Manager create and View-proposal approval.
+- [x] Create rejection creates no Cave, revision, or Cave-View grant.
+- [x] Create request-changes/revision/resubmit preserves null-base immutable proposal history.
+- [x] Initial proposal can stage Files before request creation.
+- [x] Proposal versions preserve exact File identity/intents.
+- [x] Proposal versions preserve exact proposed line-plot GeoJSON.
+- [x] New proposal versions do not mutate old versions.
+- [x] File-only and line-plot-only proposals are valid.
+- [x] Empty proposal versions are rejected.
+- [x] Approval publishes the exact selected immutable proposal version.
+- [x] Rejection creates no published revision.
 
-- [ ] Downgrade across `SupportNewCaveProposals` fails closed with an explicit compatibility error while any creation
+- [x] Downgrade across `SupportNewCaveProposals` fails closed with an explicit compatibility error while any creation
       proposal version has null `BaseRevisionId`; the failed downgrade leaves both schema and proposal data unchanged.
 
 ### Architecture/security/compatibility
-- [ ] Services/workflow coordinators do not acquire direct DbContext/Npgsql ownership.
-- [ ] Every changed `IgnoreQueryFilters()` path remains explicitly tenant-qualified.
-- [ ] People-only free-form tag and string-enum invariants remain unchanged.
-- [ ] Imports remain set-oriented/bounded; no interactive per-Cave import loop was introduced.
-- [ ] Snapshot query growth remains bounded for supported import scale.
-- [ ] Archive still represents current state without unexpectedly exporting historical/staged payloads.
-- [ ] Hard deletion remains blocked for unresolved proposals.
-- [ ] Ordinary File removal and explicit hard deletion both preserve commit-before-external-delete ordering; ordinary
+- [x] Services/workflow coordinators do not acquire direct DbContext/Npgsql ownership.
+- [x] Every changed `IgnoreQueryFilters()` path remains explicitly tenant-qualified.
+- [x] People-only free-form tag and string-enum invariants remain unchanged.
+- [x] Imports remain set-oriented/bounded; no interactive per-Cave import loop was introduced.
+- [x] Snapshot query growth remains bounded for supported import scale.
+- [x] Archive still represents current state without unexpectedly exporting historical/staged payloads.
+- [x] Hard deletion remains blocked for unresolved proposals.
+- [x] Ordinary File removal and explicit hard deletion both preserve commit-before-external-delete ordering; ordinary
       File removal uses durable `CaveAssetRemoval` debt and line-plot removal deletes `CaveGeoJson` transactionally.
-- [ ] No PostGIS/MVT line-plot redesign leaked into this task.
-- [ ] Durable docs describe the implemented truth and no longer contradict the new File lifecycle.
+- [x] No PostGIS/MVT line-plot redesign leaked into this task.
+- [x] Durable docs describe the implemented truth and no longer contradict the new File lifecycle.
 
 ### Validation/reporting
 
-- [ ] All changed/new focused unit tests pass.
-- [ ] All changed/new focused integration tests pass.
-- [ ] All changed/new focused frontend tests pass.
-- [ ] Directly impacted backend build passes.
-- [ ] Frontend build passes.
-- [ ] Required migration tests and pending-model check pass.
-- [ ] Conditional import/archive checks were run if actually applicable.
-- [ ] `git diff --check` passes.
-- [ ] Final adversarial diff review finds no remaining mutation bypass or stale-write path.
+- [x] All changed/new focused unit tests pass.
+- [x] All changed/new focused integration tests pass.
+- [x] All changed/new focused frontend tests pass.
+- [x] Directly impacted backend build passes.
+- [x] Frontend build passes.
+- [x] Required migration tests and pending-model check pass.
+- [x] Conditional import/archive checks were run if actually applicable.
+- [x] `git diff --check` passes.
+- [x] Final adversarial diff review finds no remaining mutation bypass or stale-write path.
 
 ## 15. Required final report
 

@@ -1,8 +1,8 @@
 # Cave revisions completion implementation plan
 
-Status: **active pre-merge target-state plan** for `feature/cave-revisions-completion`.
+Status: **completion implementation and acceptance validated on `feature/cave-revisions-completion`**; integration into `main` is a separate future merge.
 
-This directory is normative for the completion target and validation gates; it is **not** a live progress tracker.
+This directory preserves the target-state design, implementation sequence, and acceptance gates as historical execution guidance, not a live progress tracker. The durable architecture documents govern ongoing development.
 Current SHA-pinned implementation/validation status is recorded in
 [`../../../CAVE_REVISIONS_COMPLETION_STATUS.md`](../../../CAVE_REVISIONS_COMPLETION_STATUS.md). The status ledger may report
 implementation gaps, but it does not override this plan or the durable architecture contracts.
@@ -30,17 +30,19 @@ Read these sources before changing code:
 4. `docs/testing.md`.
 5. `docs/cave-revisions.md`.
 6. **This plan, starting here.**
-Where this active plan intentionally changes branch-only mechanics described in `docs/cave-revisions.md`, the target-state
-decision in this plan governs the implementation. The implementation must then update the durable document in the same
-change so the final repository has one truthful architecture description. Never leave contradictory docs behind.
+During completion implementation, a target-state decision in this plan governed any intentional change to older
+branch-only mechanics in `docs/cave-revisions.md`. That implementation has been reconciled into the durable architecture
+documents; consult those documents for current behavior and this plan for historical design rationale.
 
 Persisted V1 snapshot/proposal schemas are still pre-release on this branch. They may be corrected by this work before
 the feature lands. Once the feature lands, the existing V1 immutability rule applies and later semantic changes require
 schema-versioned models.
 
-## How to execute this plan
+## Historical implementation sequence
 
-Work through `implementation.md` in order. Do not start with isolated UI cleanup or a storage rewrite.
+The completion work was executed through `implementation.md` in dependency order, beginning with concurrency and
+storage safety rather than UI cleanup. The instructions below are retained as historical guidance, not an outstanding
+post-acceptance to-do list.
 
 For every phase:
 
@@ -130,9 +132,9 @@ If an implementation detail is unclear, resolve it from `architecture.md` first 
 Do not reorder phases 1–3 behind the UI work. The editor must be built on the correct concurrency and asset lifecycle
 contracts, not patched around the old ones.
 
-## Handoff/completion protocol
+## Historical handoff/completion protocol
 
-An agent stopping or handing off before completion must state:
+During this implementation, an agent stopping or handing off before completion was required to state:
 
 - the last fully completed phase from `implementation.md`;
 - files changed in the incomplete phase;
