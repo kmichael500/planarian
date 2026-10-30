@@ -533,7 +533,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<Planarian.Modules.Account.Services.AccountMaintenanceMiddleware>();
 
-app.MapHub<NotificationHub>("/api/notificationHub", options => { });
+app.MapHub<NotificationHub>(NotificationHubContract.Route, options => { });
 
 app.MapControllers();
 

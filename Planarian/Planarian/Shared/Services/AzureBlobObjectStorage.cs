@@ -47,7 +47,7 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
                 return;
             }
             catch (RequestFailedException ex) when (ex.Status == 409 &&
-                ex.ErrorCode == "ContainerBeingDeleted" && attempt < 9)
+                ex.ErrorCode == BlobErrorCode.ContainerBeingDeleted && attempt < 9)
             {
                 InvalidateContainer(address.Partition);
                 if (!content.CanSeek)

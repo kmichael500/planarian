@@ -2,6 +2,7 @@ using Azure;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Net.Http.Headers;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Helpers;
@@ -628,7 +629,7 @@ public class FileService : ServiceBase<FileRepository>
                 return;
             }
             catch (RequestFailedException ex) when (ex.Status == 409 &&
-                ex.ErrorCode == "ContainerBeingDeleted" && attempt < 9)
+                ex.ErrorCode == BlobErrorCode.ContainerBeingDeleted && attempt < 9)
             {
                 ContainerInitializationTasks.TryRemove(initializationKey, out _);
                 await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * (attempt + 1), 8)));
@@ -801,7 +802,7 @@ public class FileService : ServiceBase<FileRepository>
     }
 }
 
-public class FileTypeTagName
+public static class FileTypeTagName
 {
     public const string Other = "Other";
 }
@@ -812,6 +813,7 @@ public class FileVm
     [MaxLength(PropertyLength.FileName)] public string Extension { get; set; } = string.Empty;
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
-    [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
+    // Historical API name: this contains the File TagType display name, not TagType.Key.
+    [MaxLength(PropertyLength.Name)] public string FileTypeKey { get; set; } = null!;
     public string? Uuid { get; set; }
 }

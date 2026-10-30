@@ -3,18 +3,19 @@ import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "./CaveService";
+import { FileAccessAction } from "../../Files/Services/FileService";
 
 it("builds request and authoring staged-file view URLs through the authenticated API helper", () => {
   const builder = jest.spyOn(HttpHelpers, "BuildAuthenticatedApiUrl")
     .mockReturnValue("https://api.example.test/file?account_id=account-a");
 
-  expect(CaveService.GetStagedChangeRequestFileUrl("request/id", "file id", "view")).toBe(
+  expect(CaveService.GetStagedChangeRequestFileUrl("request/id", "file id", FileAccessAction.View)).toBe(
     "https://api.example.test/file?account_id=account-a"
   );
   expect(builder).toHaveBeenLastCalledWith(
     "api/cave-change-requests/request%2Fid/files/file%20id/view"
   );
-  expect(CaveService.GetAuthoringStagedFileUrl("file id", "view")).toBe(
+  expect(CaveService.GetAuthoringStagedFileUrl("file id", FileAccessAction.View)).toBe(
     "https://api.example.test/file?account_id=account-a"
   );
   expect(builder).toHaveBeenLastCalledWith("api/files/staged/file%20id/view");

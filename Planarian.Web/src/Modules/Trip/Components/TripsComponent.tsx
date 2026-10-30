@@ -12,7 +12,7 @@ import {
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import { TripCardComponent } from "./TripCard";
-import { TagType } from "../../Tag/Models/TagType";
+import { TagSelectSource, TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
@@ -81,7 +81,7 @@ const TripsComponent: React.FC<TripsByProjectIdComponentProps> = (props) => {
         />
         <TagFilterFormItem
           projectId={props.projectId}
-          tagType={TagType.ProjectMember}
+          tagType={TagSelectSource.ProjectMember}
           queryBuilder={queryBuilder}
           field={"tripMemberIds"}
           label={"Trip Members"}

@@ -26,12 +26,12 @@ public static class CaveProposalChangeScopeSummary
         var otherChanges = 0;
         foreach (var metadata in diff.ReferenceMetadataChanges)
         {
-            if (metadata.Path is "State" or "County")
+            if (metadata.Path is nameof(CavePublishedSnapshotV1.State) or nameof(CavePublishedSnapshotV1.County))
                 caveFields.Add(metadata.Path);
-            else if (metadata.Path.StartsWith("Tags/", StringComparison.Ordinal))
-                caveFields.Add($"Tag:{metadata.Path[5..]}");
-            else if (!metadata.Path.StartsWith("Entrances/", StringComparison.Ordinal) &&
-                     !metadata.Path.StartsWith("Files/", StringComparison.Ordinal))
+            else if (metadata.Path.StartsWith($"{nameof(CavePublishedSnapshotV1.Tags)}/", StringComparison.Ordinal))
+                caveFields.Add($"Tag:{metadata.Path[(nameof(CavePublishedSnapshotV1.Tags).Length + 1)..]}");
+            else if (!metadata.Path.StartsWith($"{nameof(CavePublishedSnapshotV1.Entrances)}/", StringComparison.Ordinal) &&
+                     !metadata.Path.StartsWith($"{nameof(CavePublishedSnapshotV1.Files)}/", StringComparison.Ordinal))
                 otherChanges++;
         }
 

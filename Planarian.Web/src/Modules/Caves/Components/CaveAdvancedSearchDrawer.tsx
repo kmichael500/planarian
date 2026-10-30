@@ -73,7 +73,6 @@ export interface CaveAdvancedSearchDrawerProps {
 
 const exportFeatureOrder: FeatureKey[] = [
   FeatureKey.EnabledFieldCaveId,
-  FeatureKey.EnabledFieldCaveDistance,
   FeatureKey.EnabledFieldCaveCounty,
   FeatureKey.EnabledFieldCaveLengthFeet,
   FeatureKey.EnabledFieldCaveDepthFeet,
@@ -146,12 +145,9 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
 
   useEffect(() => {
     const allFeatureKeys = Object.values(FeatureKey) as FeatureKey[];
-    const enabledKeys = allFeatureKeys.filter((key) => {
-      if (key === FeatureKey.EnabledFieldCaveDistance) {
-        return false;
-      }
-      return isFeatureEnabled(key);
-    });
+    const enabledKeys = allFeatureKeys.filter((key) =>
+      key !== FeatureKey.ExportEnabled && isFeatureEnabled(key)
+    );
 
     const sortedKeys = [...enabledKeys].sort((a, b) => {
       const orderA = getFeatureOrder(a);

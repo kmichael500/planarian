@@ -1,6 +1,6 @@
 import { Fragment, ReactNode } from "react";
 import { Alert, Card, Collapse, Grid, List, Space, Tag, theme, Typography } from "antd";
-import { CaveRevisionDiffVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
+import { CaveRevisionDiffVm, CaveSnapshotVm, SnapshotTagReference, SnapshotTagRole } from "../Models/CaveRevisionVm";
 import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 import {
   AffectedEntrancePresentation,
@@ -243,7 +243,7 @@ const snapshotTagItems = (tags: SnapshotTagReference[]): SnapshotItem[] => {
     return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi) || a.localeCompare(b);
   }).map(role => ({
     key: `tag-${role}`,
-    label: roleLabels[role] ?? role,
+    label: roleLabels[role as SnapshotTagRole] ?? role,
     fullWidth: true,
     value: <Space wrap size={[4, 4]}>{groups[role].sort((a, b) => a.nameAtRevision.localeCompare(b.nameAtRevision))
       .map(tag => <Tag key={tag.tagTypeId} style={{ whiteSpace: "normal", overflowWrap: "anywhere", maxWidth: "100%" }}>

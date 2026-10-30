@@ -1,7 +1,7 @@
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import { CaveVm } from "../Models/CaveVm";
-import { CaveFileSnapshotVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
+import { CaveFileSnapshotVm, CaveSnapshotVm, SnapshotTagReference, SnapshotTagRole } from "../Models/CaveRevisionVm";
 import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 import dayjs from "dayjs";
 
@@ -60,7 +60,7 @@ export const caveToForm = (cave: CaveVm, linePlots: GeoJsonUploadVm[] = []): Add
   otherTagIds: cave.otherTagIds,
 });
 
-const tagIds = (tags: SnapshotTagReference[], role: string) =>
+const tagIds = (tags: SnapshotTagReference[], role: SnapshotTagRole) =>
   tags.filter((tag) => tag.role === role).map((tag) => tag.tagTypeId);
 
 export const snapshotToForm = (snapshot: CaveSnapshotVm, countyNumberIntent?: CountyNumberIntent,

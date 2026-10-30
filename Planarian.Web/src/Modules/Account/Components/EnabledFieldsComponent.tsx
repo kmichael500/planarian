@@ -30,7 +30,6 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldCaveState: "State",
   EnabledFieldCaveCounty: "County",
   EnabledFieldCaveReportedOn: "Reported On",
-  EnabledFieldCaveDistance: "Distance",
 
   EnabledFieldEntranceCoordinates: "Coordinates",
   EnabledFieldEntranceDescription: "Description",
@@ -44,6 +43,7 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldEntranceOtherTags: "Other",
   EnabledFieldEntranceFieldIndicationTags: "Field Indication",
   EnabledFieldEntranceReportedByNameTags: "Reported By",
+  ExportEnabled: "Export",
 };
 
 export const EnabledFieldsComponent = ({

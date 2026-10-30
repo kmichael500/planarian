@@ -284,7 +284,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     {
         if (exception.Data is not IEnumerable values) return string.Empty;
         return string.Join("\n", values.Cast<object>().Select(value =>
-            value.GetType().GetProperty("Reason")?.GetValue(value)?.ToString() ?? string.Empty));
+            value.GetType().GetProperty(nameof(FailedCaveCsvRecord<object>.Reason))?.GetValue(value)?.ToString() ?? string.Empty));
     }
 
     private static void AssertGoldenEqual<T>(T expected, T actual, string label)

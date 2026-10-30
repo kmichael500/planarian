@@ -321,7 +321,7 @@ it("maps every proposal snapshot field and tag role into revisable editor state"
       fileTypeTagId: "filetype01",
       name: "Published Map",
       extension: ".pdf",
-      fileTypeKey: "Map",
+      fileTypeKey: FileTypeKey.Map,
     }, {
       id: "file000002",
       fileTypeTagId: "filetype02",

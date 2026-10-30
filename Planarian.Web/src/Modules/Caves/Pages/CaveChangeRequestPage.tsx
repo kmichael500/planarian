@@ -4,6 +4,7 @@ import { Alert, Card, Collapse, Divider, Grid, Input, message, Space, Spin, Tag,
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
@@ -15,9 +16,14 @@ import { useLikelyCountyNumber } from "../Components/useLikelyCountyNumber";
 import { formatChangeScopeSummary } from "../Components/CaveChangeRequestList";
 import { CaveStaleReviewContext, CaveStaleReviewNotice } from "../Components/CaveStaleReviewContext";
 import { FileViewer } from "../../Files/Components/FileViewerComponent";
-import { FileService } from "../../Files/Services/FileService";
+import { FileAccessAction, FileService } from "../../Files/Services/FileService";
 import { getFileType } from "../../Files/Services/FileHelpers";
-import { CaveChangeRequestDetailVm, CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
+import {
+  CaveChangeRequestDetailVm,
+  CaveChangeRequestSummaryVm,
+  CaveProposalAuthoringConflictVm,
+  CaveProposalVersionDetailVm,
+} from "../Models/CaveChangeRequestVm";
 import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
 import { CaveService } from "../Service/CaveService";
 
@@ -143,11 +149,12 @@ export const CaveChangeRequestPage = () => {
         : decision.kind === "requestChanges" ? "Changes sent back to the submitter." : "Change request rejected.");
       setDetail(await CaveService.GetChangeRequest(requestId));
       setDecisionDialog(undefined);
-    } catch (error: any) {
-      if (error?.conflictKind === "ActiveProposalVersionChanged") {
+    } catch (error: unknown) {
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "ActiveProposalVersionChanged") {
         message.warning("The proposal changed while you were reviewing it. Review the current version before making a decision.");
         await refreshAfterConflict();
-      } else if (error?.conflictKind === "PublishedCaveChanged") {
+      } else if (conflict.conflictKind === "PublishedCaveChanged") {
         message.warning("The published Cave changed. Revise the proposal against the current Cave before approval.");
         await refreshAfterConflict();
       } else message.error("The review decision could not be saved.");
@@ -178,8 +185,9 @@ export const CaveChangeRequestPage = () => {
       await CaveService.ResubmitChangeRequest(requestId, detail.request.currentProposalVersionId);
       message.success("Changes resubmitted for review.");
       setDetail(await CaveService.GetChangeRequest(requestId));
-    } catch (error: any) {
-      if (error?.conflictKind === "ActiveProposalVersionChanged") {
+    } catch (error: unknown) {
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "ActiveProposalVersionChanged") {
         message.warning("The proposal changed. Reload and review the latest draft before resubmitting.");
         await refreshAfterConflict();
       } else message.error("The changes could not be resubmitted.");
@@ -396,7 +404,7 @@ export const CaveChangeRequestPage = () => {
       name={activeFile ? `${activeFile.name}${activeFile.extension}` : undefined}
       fileType={getFileType(activeFile?.extension)}
       viewUrl={activeFileIsStaged && activeFile
-        ? CaveService.GetStagedChangeRequestFileUrl(request.id, activeFile.id, "view") : undefined}
+        ? CaveService.GetStagedChangeRequestFileUrl(request.id, activeFile.id, FileAccessAction.View) : undefined}
       onDownload={activeFileIsStaged && activeFile
         ? () => CaveService.StartStagedChangeRequestFileDownload(request.id, activeFile.id) : undefined}
     />

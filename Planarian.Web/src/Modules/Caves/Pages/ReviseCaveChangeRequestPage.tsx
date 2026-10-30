@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { AppService } from "../../../Shared/Services/AppService";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
@@ -13,7 +14,7 @@ import { CaveRevisionDiff, CaveRevisionDiffAssetActions } from "../Components/Ca
 import { CaveLinePlotViewer } from "../Components/CaveLinePlotViewer";
 import { CaveStaleReviewContext, CaveStaleReviewNotice } from "../Components/CaveStaleReviewContext";
 import { FileViewer } from "../../Files/Components/FileViewerComponent";
-import { FileService } from "../../Files/Services/FileService";
+import { FileAccessAction, FileService } from "../../Files/Services/FileService";
 import { getFileType } from "../../Files/Services/FileHelpers";
 import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
@@ -21,6 +22,7 @@ import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormVa
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
+import { CaveProposalAuthoringConflictVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
 
 export const ReviseCaveChangeRequestPage = () => {
@@ -191,9 +193,10 @@ export const ReviseCaveChangeRequestPage = () => {
       setPreview(await CaveService.PreviewRevisedChanges(requestId, values, againstCurrent,
         expectedBaseRevisionId, expectedProposalVersionId!));
     } catch (error: any) {
-      if (error?.conflictKind === "ActiveProposalVersionChanged")
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before continuing.");
-      else if (error?.conflictKind === "PublishedCaveChanged")
+      else if (conflict.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed again. Reload this page before revising the proposal.");
       else message.error("The revised proposal could not be previewed.");
     } finally { setLoading(false); }
@@ -209,9 +212,10 @@ export const ReviseCaveChangeRequestPage = () => {
       unsaved.markClean();
       navigate(ClientRoutes.caveChangeRequest.get(requestId));
     } catch (error: any) {
-      if (error?.conflictKind === "ActiveProposalVersionChanged")
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before saving.");
-      else if (error?.conflictKind === "PublishedCaveChanged")
+      else if (conflict.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed again. Reload before creating the new proposal version.");
       else message.error("The proposal version could not be saved.");
     } finally { setSaving(false); }
@@ -269,8 +273,8 @@ export const ReviseCaveChangeRequestPage = () => {
       fileType={getFileType(activeFile?.extension)}
       viewUrl={activeFile && !publishedFileIds.has(activeFile.id)
         ? existingStagedFileIds.has(activeFile.id)
-          ? CaveService.GetStagedChangeRequestFileUrl(requestId, activeFile.id, "view")
-          : CaveService.GetAuthoringStagedFileUrl(activeFile.id, "view") : undefined}
+          ? CaveService.GetStagedChangeRequestFileUrl(requestId, activeFile.id, FileAccessAction.View)
+          : CaveService.GetAuthoringStagedFileUrl(activeFile.id, FileAccessAction.View) : undefined}
       onDownload={activeFile && !publishedFileIds.has(activeFile.id)
         ? () => existingStagedFileIds.has(activeFile.id)
           ? CaveService.StartStagedChangeRequestFileDownload(requestId, activeFile.id)

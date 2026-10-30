@@ -5,6 +5,7 @@ import { RcFile } from "antd/lib/upload";
 import { useMemo, useState } from "react";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
+import { FileAccessAction } from "../../Files/Services/FileService";
 import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
@@ -50,11 +51,11 @@ export const CaveFileAuthoringEditor = ({
   const accessFor = (file?: EditFileMetadataVm) => {
     if (!file) return {};
     if (locallyStagedFileIds.has(file.id)) return {
-      viewUrl: CaveService.GetAuthoringStagedFileUrl(file.id, "view"),
+      viewUrl: CaveService.GetAuthoringStagedFileUrl(file.id, FileAccessAction.View),
       download: () => CaveService.StartAuthoringStagedFileDownload(file.id),
     };
     if (stagedFileRequestId && requestStagedIds.has(file.id)) return {
-      viewUrl: CaveService.GetStagedChangeRequestFileUrl(stagedFileRequestId, file.id, "view"),
+      viewUrl: CaveService.GetStagedChangeRequestFileUrl(stagedFileRequestId, file.id, FileAccessAction.View),
       download: () => CaveService.StartStagedChangeRequestFileDownload(stagedFileRequestId, file.id),
     };
     return {};

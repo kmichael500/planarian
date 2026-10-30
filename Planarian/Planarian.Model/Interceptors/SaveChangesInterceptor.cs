@@ -111,7 +111,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 if (entityState == EntityState.Added && context.RequestUser != null &&
                     await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
                     return;
-                ValidateCurrentAndOriginalAccount(entity, accountState.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, accountState.AccountId, requestUserAccountId, nameof(AccountState.AccountId));
                 break;
 
             case nameof(User):
@@ -200,7 +200,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
                     throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
                 }
-                ValidateCurrentAndOriginalAccount(entity, accountUser.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, accountUser.AccountId, requestUserAccountId, nameof(AccountUser.AccountId));
                 break;
 
             case nameof(TagType):
@@ -210,7 +210,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                     await RequirePlanarianAdmin(context);
                     break;
                 }
-                ValidateCurrentAndOriginalAccount(entity, tagType.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, tagType.AccountId, requestUserAccountId, nameof(TagType.AccountId));
                 break;
 
             case nameof(ArcheologyTag):
@@ -243,47 +243,48 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
             case nameof(Cave):
                 var cave = (Cave)entity.Entity;
-                ValidateCurrentAndOriginalAccount(entity, cave.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, cave.AccountId, requestUserAccountId, nameof(Cave.AccountId));
                 break;
             case nameof(CaveRevision):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveRevision)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveRevision)entity.Entity).AccountId, requestUserAccountId, nameof(CaveRevision.AccountId));
                 break;
             case nameof(CaveImportBatch):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveImportBatch)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveImportBatch)entity.Entity).AccountId, requestUserAccountId, nameof(CaveImportBatch.AccountId));
                 break;
             case nameof(CaveChangeRequest):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequest)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequest)entity.Entity).AccountId, requestUserAccountId, nameof(CaveChangeRequest.AccountId));
                 break;
             case nameof(CaveProposalVersion):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveProposalVersion)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveProposalVersion)entity.Entity).AccountId, requestUserAccountId, nameof(CaveProposalVersion.AccountId));
                 break;
             case nameof(CaveChangeRequestStagedFile):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequestStagedFile)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequestStagedFile)entity.Entity).AccountId, requestUserAccountId, nameof(CaveChangeRequestStagedFile.AccountId));
                 break;
             case nameof(CaveChangeRequestReviewEvent):
-                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequestReviewEvent)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequestReviewEvent)entity.Entity).AccountId, requestUserAccountId, nameof(CaveChangeRequestReviewEvent.AccountId));
                 break;
             case nameof(StorageCleanupTarget):
-                ValidateCurrentAndOriginalAccount(entity, ((StorageCleanupTarget)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((StorageCleanupTarget)entity.Entity).AccountId, requestUserAccountId, nameof(StorageCleanupTarget.AccountId));
                 break;
 
             case nameof(County):
-                ValidateCurrentAndOriginalAccount(entity, ((County)entity.Entity).AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, ((County)entity.Entity).AccountId, requestUserAccountId, nameof(County.AccountId));
                 break;
             case nameof(CavePermission):
                 var cavePermission = (CavePermission)entity.Entity;
                 if (IsInvitationClaimPermissionTransition(
-                        entity, cavePermission.AccountId, cavePermission.UserId, ownershipValidation))
+                        entity, cavePermission.AccountId, cavePermission.UserId, nameof(CavePermission.AccountId),
+                        nameof(CavePermission.UserId), ownershipValidation))
                     break;
-                ValidateCurrentAndOriginalAccount(entity, cavePermission.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, cavePermission.AccountId, requestUserAccountId, nameof(CavePermission.AccountId));
                 break;
             case nameof(Favorite):
                 var favorite = (Favorite)entity.Entity;
-                ValidateCurrentAndOriginalAccount(entity, favorite.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, favorite.AccountId, requestUserAccountId, nameof(Favorite.AccountId));
                 break;
             case nameof(UserPermission):
                 var userPermission = (UserPermission)entity.Entity;
-                if (IsCurrentOrOriginalGlobalAccount(entity, userPermission.AccountId))
+                if (IsCurrentOrOriginalGlobalAccount(entity, userPermission.AccountId, nameof(UserPermission.AccountId)))
                 {
                     await RequirePlanarianAdmin(context);
                     break;
@@ -293,9 +294,10 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                     await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
                     return;
                 if (IsInvitationClaimPermissionTransition(
-                        entity, userPermission.AccountId, userPermission.UserId, ownershipValidation))
+                        entity, userPermission.AccountId, userPermission.UserId, nameof(UserPermission.AccountId),
+                        nameof(UserPermission.UserId), ownershipValidation))
                     break;
-                ValidateCurrentAndOriginalAccount(entity, userPermission.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, userPermission.AccountId, requestUserAccountId, nameof(UserPermission.AccountId));
                 break;
 
             case nameof(Entrance):
@@ -323,7 +325,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
             case nameof(FeatureSetting):
                 var featureSetting = (FeatureSetting)entity.Entity;
-                if (IsCurrentOrOriginalGlobalAccount(entity, featureSetting.AccountId))
+                if (IsCurrentOrOriginalGlobalAccount(entity, featureSetting.AccountId, nameof(FeatureSetting.AccountId)))
                 {
                     await RequirePlanarianAdmin(context);
                     break;
@@ -331,12 +333,12 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 if (entityState == EntityState.Added && context.RequestUser != null &&
                     await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
                     return;
-                ValidateCurrentAndOriginalAccount(entity, featureSetting.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, featureSetting.AccountId, requestUserAccountId, nameof(FeatureSetting.AccountId));
                 break;
 
             case nameof(File):
                 var file = (File)entity.Entity;
-                ValidateCurrentAndOriginalAccount(entity, file.AccountId, requestUserAccountId);
+                ValidateCurrentAndOriginalAccount(entity, file.AccountId, requestUserAccountId, nameof(File.AccountId));
                 break;
 
             case nameof(Permission):
@@ -358,13 +360,12 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
         return originalIsDefault && string.IsNullOrWhiteSpace(originalAccountId);
     }
 
-    private static bool IsCurrentOrOriginalGlobalAccount(EntityEntry entity, string? currentAccountId)
+    private static bool IsCurrentOrOriginalGlobalAccount(EntityEntry entity, string? currentAccountId,
+        string accountIdPropertyName)
     {
         if (string.IsNullOrWhiteSpace(currentAccountId)) return true;
-        if (entity.State is not (EntityState.Modified or EntityState.Deleted) ||
-            entity.Metadata.FindProperty("AccountId") is null)
-            return false;
-        return string.IsNullOrWhiteSpace(entity.Property("AccountId").OriginalValue as string);
+        if (entity.State is not (EntityState.Modified or EntityState.Deleted)) return false;
+        return string.IsNullOrWhiteSpace(entity.Property(accountIdPropertyName).OriginalValue as string);
     }
 
     private static async Task RequirePlanarianAdmin(PlanarianDbContextBase context)
@@ -378,6 +379,8 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
         EntityEntry entity,
         string? accountId,
         string userId,
+        string accountIdPropertyName,
+        string userIdPropertyName,
         SaveChangesOwnershipBatchLoader.ValidationResult ownershipValidation)
     {
         if (entity.State != EntityState.Modified) return false;
@@ -387,14 +390,10 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
             .Select(property => property.Metadata.Name)
             .Where(name => name is not nameof(EntityBase.ModifiedOn) and not nameof(EntityBase.ModifiedByUserId))
             .ToHashSet(StringComparer.Ordinal);
-        if (!businessChanges.SetEquals(["UserId"])) return false;
+        if (!businessChanges.SetEquals([userIdPropertyName])) return false;
 
-        var originalAccountId = entity.Metadata.FindProperty("AccountId") is null
-            ? null
-            : entity.Property("AccountId").OriginalValue as string;
-        var originalUserId = entity.Metadata.FindProperty("UserId") is null
-            ? null
-            : entity.Property("UserId").OriginalValue as string;
+        var originalAccountId = entity.Property(accountIdPropertyName).OriginalValue as string;
+        var originalUserId = entity.Property(userIdPropertyName).OriginalValue as string;
         return originalAccountId == accountId &&
                ownershipValidation.IsInvitationPermissionTransfer(accountId, userId, originalUserId);
     }
@@ -428,19 +427,18 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
     }
 
     private static void ValidateCurrentAndOriginalAccount(EntityEntry entity, string? currentAccountId,
-        string? requestUserAccountId)
+        string? requestUserAccountId, string accountIdPropertyName)
     {
         ValidateAccount(currentAccountId, requestUserAccountId);
-        ValidateOriginalAccountIfPresent(entity, requestUserAccountId);
+        ValidateOriginalAccountIfPresent(entity, requestUserAccountId, accountIdPropertyName);
     }
 
-    private static void ValidateOriginalAccountIfPresent(EntityEntry entity, string? requestUserAccountId)
+    private static void ValidateOriginalAccountIfPresent(EntityEntry entity, string? requestUserAccountId,
+        string accountIdPropertyName)
     {
-        if (entity.State is not (EntityState.Modified or EntityState.Deleted) ||
-            entity.Metadata.FindProperty("AccountId") is null)
-            return;
+        if (entity.State is not (EntityState.Modified or EntityState.Deleted)) return;
 
-        var originalAccountId = entity.Property("AccountId").OriginalValue as string;
+        var originalAccountId = entity.Property(accountIdPropertyName).OriginalValue as string;
         if (!string.IsNullOrWhiteSpace(originalAccountId))
             ValidateAccount(originalAccountId, requestUserAccountId);
     }

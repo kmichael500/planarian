@@ -561,7 +561,7 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
         var preview = await service.PreviewAsync(importedCaveId, values, importedRevisionId, default);
         var requestId = await service.CreateAsync(importedCaveId, values, importedRevisionId, default);
 
-        Assert.Equal(["Name"], preview.Diff.Scalars.Select(change => change.Path));
+        Assert.Equal([nameof(CavePublishedSnapshotV1.Name)], preview.Diff.Scalars.Select(change => change.Path));
         var stored = await contributor.CaveProposalVersions.SingleAsync(row => row.ChangeRequestId == requestId);
         var proposal = CaveProposalJson.Deserialize(stored.ProposalJson, stored.SchemaVersion);
         Assert.Null(proposal.LengthFeet);

@@ -1,7 +1,8 @@
 import { GeoJsonUploadVm } from "./GeoJsonUploadVm";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 
-export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
+export type CaveProposalCountyNumberMode = "PreserveExisting" | "Manual" | "FirstAvailable" | "AutomaticNext";
+export type CountyNumberIntent = Exclude<CaveProposalCountyNumberMode, "PreserveExisting">;
 
 export type CaveChangeRequestStatus = "Pending" | "ChangesRequested" | "Approved" | "Rejected";
 export type CaveChangeRequestSortBy = "UpdatedOn" | "SubmittedOn" | "CaveName";
@@ -91,7 +92,7 @@ export interface CaveProposalCountyNumberChangeVm {
 }
 
 export interface CaveProposalCountyNumberStateVm {
-  mode: "PreserveExisting" | "Manual" | "FirstAvailable" | "AutomaticNext";
+  mode: CaveProposalCountyNumberMode;
   number?: number;
 }
 
@@ -113,6 +114,23 @@ export interface CaveChangeRequestDetailVm {
   reviewEvents?: CaveChangeRequestReviewEventVm[];
 }
 
+export type CaveProposalAuthoringConflictKind =
+  | "PublishedCaveChanged"
+  | "ActiveProposalVersionChanged";
+
+export interface CaveProposalAuthoringConflictVm {
+  conflictKind: CaveProposalAuthoringConflictKind;
+  expectedId: string;
+  actualId?: string;
+}
+
+export type CaveChangeRequestDecisionResult =
+  | "ChangesRequested"
+  | "Resubmitted"
+  | "Approved"
+  | "Rejected"
+  | "Conflict";
+
 export type CaveChangeRequestReviewAction = "ChangesRequested" | "Resubmitted" | "Approved" | "Rejected";
 
 export interface CaveChangeRequestReviewEventVm {
@@ -126,7 +144,7 @@ export interface CaveChangeRequestReviewEventVm {
 }
 
 export interface CaveChangeRequestDecisionVm {
-  result: "ChangesRequested" | "Resubmitted" | "Approved" | "Rejected" | "Conflict";
+  result: CaveChangeRequestDecisionResult;
   requestId: string;
   publishedRevisionId?: string;
   currentRevisionId?: string;

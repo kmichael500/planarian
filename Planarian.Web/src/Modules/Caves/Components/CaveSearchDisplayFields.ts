@@ -1,10 +1,10 @@
-import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { ComputedFeatureKey, DisplayFeatureKey, FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItemKey } from "../../../Shared/Models/SelectListItem";
 
 export type CaveSearchDisplayFeature = SelectListItemKey<CaveSearchVm> & {
-  data: { key: FeatureKey };
+  data: { key: DisplayFeatureKey };
 };
 
 export const DEFAULT_CAVE_SEARCH_DISPLAY_FEATURES: NestedKeyOf<CaveSearchVm>[] =
@@ -19,7 +19,7 @@ export const CAVE_SEARCH_DISPLAY_FEATURES: CaveSearchDisplayFeature[] = [
   {
     display: "Distance From Me",
     value: "distanceMiles",
-    data: { key: FeatureKey.EnabledFieldCaveDistance },
+    data: { key: ComputedFeatureKey.CaveDistance },
   },
   {
     display: "County",

@@ -1,4 +1,9 @@
 using System.Text.RegularExpressions;
+using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.Leads;
+using Planarian.Model.Database.Entities.Projects;
+using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared.Base;
 using Xunit;
 
@@ -8,17 +13,17 @@ public sealed class SaveChangesInterceptorCoverageContractTests
 {
     private static readonly string[] IntentionalNonTenantEntityAllowlist =
     [
-        "Lead",
-        "LeadTag",
-        "Member",
-        "MessageLog",
-        "MessageLogEvent",
-        "MessageType",
-        "Photo",
-        "Project",
-        "ThrottleEventLog",
-        "Trip",
-        "TripTag"
+        nameof(Lead),
+        nameof(LeadTag),
+        nameof(Member),
+        nameof(MessageLog),
+        nameof(MessageLogEvent),
+        nameof(MessageType),
+        nameof(Photo),
+        nameof(Project),
+        nameof(ThrottleEventLog),
+        nameof(Trip),
+        nameof(TripTag)
     ];
 
     [Fact]
@@ -27,7 +32,7 @@ public sealed class SaveChangesInterceptorCoverageContractTests
         var root = FindRepositoryRoot();
         var interceptorPath = Path.Combine(root, "Planarian", "Planarian.Model", "Interceptors",
             "SaveChangesInterceptor.cs");
-        var interceptorSource = File.ReadAllText(interceptorPath);
+        var interceptorSource = System.IO.File.ReadAllText(interceptorPath);
         var switchCases = Regex.Matches(interceptorSource, @"case nameof\(([^)]+)\):")
             .Select(match => match.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
@@ -49,7 +54,7 @@ public sealed class SaveChangesInterceptorCoverageContractTests
     public void CurrentCaveAndAccountOwnershipCasesRemainInTheInterceptorSwitch()
     {
         var root = FindRepositoryRoot();
-        var source = File.ReadAllText(Path.Combine(root, "Planarian", "Planarian.Model", "Interceptors",
+        var source = System.IO.File.ReadAllText(Path.Combine(root, "Planarian", "Planarian.Model", "Interceptors",
             "SaveChangesInterceptor.cs"));
         var switchCases = Regex.Matches(source, @"case nameof\(([^)]+)\):")
             .Select(match => match.Groups[1].Value)
@@ -57,14 +62,14 @@ public sealed class SaveChangesInterceptorCoverageContractTests
 
         string[] required =
         [
-            "Account", "AccountState", "AccountUser", "TagType",
-            "ArcheologyTag", "BiologyTag", "CartographerNameTag", "CaveOtherTag", "CaveReportedByNameTag",
-            "GeologicAgeTag", "GeologyTag", "MapStatusTag", "PhysiographicProvinceTag",
-            "Cave", "CaveRevision", "CaveImportBatch", "CaveChangeRequest", "CaveProposalVersion",
-            "CaveChangeRequestStagedFile", "CaveChangeRequestReviewEvent", "StorageCleanupTarget",
-            "County", "Entrance", "EntranceHydrologyTag", "EntranceReportedByNameTag", "EntranceStatusTag",
-            "FieldIndicationTag", "EntranceOtherTag", "FeatureSetting", "File", "CaveGeoJson",
-            "CavePermission", "Favorite", "UserPermission", "Permission", "State", "User"
+            nameof(Account), nameof(AccountState), nameof(AccountUser), nameof(TagType),
+            nameof(ArcheologyTag), nameof(BiologyTag), nameof(CartographerNameTag), nameof(CaveOtherTag), nameof(CaveReportedByNameTag),
+            nameof(GeologicAgeTag), nameof(GeologyTag), nameof(MapStatusTag), nameof(PhysiographicProvinceTag),
+            nameof(Cave), nameof(CaveRevision), nameof(CaveImportBatch), nameof(CaveChangeRequest), nameof(CaveProposalVersion),
+            nameof(CaveChangeRequestStagedFile), nameof(CaveChangeRequestReviewEvent), nameof(StorageCleanupTarget),
+            nameof(County), nameof(Entrance), nameof(EntranceHydrologyTag), nameof(EntranceReportedByNameTag), nameof(EntranceStatusTag),
+            nameof(FieldIndicationTag), nameof(EntranceOtherTag), nameof(FeatureSetting), nameof(Planarian.Model.Database.Entities.RidgeWalker.File), nameof(CaveGeoJson),
+            nameof(CavePermission), nameof(Favorite), nameof(UserPermission), nameof(Permission), nameof(State), nameof(User)
         ];
 
         var missing = required.Where(name => !switchCases.Contains(name)).OrderBy(name => name).ToArray();
@@ -78,7 +83,7 @@ public sealed class SaveChangesInterceptorCoverageContractTests
              directory is not null;
              directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Planarian", "Planarian.sln")))
+            if (System.IO.File.Exists(Path.Combine(directory.FullName, "Planarian", "Planarian.sln")))
                 return directory.FullName;
         }
 

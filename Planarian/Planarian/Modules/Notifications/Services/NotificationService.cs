@@ -14,6 +14,6 @@ public class NotificationService
 
     public async Task SendNotificationToGroupAsync(string groupName, object message)
     {
-        await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", message);
+        await _hubContext.Clients.Group(groupName).SendAsync(NotificationHubContract.ReceiveNotification, message);
     }
 }

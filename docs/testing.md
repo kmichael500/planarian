@@ -51,6 +51,10 @@ state; use an existing nonparallel collection only for the smallest resource tha
 Prefer small typed factories, actor setup, permission helpers, and focused assertions over a general scenario DSL.
 Readable duplication is better than an abstraction that conceals why the behavior occurs.
 
+When a finite backend-owned wire value (for example an enum, permission key, feature key, tag role, or status)
+must be mirrored in TypeScript, keep the frontend type explicit and cover the mirror in
+`CrossStackStringContractTests`. Do not rely on two independently maintained string lists remaining synchronized.
+
 Unit-test pure parsing, planning, validation, matching, defaults, preview, and domain rules. Integration-test real
 translation, tenant isolation, transaction/atomicity behavior, locking/concurrency, PostGIS, revision publication,
 and deferred cleanup. Import harnesses may remove wiring while keeping CSV inputs and persistence expectations visible.

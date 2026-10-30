@@ -6,12 +6,12 @@ namespace Planarian.Modules.Caves.Models;
 
 public class CaveEntranceCsvModelMap : ClassMap<CaveEntranceCsvModel>
 {
-    public CaveEntranceCsvModelMap(Dictionary<FeatureKey, bool> featureDict, HashSet<string>? exportFields)
+    public CaveEntranceCsvModelMap(Dictionary<FeatureKey, bool> featureDict, HashSet<FeatureKey>? exportFields)
     {
 
         bool Include(FeatureKey key) =>
             featureDict.TryGetValue(key, out var enabled) && enabled &&
-            (exportFields == null || exportFields.Contains(key.ToString()));
+            (exportFields == null || exportFields.Contains(key));
 
 
         if (Include(FeatureKey.EnabledFieldEntranceName))

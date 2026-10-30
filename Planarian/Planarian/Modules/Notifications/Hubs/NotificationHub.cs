@@ -3,6 +3,12 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Planarian.Modules.Notifications.Hubs;
 
+public static class NotificationHubContract
+{
+    public const string Route = "/api/notificationHub";
+    public const string ReceiveNotification = "ReceiveNotification";
+}
+
 [Authorize]
 public class NotificationHub : Hub
 {

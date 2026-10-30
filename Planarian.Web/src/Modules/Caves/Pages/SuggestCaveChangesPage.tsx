@@ -4,6 +4,7 @@ import { EditOutlined, SendOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
@@ -15,11 +16,14 @@ import { useLikelyCountyNumber } from "../Components/useLikelyCountyNumber";
 import { FileViewer } from "../../Files/Components/FileViewerComponent";
 import { getFileType } from "../../Files/Services/FileHelpers";
 import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
-import { FileService } from "../../Files/Services/FileService";
+import { FileAccessAction, FileService } from "../../Files/Services/FileService";
 import { caveToForm } from "../Helpers/CaveFormMapper";
 import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 import { AddCaveVm } from "../Models/AddCaveVm";
-import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
+import {
+  CaveChangePreviewVm,
+  CaveProposalAuthoringConflictVm,
+} from "../Models/CaveChangeRequestVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveService } from "../Service/CaveService";
 
@@ -83,8 +87,9 @@ export const SuggestCaveChangesPage = () => {
     try {
       setDraft(values);
       setPreviewResult(await CaveService.PreviewChanges(caveId, values, expectedBaseRevisionId!));
-    } catch (error: any) {
-      if (error?.conflictKind === "PublishedCaveChanged")
+    } catch (error: unknown) {
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed while you were editing. Reload and review the current Cave before continuing.");
       else message.error("The proposed changes could not be previewed.");
     } finally {
@@ -100,8 +105,9 @@ export const SuggestCaveChangesPage = () => {
       message.success("Your changes were submitted for review.");
       unsaved.markClean();
       navigate(ClientRoutes.caveChangeRequest.get(id));
-    } catch (error: any) {
-      if (error?.conflictKind === "PublishedCaveChanged")
+    } catch (error: unknown) {
+      const conflict = error as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
+      if (conflict.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed after your preview. Reload and review it before submitting.");
       else message.error("The change request could not be submitted.");
     } finally {
@@ -158,7 +164,7 @@ export const SuggestCaveChangesPage = () => {
         name={activeFile ? `${activeFile.name}${activeFile.extension ?? ""}` : undefined}
         fileType={getFileType(activeFile?.extension)}
         viewUrl={activeFileIsStaged && activeFile
-          ? CaveService.GetAuthoringStagedFileUrl(activeFile.id, "view") : undefined}
+          ? CaveService.GetAuthoringStagedFileUrl(activeFile.id, FileAccessAction.View) : undefined}
         onDownload={activeFileIsStaged && activeFile
           ? () => CaveService.StartAuthoringStagedFileDownload(activeFile.id) : undefined}
       />

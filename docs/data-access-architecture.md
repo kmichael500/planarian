@@ -18,6 +18,20 @@ Application orchestration depends on feature capabilities, not database infrastr
 repositories own EF Core, Npgsql, and PostgreSQL access; there is no generic CRUD repository. Repositories return
 materialized projections, never `IQueryable`.
 
+When EF Core inspection or reflection targets one known CLR member, use typed access or `nameof` on that exact
+entity/contract rather than duplicating the spelling in a string. Generic cross-entity code must not borrow `nameof`
+from a representative concrete entity just because several entities currently share the same member spelling; use a
+real shared CLR contract or derive the relationship/member from EF model metadata instead. Reusable EF relationship
+metadata mechanics belong in `Planarian.Model/Database/Extensions` so feature repositories and interceptors keep only
+their domain-specific ownership/mutation policy. When code needs a physical database table or column name, use the EF
+model metadata when practicable: CLR names are **not** guaranteed to match
+mapped SQL names. Explicit SQL, historical migrations, serialized API values, and external protocol identifiers are
+compatibility contracts; do not rename or derive those mechanically without verifying their consumers. When maintained
+SQL must embed finite application-owned values, keep the SQL explicit and add a contract test tying those literals back
+to the canonical application constants instead of attempting to generate SQL from CLR names. For finite
+application-owned states, prefer C# enums or TypeScript string-literal unions, while treating newly received external
+values defensively.
+
 For ordinary tracked mutations, a service may coordinate application intent through its feature repository and use that
 repository's unit-of-work helpers such as `Add`, `Delete`, and `SaveChangesAsync`; those calls are not themselves a persistence
 leak. Planarian's ownership interceptor intentionally rejects synchronous `SaveChanges`, because its authorization checks
