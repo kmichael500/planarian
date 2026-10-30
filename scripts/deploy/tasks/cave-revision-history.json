@@ -1,0 +1,11 @@
+{
+  "id": "cave-revision-history",
+  "script": "scripts/deploy/tasks/cave-revision-history.sh",
+  "triggers": [
+    "Planarian/Planarian.Migrations/Migrations/20261029194500_CaveRevisionsCompletion.cs",
+    "Planarian/Planarian.Operations/CaveRevisionHistory/**"
+  ],
+  "requires": ["api", "database"],
+  "maintenance": true,
+  "run_on_first_release": true
+}

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Planarian.Library.Constants;
-using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
+using Planarian.Library.Exceptions;
+using Planarian.Model.Shared.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 
 namespace Planarian.Model.Shared;
@@ -59,7 +59,7 @@ public class RequestUser
         {
             // Intentionally return 401 here so the client clears stale account selection state
             // and forces a fresh login/session bootstrap instead of continuing with a bad account.
-            throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
+            throw RequestPolicyErrors.Unauthorized("the accountId doesn't exist or is invalid for this user");
         }
 
         Id = user.Id;
@@ -84,13 +84,11 @@ public class RequestUser
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(e => e.LastActiveOn, utcNow));
         }
-
-
     }
 
     public string AccountUploadFileChunkName =>
         $"account-{AccountId?.ToLower() ?? throw new NullReferenceException($" {nameof(AccountId)} is null")}";
-    
+
     public string AccountContainerName => AccountUploadFileChunkName;
 
     /// <summary>
@@ -184,7 +182,7 @@ public class RequestUser
 
         if (!hasCavePermission && @throw)
         {
-            throw ApiExceptionDictionary.Forbidden("You don't have permission to perform this action");
+            throw RequestPolicyErrors.Forbidden("You don't have permission to perform this action");
         }
 
         return hasCavePermission;
@@ -199,7 +197,7 @@ public class RequestUser
         bool @throw = true)
     {
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
-            throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated and permissionKey are required");
+            throw RequestPolicyErrors.BadRequest("Invalid request. IsAuthenticated and permissionKey are required");
 
         // Platform and synthetic account capabilities are not resource grants. Route them
         // through the canonical capability resolver so malformed persisted rows cannot turn
@@ -208,7 +206,7 @@ public class RequestUser
             return await HasCavePermission(permissionKey, @throw);
 
         if (string.IsNullOrWhiteSpace(AccountId))
-            throw ApiExceptionDictionary.BadRequest("Invalid request. AccountId is required for scoped Cave authorization");
+            throw RequestPolicyErrors.BadRequest("Invalid request. AccountId is required for scoped Cave authorization");
 
         var satisfyingPermissionKeys = PermissionPolicy.GetSatisfyingUserPermissionKeys(permissionKey);
         var satisfyingCavePermissionKeys = PermissionPolicy.GetSatisfyingCavePermissionKeys(permissionKey);
@@ -275,7 +273,7 @@ public class RequestUser
 
         if (!hasPermission && @throw)
         {
-            throw ApiExceptionDictionary.Forbidden("You don't have permission to perform this action");
+            throw RequestPolicyErrors.Forbidden("You don't have permission to perform this action");
         }
 
         return hasPermission;

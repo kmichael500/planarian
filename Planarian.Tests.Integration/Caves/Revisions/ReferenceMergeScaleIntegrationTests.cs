@@ -8,6 +8,7 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
+using Planarian.Operations.CaveRevisionHistory;
 
 using Planarian.Tests;
 

@@ -101,7 +101,7 @@ sequenceDiagram
 
 Every Cave that already exists when revision history is enabled receives exactly one system-generated rollout revision before the new API serves requests. That revision uses `Source = SystemBaseline` and `Operation = Baseline`; its canonical snapshot records the Cave exactly as it existed at the rollout boundary. It does **not** mean the Cave was created at that time or that no earlier changes occurred.
 
-The rollout is a deliberate deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. Normal API startup fails closed while any live Cave has `CurrentRevisionId = null`.
+The rollout is a deliberate deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. The coordinated deployment keeps the API stopped until the operation completes and verifies that no live Cave has `CurrentRevisionId = null`; normal web startup contains no deployment/rollout command path.
 
 After rollout, an existing Cave without `CurrentRevisionId` is an integrity/deployment error. Ordinary reads, authoring-context reads, interactive writes, and bulk writes never manufacture a late baseline. A Cave created after rollout instead receives its ordinary `Create` revision atomically with creation.
 
@@ -113,17 +113,20 @@ The rollout boundary assumes Cave-owned writes are quiesced while initialization
 
 1. stop or otherwise quiesce the old API's Cave/Entrance/File/line-plot/import/admin writes;
 2. apply the Cave-revisions EF migrations;
-3. run the new API artifact once with `--initialize-cave-revision-history`;
-4. verify the command completes successfully;
-5. start the new API normally. Its startup guard independently verifies that no live Cave still has a null `CurrentRevisionId`.
+3. run the separately published operations artifact with `initialize-cave-revision-history`;
+4. allow that command to verify the rollout is complete;
+5. deploy/start the new API only after the operation succeeds.
 
-The published API artifact runs the bootstrap with:
+The deployment-only executable runs the bootstrap with:
 
 ```bash
-dotnet Planarian.dll --initialize-cave-revision-history
+ConnectionStrings__default="<scoped database connection>" \
+  dotnet Planarian.Operations.dll initialize-cave-revision-history
 ```
 
-The command exits after initialization; it does not start the HTTP server. A successful rerun is a no-op and reports the existing history boundary.
+`Planarian.Operations` is a small console host, not the web application. Its `Program.cs` is generic and only dispatches registered operation names. The temporary Cave operation and its `CaveRevisionRolloutRepository` live entirely in the Operations project; that repository owns the EF/Npgsql setup and rollout mechanics and uses the permanent shared snapshot repository only for canonical snapshot construction. It does not start Kestrel or load Azure App Configuration. A successful rerun is a no-op and reports the existing history boundary.
+
+The API runtime has no rollout command, readiness check, or deployment-history knowledge. The coordinated deployment owns the safety boundary: it keeps the old API quiesced, requires the Operations command to complete successfully, and only then deploys/starts the new API.
 
 Do not let the old writer remain active during step 3. The rollout intentionally commits bounded batches for resumability rather than holding one database-wide transaction, so quiescing writers is what makes the shared timestamp represent one authoritative rollout state. Concurrent rollout commands themselves are serialized with a PostgreSQL advisory lock.
 
@@ -208,5 +211,8 @@ The Cave detail page is read-only for Cave-owned Files and line plots. Normal in
 4. Planarian/Planarian/Modules/Caves/Services/CaveService.cs
 5. Planarian/Planarian/Modules/Caves/Revisions/CaveMutationWorkflow.cs
 6. Planarian/Planarian/Modules/Caves/Revisions/CaveMutationRepository.cs
-7. Planarian/Planarian/Modules/Caves/Revisions/CavePublishedSnapshotRepository.cs
-8. Planarian/Planarian.Model/Database/Revisions/CavePublishedSnapshotV1.cs
+7. Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs
+8. Planarian/Planarian.Operations/OperationsCatalog.cs
+9. Planarian/Planarian.Operations/CaveRevisionHistory/InitializeCaveRevisionHistoryOperation.cs
+10. Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutRepository.cs
+11. Planarian/Planarian.Model/Database/Revisions/CavePublishedSnapshotV1.cs

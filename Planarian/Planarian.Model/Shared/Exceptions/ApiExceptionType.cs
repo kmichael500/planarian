@@ -1,3 +1,4 @@
+// Namespace retained for source compatibility; this contract is owned by Planarian.Model.
 namespace Planarian.Library.Exceptions;
 
 public enum ApiExceptionType

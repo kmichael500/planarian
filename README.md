@@ -31,6 +31,9 @@ Published Cave changes are recorded as immutable revisions, while pending propos
 state and pass through a controlled review and publication boundary. See
 [`docs/cave-revisions.md`](docs/cave-revisions.md) for the durable architecture contract.
 
+The deployment process is documented in [docs/deployment.md](docs/deployment.md), including the
+coordinated API/web/EF migration release workflow and the one-time Cave revision history rollout.
+
 ## Data
 
 Most of these fields can be enabled or disabled, so a group can decide what it wants to collect.
@@ -217,7 +220,7 @@ Hosted browser frontend/API mappings must use HTTPS and be schemeful same-site. 
 
 ### Azure App Service API deployments
 
-Azure/Linux App Service terminates TLS before Kestrel. Before each API deployment, `scripts/deploy-dev.sh` idempotently sets `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`; the Development and Production API GitHub workflows do the same before publishing the package. Configure the GitHub Environment with the non-secret `AZURE_RESOURCE_GROUP` variable and an `AZURE_CREDENTIALS` secret usable by `azure/login` in addition to the existing publish-profile and app-name secrets.
+Azure/Linux App Service terminates TLS before Kestrel. Local `scripts/deploy-dev.sh` can configure `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`; for hosted releases, configure that App Service setting once before enabling the coordinated GitHub deployment workflow. The workflow verifies the setting before API deployment rather than rewriting App Service configuration on every release. Configure the GitHub Environment with the non-secret `AZURE_RESOURCE_GROUP` variable and an `AZURE_CREDENTIALS` secret usable by `azure/login`; the coordinated workflow no longer uses the old publish-profile deployment path.
 
 This is required so forwarded `X-Forwarded-Proto` restores the public HTTPS scheme before HTTPS redirection and before Planarian constructs `ApiBaseUrl`, SignalR URLs, photo URLs, profile URLs, and other request-generated URLs. The API intentionally fails fast in Azure when the setting is absent.
 

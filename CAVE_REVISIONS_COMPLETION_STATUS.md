@@ -1,9 +1,9 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **FEATURE COMPLETION INTEGRATED AND ACCEPTED — READY FOR A SEPARATE MERGE INTO `main`**. GAP-014 inactive-account sweeping remains intentionally deferred.
+**Status:** **CAVE FEATURE INTEGRATED AND VALIDATED; COORDINATED DEPLOYMENT AWAITS ENVIRONMENT SETUP AND DEVELOPMENT REHEARSAL BEFORE ACTIVATION.** The backend/browser feature acceptance recorded below remains SHA-specific. GAP-014 inactive-account sweeping remains intentionally deferred.
 **Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `62bf08ba06b0afafa655b643155d0be1b4317942` (final reviewed code + durable-docs tree; the following ledger-only commit records that review without changing implementation). Agent 2/3 accepted `52f2c593` before GAP-015, whose integrated source commit is `f004ae48fcd88fbc415bb9cb4363794c2d52f418`. Earlier package evidence remains SHA-pinned to its own source.
+**Completion HEAD reviewed:** `161b3294287d72c550f0896a855efbf22a3ff825` (committed Cave Revisions and one-migration source baseline; the new coordinated deployment workflow is currently an uncommitted implementation, with separate local static/unit evidence and outstanding hosted-environment acceptance). Agent 2/3 accepted `52f2c593` before GAP-015, whose integrated source commit is `f004ae48fcd88fbc415bb9cb4363794c2d52f418`. Earlier package evidence remains SHA-pinned to its own source.
 **Typed-identifier refresh:** 2026-10-29; the original `dc34b128` package is merged, then post-merge adversarial review fixed serialized revision-diff path coupling and aligned the raw-member architecture guard with the documented exact-`nameof` exception in `455386de`.
 **Permission-policy refresh:** 2026-10-29; `e0b90a60` centralizes Account/Cave role semantics, hardens unsupported-key handling, moves current browser authorization to a versioned server-effective projection, and retains a version-gated compatibility adapter for independently deployed older APIs.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
@@ -11,6 +11,146 @@
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
 **Historical branch-distance/diff statistics:** omitted from the live summary because they drift with each completion merge; use `git rev-list --left-right --count main...feature/cave-revisions-completion` and `git diff --stat main...feature/cave-revisions-completion` to obtain current values.
+
+## 2026-10-29 — Coordinated deployment pipeline (implementation, not activated)
+
+The four independent API/web GitHub Actions deployment workflows are replaced
+in the feature branch by `.github/workflows/Planarian.Deploy.yml` and the
+change planner in `scripts/deploy/plan.py`. It builds and deploys only the API,
+web, and EF migrations required since the last successful coordinated release
+for the selected environment. `main` still deploys Development automatically,
+while a manual Development dispatch may use any trusted selected repository
+branch/ref. Production is independent of Development history: it requires a
+manual `planarian-release-v*` tag dispatch and no longer has an exact-commit
+Development-promotion gate. Production still refuses divergent-history
+rollback implicitly and requires a recoverability acknowledgment when database
+changes are selected.
+
+Durable selective-deployment state is recorded with GitHub's native Deployment
+objects rather than Actions workflow-run history. Immediately before the first
+hosted mutation, the gated deploy job creates a task-scoped
+`planarian-coordinated-release` record in an internal Development/Production
+tracking environment. The newest `SUCCESS`/`ACTIVE` tracking Deployment is the
+component-diff baseline; every newer tracking record, including a failed,
+in-progress, statusless, or interrupted attempt, freezes its migration files
+because that attempt may already have crossed the database boundary. The plan
+job reads the full paginated Deployment connection, validates pagination and
+commit availability, and fails closed rather than guessing state. This closes
+a real partial-failure gap where a migration applied during a failed release
+could otherwise have been edited before the next successful release.
+
+One-off deployment behavior is not encoded as Cave-specific logic in the
+permanent workflow or planner. `scripts/deploy/release_tasks.py` loads strict,
+fail-closed manifests and `scripts/deploy/run_tasks.py` executes generic
+preflight/run plus optional maintenance phases. The Cave history bootstrap is
+isolated to `scripts/deploy/tasks/cave-revision-history.{json,sh}` and the small
+`Planarian.Operations` console host. Permanent canonical snapshot persistence
+remains in the existing `Planarian.Library`; rollout-specific persistence does not. The prior `Planarian.Model -> Planarian.Library`
+dependency was inverted: Model is now independent, Library references Model, and
+both the API and Operations reference Library. Operations does not reference
+`Planarian.csproj` or load the web host. Its generic `Program.cs` only
+dispatches registered operations; the Cave-specific operation and
+`CaveRevisionRolloutRepository` live entirely in `Planarian.Operations`.
+The Operations-only repository owns the `PlanarianDbContext`/Npgsql setup from
+the same scoped `ConnectionStrings__default` secret used by the EF bundle. Its manifest
+uses the completion migration plus the isolated
+`Planarian.Operations/CaveRevisionHistory/**` folder as domain triggers and
+declares API/database requirements, first-release behavior, and maintenance
+requirements. Manifest/script/Cave-operation edits reselect the task, while
+unrelated Operations or shared Library changes do not reopen Cave maintenance. The task owns
+quiescence, idempotent
+`Planarian.Operations initialize-cave-revision-history` execution, and API
+resume. The registry rejects stray/nested/symlink task content, noncanonical paths,
+duplicate IDs/scripts/triggers/requirements, unknown requirements, dead tasks,
+multiple maintenance owners, and path escape. The Cave preflight also verifies
+the exact completion migration is present. After the one-off succeeds in every
+environment that needs it, its manifest/script and Cave-specific Operations
+command/rollout repository can be retired; the generic Operations host and
+normal shared snapshot repository remain. The API contains no rollout command,
+readiness repository, or deployment-history startup check; the coordinated
+deployment owns sequencing and will not start the new API until the Operations
+rollout succeeds.
+
+Security/operational hardening in the final pass includes explicit least-
+privilege `GITHUB_TOKEN` permissions, non-persisted checkout credentials, full
+commit-SHA pins for every action touched by this package, Azure Login v3.1.0 on
+the verified peeled action commit, suppressed default Azure CLI stdout,
+trusted-ref guidance for privileged manual Development runs, protected release-
+tag guidance for Production, and fail-before-mutation checks for required
+runner tools/configuration. Stage 1 intentionally keeps the existing Azure
+service-principal secret; OIDC/federated Azure login is documented as a later
+hardening step once the Azure identity exists. The scoped database migration
+secret is supplied to both the EF bundle and `Planarian.Operations` as
+`ConnectionStrings__default`, rather than being placed on either process
+command line. GitHub no longer needs an Azure App Configuration connection
+string for the Cave operation.
+
+**Final deployment validation:** `python3 -m unittest discover -s
+scripts/deploy -p 'test_*.py'` passes **72/72**. The matrix covers selective
+component planning, arbitrary Development refs, independent Production
+history, divergent rollback refusal, durable GitHub Deployment pagination and
+state parsing, statusless/interrupted attempts, partial-failure migration
+immutability, branch-only migration removal refusal, snapshot-without-migration
+refusal, strict task registration/execution/retirement, maintenance ordering,
+exact-commit maintenance-resume gating, artifact-before-mutation ordering,
+least-privilege workflow contracts, immutable
+action references, runner preflight, EF pending-model enforcement, PR-base
+migration protection, environment-based migration-secret handling, the separate
+`Planarian.Operations` artifact boundary, narrow one-off task reselection, and
+regressions that keep rollout/deployment knowledge out of web `Program.cs`
+and generic command details out of Operations `Program.cs`, while requiring the
+Cave rollout implementation itself to remain isolated in `Planarian.Operations`.
+
+The dependency-inversion pass previously validated **42/42** relevant
+unit/contract tests, **15/15** permission/save-interceptor integration tests,
+and **5/5** Cave rollout/scale integration tests. A fresh adversarial pass over
+the final isolation design then tightened the trusted snapshot escape hatch to
+an internal friend-assembly boundary, made the deployment-only rollout types
+internal, removed unnecessary DbContext ownership/disposal ceremony, and
+qualified every rollout `IgnoreQueryFilters` bypass explicitly by authoritative
+Account IDs. Exact-tree revalidation passes **12/12** directly affected
+rollout/migration/reference-scale integration tests with zero skips, including
+the production connection-string entrypoint and the 10,000-Cave consumers. The
+full deployment suite passes **72/72**. The affected Library and Operations
+projects build with zero warnings/errors; the integration project builds with
+only pre-existing Model/API nullable warnings. The exact Operations publish
+produces an approximately **9.1 MiB** artifact containing no `Planarian.dll`,
+no Azure App Configuration/Identity/Storage dependency, and no
+`Microsoft.AspNetCore.App` runtime requirement. Direct dependency inspection
+confirms Model has no project references, Library references only Model and no
+longer carries a direct Npgsql package, and Operations references only Library
+plus Model while owning its EF/Npgsql rollout dependencies. The Library exposes
+its trusted non-request snapshot entry point only to `Planarian.Operations`
+through the SDK-supported `InternalsVisibleTo` assembly boundary; neither
+Library nor the API takes a project reference on Operations.
+
+The earlier, broader pre-simplification validation remains useful historical
+evidence (522/522 unit/architecture, 46/46 migration/foundation/rollout, and
+302/302 Cave Revisions integration), but those broad suites were intentionally
+not rerun after the final dependency inversion because the user requested only
+tests relevant to this refactor. Targeted formatting, registered-task shell
+syntax, repository documentation validation, stale-reference scans, and
+`git diff HEAD --check` are the final static closeout gates.
+
+The exact deployment EF bundle command previously built a self-contained
+`linux-x64` migration bundle successfully at **119 MiB**; the final refactor
+did not modify the migration project or migration files.
+An additional
+ad-hoc macOS bundle/environment-variable smoke using an emulated amd64 PostGIS
+container was inconclusive because the emulated host connection dropped; it is
+not counted as validation evidence. No hosted Azure release or existing
+Development/Production application database was touched.
+
+**Activation boundary:** Existing Development/Production GitHub Environment
+values must still be configured; a self-hosted deploy runner, if used, must be
+Linux x64, current enough for Node 24 actions, and able to reach PostgreSQL and
+the Azure control plane. The Cave operation itself no longer needs Azure App
+Configuration access. Verify any separately installed GitHub deployment
+integration ignores the internal `planarian-coordinated-release` tracking
+records unless intentionally configured otherwise. The stopped-App-Service ZIP
+deployment mechanism for the initial Cave rollout still requires a safe
+Development rehearsal before Production activation. Stage-2 deployment slots
+remain intentionally outside scope.
 
 ## 2026-10-29 — Single post-v32 Cave Revisions migration consolidation
 
@@ -607,7 +747,7 @@ The structural migration includes the intentional data-preservation work that EF
 
 The migration tests are split by behavior (`MigrationUpgrade`, File metadata, File ownership, FeatureSetting backfill, legacy reporter cleanup, and legacy revision initialization) rather than one monolithic class. The required migration + PostgreSQL-foundation Release suite passes **32/32**. Coverage includes a normalized PostgreSQL catalog comparison proving v32 columns/types/nullability/defaults/constraints/indexes round-trip unchanged (physical column order intentionally excluded), rollback after the new revision/proposal/import tables contain valid data, distinct legacy `FileName` preservation, post-upgrade Name and Extension edits, Files created after upgrade, migration length/validation boundaries, the complete supported File ownership matrix with transactional rollback, and exact FeatureSetting backfill provenance. `dotnet-ef migrations has-pending-model-changes` also reports no pending model changes.
 
-After the schema migration, a separate one-time application bootstrap creates the authoritative `SystemBaseline/Baseline` revision for every pre-existing Cave from the canonical snapshot projection and advances `CurrentRevisionId`. Normal API startup refuses to serve while any live Cave remains uninitialized. The rollout is resumable, reuses one history-boundary timestamp across retries, has no user actor, refuses to create a late baseline after ordinary revision publication begins, and has supported-scale coverage for 10,000 Caves.
+After the schema migration, a separate one-time `Planarian.Operations` bootstrap creates the authoritative `SystemBaseline/Baseline` revision for every pre-existing Cave from the canonical snapshot projection and advances `CurrentRevisionId`. The coordinated deployment keeps the API quiesced and refuses to deploy/start the new API until the operation succeeds. The API itself contains no rollout/readiness behavior. The rollout is resumable, reuses one history-boundary timestamp across retries, has no user actor, refuses to create a late baseline after ordinary revision publication begins, and has supported-scale coverage for 10,000 Caves.
 
 The rollback contract is intentionally **schema-contract/data-compatible**, not a promise to reconstruct deliberately removed legacy `ReportedByUserId` values. Those columns were unused legacy data and are recreated nullable on downgrade without restoring their former contents. Migration chronology and the supported rollback contract are therefore no longer merge blockers.
 

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+using System.Net;
 
 namespace Planarian.Library.Exceptions;
 
@@ -8,27 +8,27 @@ public static class ApiExceptionDictionary
 
     public static ApiException BadRequest(string message)
     {
-        return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.BadRequest, message);
+        return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.BadRequest, message);
     }
 
     public static ApiException Unauthorized(string message)
     {
-        return new ApiException(StatusCodes.Status401Unauthorized, ApiExceptionType.Unauthorized, message);
+        return new ApiException((int)HttpStatusCode.Unauthorized, ApiExceptionType.Unauthorized, message);
     }
 
     public static ApiException Forbidden(string message)
     {
-        return new ApiException(StatusCodes.Status403Forbidden, ApiExceptionType.Forbidden, message);
+        return new ApiException((int)HttpStatusCode.Forbidden, ApiExceptionType.Forbidden, message);
     }
 
     public static ApiException NotFound(string type)
     {
-        return new ApiException(StatusCodes.Status404NotFound, ApiExceptionType.NotFound, $"{type} not found");
+        return new ApiException((int)HttpStatusCode.NotFound, ApiExceptionType.NotFound, $"{type} not found");
     }
 
     public static ApiException Conflict(string message)
     {
-        return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.Conflict, message);
+        return new ApiException((int)HttpStatusCode.Conflict, ApiExceptionType.Conflict, message);
     }
 
     public static ApiException FromErrorCode(string? errorCode, string message, object? data)
@@ -41,14 +41,14 @@ public static class ApiExceptionDictionary
         var exception = apiExceptionType switch
         {
             ApiExceptionType.BadRequest => BadRequest(message),
-            ApiExceptionType.NotFound => new ApiException(StatusCodes.Status404NotFound, ApiExceptionType.NotFound, message),
+            ApiExceptionType.NotFound => new ApiException((int)HttpStatusCode.NotFound, ApiExceptionType.NotFound, message),
             ApiExceptionType.Conflict => Conflict(message),
             ApiExceptionType.SessionCancelled => SessionCancelled(message),
             ApiExceptionType.TooManyRequests => TooManyRequests(message),
             ApiExceptionType.Unauthorized => Unauthorized(message),
             ApiExceptionType.Forbidden => Forbidden(message),
             ApiExceptionType.InternalServerError => InternalServerError(message),
-            _ => new ApiException(StatusCodes.Status400BadRequest, apiExceptionType, message)
+            _ => new ApiException((int)HttpStatusCode.BadRequest, apiExceptionType, message)
         };
 
         return WithData(exception, data);
@@ -56,7 +56,7 @@ public static class ApiExceptionDictionary
 
     public static ApiException TooManyRequests(string message)
     {
-        return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message)
+        return new ApiException((int)HttpStatusCode.TooManyRequests, ApiExceptionType.TooManyRequests, message)
         {
             ShowContactInfo = true
         };
@@ -84,18 +84,18 @@ public static class ApiExceptionDictionary
 
     #region User 100-199
 
-    public static ApiException EmailAlreadyExists => new(StatusCodes.Status400BadRequest, ApiExceptionType.EmailAlreadyExists, "Email already exists");
+    public static ApiException EmailAlreadyExists => new((int)HttpStatusCode.BadRequest, ApiExceptionType.EmailAlreadyExists, "Email already exists");
 
-    public static ApiException InvalidPasswordComplexity => new(StatusCodes.Status400BadRequest, ApiExceptionType.InvalidPasswordComplexity,
+    public static ApiException InvalidPasswordComplexity => new((int)HttpStatusCode.BadRequest, ApiExceptionType.InvalidPasswordComplexity,
         "The password does not meet the complexity requirements");
 
     public static ApiException InvalidPhoneNumber =>
-        new(StatusCodes.Status400BadRequest, ApiExceptionType.InvalidPhoneNumber, "Phone number is invalid");
+        new((int)HttpStatusCode.BadRequest, ApiExceptionType.InvalidPhoneNumber, "Phone number is invalid");
 
     public static ApiException InvalidEmailConfirmationCode =>
-        new(StatusCodes.Status400BadRequest, ApiExceptionType.InvalidEmailConfirmationCode, "The email confirmation code does not exist");
+        new((int)HttpStatusCode.BadRequest, ApiExceptionType.InvalidEmailConfirmationCode, "The email confirmation code does not exist");
 
-    public static ApiException EmailNotConfirmed => new(StatusCodes.Status400BadRequest, ApiExceptionType.EmailNotConfirmed,
+    public static ApiException EmailNotConfirmed => new((int)HttpStatusCode.BadRequest, ApiExceptionType.EmailNotConfirmed,
         "Please confirm your email address before logging in.");
 
     #endregion
@@ -103,41 +103,41 @@ public static class ApiExceptionDictionary
     #region Authentication 200-299
 
     public static ApiException EmailDoesNotExist =>
-        new(StatusCodes.Status401Unauthorized, ApiExceptionType.EmailDoesNotExist, "Email does not exist");
+        new((int)HttpStatusCode.Unauthorized, ApiExceptionType.EmailDoesNotExist, "Email does not exist");
 
     public static ApiException InvalidPassword =>
-        new(StatusCodes.Status401Unauthorized, ApiExceptionType.InvalidPassword, "Password is invalid");
+        new((int)HttpStatusCode.Unauthorized, ApiExceptionType.InvalidPassword, "Password is invalid");
 
     public static ApiException PasswordResetCodeExpired =>
-        new(StatusCodes.Status401Unauthorized, ApiExceptionType.PasswordResetCodeExpired, "Password reset code expired");
+        new((int)HttpStatusCode.Unauthorized, ApiExceptionType.PasswordResetCodeExpired, "Password reset code expired");
 
     public static ApiException InvalidPasswordResetCode =>
-        new(StatusCodes.Status500InternalServerError, ApiExceptionType.InvalidPasswordResetCode, "The code does not exist");
+        new((int)HttpStatusCode.InternalServerError, ApiExceptionType.InvalidPasswordResetCode, "The code does not exist");
 
     public static ApiException UserAlreadyInAccount =>
-        new(StatusCodes.Status400BadRequest, ApiExceptionType.UserAlreadyInAccount, "You are already have access to this account");
+        new((int)HttpStatusCode.BadRequest, ApiExceptionType.UserAlreadyInAccount, "You are already have access to this account");
 
     #endregion
 
     #region Email Issues 300-399
 
     public static ApiException MessageTypeNotFound =>
-        new(StatusCodes.Status500InternalServerError, ApiExceptionType.MessageTypeNotFound, "There was an issue");
+        new((int)HttpStatusCode.InternalServerError, ApiExceptionType.MessageTypeNotFound, "There was an issue");
 
     public static ApiException EmailFailedToSend =>
-        new(StatusCodes.Status500InternalServerError, ApiExceptionType.EmailFailedToSend, "The email failed to send");
+        new((int)HttpStatusCode.InternalServerError, ApiExceptionType.EmailFailedToSend, "The email failed to send");
 
     #endregion
 
     public static ApiException NoAccount =>
-        new(StatusCodes.Status500InternalServerError, ApiExceptionType.NoAccount, "No account was found");
+        new((int)HttpStatusCode.InternalServerError, ApiExceptionType.NoAccount, "No account was found");
 
     public static Exception InvalidPermission =>
-        new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.BadRequest, "Invalid permission key");
+        new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.BadRequest, "Invalid permission key");
 
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired)
     {
-        return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.EntranceRequired, atLeastEntranceIsRequired);
+        return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.EntranceRequired, atLeastEntranceIsRequired);
     }
 
     #region Import 400-499
@@ -145,19 +145,19 @@ public static class ApiExceptionDictionary
     public static ApiException InvalidImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords,
         ImportType importType)
     {
-        return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.InvalidImport,
-                $"Failed {importType.ToString().ToLower()} import")
-            { Data = failedCaveRecords };
+        return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.InvalidImport,
+            $"Failed {importType.ToString().ToLower()} import")
+        { Data = failedCaveRecords };
     }
 
     public static ApiException NullValue(string name)
     {
-        return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.NullValue, $"Value is missing from '{name}'");
+        return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.NullValue, $"Value is missing from '{name}'");
     }
 
     public static ApiException SessionCancelled(string message = "Upload session was canceled.")
     {
-        return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.SessionCancelled, message);
+        return new ApiException((int)HttpStatusCode.Conflict, ApiExceptionType.SessionCancelled, message);
     }
 
     #endregion
@@ -166,7 +166,7 @@ public static class ApiExceptionDictionary
 
     public static Exception QueryInvalidValue(string field, string value)
     {
-        return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.QueryInvalidValue,
+        return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.QueryInvalidValue,
             $"Invalid value '{value}' for field '{field}'");
     }
 

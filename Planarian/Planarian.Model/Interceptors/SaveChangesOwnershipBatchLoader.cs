@@ -7,6 +7,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared.Base;
+using Planarian.Model.Shared.Exceptions;
 
 namespace Planarian.Model.Interceptors;
 
@@ -463,5 +464,5 @@ internal static class SaveChangesOwnershipBatchLoader
     }
 
     private static ApiException Forbidden() =>
-        ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+        RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
 }

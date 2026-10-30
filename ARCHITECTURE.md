@@ -19,7 +19,7 @@ The diagrams are C4-inspired rather than strict C4 notation. They use ordinary M
 
 ## The shortest mental model
 
-Planarian is primarily a React single-page application talking to an ASP.NET Core API. The API stores relational/geospatial data in PostgreSQL/PostGIS and stores large File bytes in object storage.
+Planarian is primarily a React single-page application talking to an ASP.NET Core API. The API stores relational/geospatial data in PostgreSQL/PostGIS and stores large File bytes in object storage. Deployment-only database operations are kept outside the web host: the small `Planarian.Operations` console executable composes explicit operational commands from shared persistence libraries and a scoped database connection, without starting the API or loading its hosted-service configuration.
 
 For Cave changes, the central idea is:
 
@@ -157,7 +157,7 @@ If the completion branch feels overwhelming, read the source in this order.
 6. [backend CaveService.cs](Planarian/Planarian/Modules/Caves/Services/CaveService.cs)
 7. [CaveMutationWorkflow.cs](Planarian/Planarian/Modules/Caves/Revisions/CaveMutationWorkflow.cs)
 8. [CaveMutationRepository.cs](Planarian/Planarian/Modules/Caves/Revisions/CaveMutationRepository.cs)
-9. [CavePublishedSnapshotRepository.cs](Planarian/Planarian/Modules/Caves/Revisions/CavePublishedSnapshotRepository.cs)
+9. [CavePublishedSnapshotRepository.cs](Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs)
 10. [CaveRevision.cs](Planarian/Planarian.Model/Database/Entities/RidgeWalker/CaveRevision.cs)
 
 Read [Cave publication](docs/architecture/cave-publication.md) alongside this tour.

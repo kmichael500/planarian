@@ -8,10 +8,11 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Caves.Revisions;
 
-namespace Planarian.Modules.Caves.Revisions;
+namespace Planarian.Operations.CaveRevisionHistory;
 
-public sealed record CaveRevisionRolloutResult(DateTime RevisionHistoryStartedOn, int InitializedCaveCount,
+internal sealed record CaveRevisionRolloutResult(DateTime RevisionHistoryStartedOn, int InitializedCaveCount,
     int BatchCount, bool AlreadyComplete);
 
 /// <summary>
@@ -20,19 +21,32 @@ public sealed record CaveRevisionRolloutResult(DateTime RevisionHistoryStartedOn
 /// to open the editor first". The command is resumable while only rollout baselines exist, and fails closed after live
 /// revision publication has begun.
 /// </summary>
-public sealed class CaveRevisionRolloutRepository
+internal sealed class CaveRevisionRolloutRepository
 {
-    private const int BatchSize = CavePublishedSnapshotRepository.ProjectionChunkSize;
-    public const string CommandLineSwitch = "--initialize-cave-revision-history";
+    private const int BatchSize = 2500;
 
     private readonly PlanarianDbContext _db;
 
-    public CaveRevisionRolloutRepository(PlanarianDbContext db)
+    internal CaveRevisionRolloutRepository(PlanarianDbContext db)
     {
         _db = db;
     }
 
-    public async Task<CaveRevisionRolloutResult> InitializeAsync(CancellationToken cancellationToken = default)
+    internal static async Task<CaveRevisionRolloutResult> InitializeAsync(
+        string connectionString, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("A database connection string is required.", nameof(connectionString));
+
+        var options = new DbContextOptionsBuilder<PlanarianDbContext>()
+            .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
+            .Options;
+
+        await using var db = new PlanarianDbContext(options);
+        return await new CaveRevisionRolloutRepository(db).InitializeAsync(cancellationToken);
+    }
+
+    internal async Task<CaveRevisionRolloutResult> InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _db.Database.OpenConnectionAsync(cancellationToken);
         var connection = (NpgsqlConnection)_db.Database.GetDbConnection();
@@ -56,9 +70,14 @@ public sealed class CaveRevisionRolloutRepository
 
     private async Task<CaveRevisionRolloutResult> InitializeLockedAsync(CancellationToken cancellationToken)
     {
-        var uninitializedCount = await CountUninitializedCavesAsync(cancellationToken);
+        var knownAccountIds = await LoadAccountIdsAsync(cancellationToken);
+        if (knownAccountIds.Count == 0)
+            return new CaveRevisionRolloutResult(DateTime.UtcNow, 0, 0, true);
+
+        var uninitializedCount = await CountUninitializedCavesAsync(knownAccountIds, cancellationToken);
         var baselineTimes = await _db.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
-            .Where(revision => revision.Source == CaveRevisionSource.SystemBaseline &&
+            .Where(revision => knownAccountIds.Contains(revision.AccountId) &&
+                               revision.Source == CaveRevisionSource.SystemBaseline &&
                                revision.Operation == CaveRevisionOperation.Baseline)
             .Select(revision => revision.CreatedOn)
             .Distinct()
@@ -76,8 +95,9 @@ public sealed class CaveRevisionRolloutRepository
         }
 
         var hasPublishedHistory = await _db.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
-            .AnyAsync(revision => revision.Source != CaveRevisionSource.SystemBaseline ||
-                                  revision.Operation != CaveRevisionOperation.Baseline,
+            .AnyAsync(revision => knownAccountIds.Contains(revision.AccountId) &&
+                                  (revision.Source != CaveRevisionSource.SystemBaseline ||
+                                   revision.Operation != CaveRevisionOperation.Baseline),
                 cancellationToken);
         if (hasPublishedHistory)
             throw new InvalidOperationException(
@@ -86,7 +106,7 @@ public sealed class CaveRevisionRolloutRepository
 
         var revisionHistoryStartedOn = baselineTimes.Count == 1 ? baselineTimes[0] : DateTime.UtcNow;
         var accountIds = await _db.Caves.IgnoreQueryFilters().AsNoTracking()
-            .Where(cave => cave.CurrentRevisionId == null)
+            .Where(cave => knownAccountIds.Contains(cave.AccountId) && cave.CurrentRevisionId == null)
             .Select(cave => cave.AccountId)
             .Distinct()
             .OrderBy(accountId => accountId)
@@ -109,7 +129,7 @@ public sealed class CaveRevisionRolloutRepository
                         break;
                     }
 
-                    var snapshots = await CavePublishedSnapshotRepository.ForRevisionRollout(_db, accountId)
+                    var snapshots = await CavePublishedSnapshotRepository.ForTrustedAccountScope(_db, accountId)
                         .BuildManyAsync(caveIds, cancellationToken);
                     await InsertBaselinesAndAdvancePointersAsync(
                         accountId, snapshots, revisionHistoryStartedOn, cancellationToken);
@@ -142,18 +162,29 @@ public sealed class CaveRevisionRolloutRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    public async Task EnsureCompleteAsync(CancellationToken cancellationToken = default)
+    private async Task EnsureCompleteAsync(CancellationToken cancellationToken)
     {
-        var count = await CountUninitializedCavesAsync(cancellationToken);
+        var accountIds = await LoadAccountIdsAsync(cancellationToken);
+        var count = await CountUninitializedCavesAsync(accountIds, cancellationToken);
         if (count != 0)
             throw new InvalidOperationException(
                 $"Cave revision history initialization is incomplete: {count} Cave(s) have no current revision. " +
-                $"Run the application with {CommandLineSwitch} after applying migrations and before serving requests.");
+                "Run Planarian.Operations initialize-cave-revision-history after applying migrations and before serving requests.");
     }
 
-    private Task<int> CountUninitializedCavesAsync(CancellationToken cancellationToken) =>
-        _db.Caves.IgnoreQueryFilters().AsNoTracking()
-            .CountAsync(cave => cave.CurrentRevisionId == null, cancellationToken);
+    private Task<List<string>> LoadAccountIdsAsync(CancellationToken cancellationToken) =>
+        _db.Accounts.AsNoTracking()
+            .Select(account => account.Id)
+            .OrderBy(accountId => accountId)
+            .ToListAsync(cancellationToken);
+
+    private Task<int> CountUninitializedCavesAsync(IReadOnlyCollection<string> accountIds,
+        CancellationToken cancellationToken) =>
+        accountIds.Count == 0
+            ? Task.FromResult(0)
+            : _db.Caves.IgnoreQueryFilters().AsNoTracking()
+                .CountAsync(cave => accountIds.Contains(cave.AccountId) && cave.CurrentRevisionId == null,
+                    cancellationToken);
 
     private async Task<List<string>> LockNextBatchAsync(string accountId, CancellationToken cancellationToken)
     {

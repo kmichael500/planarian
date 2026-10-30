@@ -243,8 +243,9 @@ Revision-history rollout is a separate deployment step after the schema migratio
 that every pre-existing Cave receives exactly one system `Baseline`, all rollout entries share one boundary timestamp and
 no user actor, partial initialization resumes with the original boundary, reruns are idempotent, and a late baseline is
 rejected once ordinary revision publication has begun. Keep a supported-scale rollout test so initialization remains
-bounded rather than degenerating into one SaveChanges/query loop per Cave. Normal API startup must fail closed until no
-live Cave has a null `CurrentRevisionId`.
+bounded rather than degenerating into one SaveChanges/query loop per Cave. The coordinated deployment must keep the API
+quiesced and refuse to deploy/start the new API unless the Operations rollout succeeds and verifies that no live Cave has
+a null `CurrentRevisionId`. The normal API runtime must not contain rollout/deployment-specific startup behavior.
 
 Then run the repository-required pending-model check:
 

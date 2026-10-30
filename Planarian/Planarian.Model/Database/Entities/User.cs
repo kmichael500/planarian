@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -13,7 +12,7 @@ public class User : EntityBase
 {
     public User(string firstName, string lastName, string email)
     {
-        if (!email.IsValidEmail()) throw new ArgumentException("Invalid email address", nameof(email));
+        if (!UserContactPolicy.IsValidEmail(email)) throw new ArgumentException("Invalid email address", nameof(email));
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
         EmailAddress = email.Trim().ToLowerInvariant();
@@ -22,8 +21,8 @@ public class User : EntityBase
     public User(string firstName, string lastName, string emailAddress, string phoneNumber) : this(firstName, lastName,
         emailAddress)
     {
-        phoneNumber = phoneNumber.ExtractPhoneNumber();
-        if (!phoneNumber.IsValidPhoneNumber()) throw new ArgumentException("Invalid phone number", nameof(phoneNumber));
+        phoneNumber = UserContactPolicy.NormalizePhoneNumber(phoneNumber);
+        if (!UserContactPolicy.IsValidPhoneNumber(phoneNumber)) throw new ArgumentException("Invalid phone number", nameof(phoneNumber));
         PhoneNumber = phoneNumber;
     }
 

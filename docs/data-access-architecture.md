@@ -18,6 +18,12 @@ Application orchestration depends on feature capabilities, not database infrastr
 repositories own EF Core, Npgsql, and PostgreSQL access; there is no generic CRUD repository. Repositories return
 materialized projections, never `IQueryable`.
 
+At the project boundary, `Planarian.Model` is dependency-free from other Planarian projects and
+`Planarian.Library` may depend on Model for shared persistence/application capabilities. The legacy
+`ApiException`/`ApiExceptionType` contract is therefore compiled by Model while retaining its historical
+`Planarian.Library.Exceptions` namespace for source compatibility; the higher-level
+`ApiExceptionDictionary` factory remains in Library. Do not reintroduce a Model -> Library project reference.
+
 When EF Core inspection or reflection targets one known CLR member, use typed access or `nameof` on that exact
 entity/contract rather than duplicating the spelling in a string. Generic cross-entity code must not borrow `nameof`
 from a representative concrete entity just because several entities currently share the same member spelling; use a

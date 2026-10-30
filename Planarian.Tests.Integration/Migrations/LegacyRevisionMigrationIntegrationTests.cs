@@ -6,6 +6,7 @@ using Planarian.Modules.Files.Controllers;
 using Xunit;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using static Planarian.Tests.MigrationTestSupport;
+using Planarian.Operations.CaveRevisionHistory;
 
 namespace Planarian.Tests;
 
@@ -36,7 +37,10 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
 
         await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
         {
-            Id = "legacyview", Key = "View", Name = "View", Description = "View Caves",
+            Id = "legacyview",
+            Key = "View",
+            Name = "View",
+            Description = "View Caves",
             PermissionType = "Cave"
         });
 
@@ -50,7 +54,9 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
             });
             permissions.CavePermissions.Add(new CavePermission
             {
-                AccountId = accountId, CaveId = caveId, UserId = permissions.RequestUser.Id,
+                AccountId = accountId,
+                CaveId = caveId,
+                UserId = permissions.RequestUser.Id,
                 PermissionId = "legacyview"
             });
             await permissions.SaveChangesAsync();
@@ -120,7 +126,7 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
         PhysiographicProvinceTagIds = cave.PhysiographicProvinceTagIds,
         OtherTagIds = cave.OtherTagIds,
         Files = cave.Files.Select(file => new EditFileMetadataVm
-            { Id = file.Id, FileTypeTagId = file.FileTypeTagId, Name = file.Name }).ToList(),
+        { Id = file.Id, FileTypeTagId = file.FileTypeTagId, Name = file.Name }).ToList(),
         Entrances = cave.Entrances.Select(entrance => new AddEntranceVm
         {
             Id = entrance.Id,

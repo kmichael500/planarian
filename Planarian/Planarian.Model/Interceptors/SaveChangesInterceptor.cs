@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Planarian.Library.Exceptions;
-using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Exceptions;
 using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -126,10 +125,10 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
                     var isRegistration = entityState == EntityState.Added &&
                                          !user.IsTemporary &&
-                                         !user.HashedPassword.IsNullOrWhiteSpace() &&
-                                         !user.EmailConfirmationCode.IsNullOrWhiteSpace() &&
+                                         !string.IsNullOrWhiteSpace(user.HashedPassword) &&
+                                         !string.IsNullOrWhiteSpace(user.EmailConfirmationCode) &&
                                          user.EmailConfirmedOn == null &&
-                                         user.PasswordResetCode.IsNullOrWhiteSpace() &&
+                                         string.IsNullOrWhiteSpace(user.PasswordResetCode) &&
                                          user.PasswordResetCodeExpiration == null;
                     var isInvitationCleanup = user.IsTemporary &&
                                               ownershipValidation.IsTemporaryInvitationUserTransition(user, entityState);
@@ -167,12 +166,12 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                                 (user.IsTemporary &&
                                  ownershipValidation.IsTemporaryInvitationUserTransition(user, entityState));
                 if (!canModify)
-                    throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+                    throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
                 break;
 
             case nameof(AccountUser):
                 var accountUser = (AccountUser)entity.Entity;
-                var isInvitation = !accountUser.InvitationCode.IsNullOrWhiteSpace();
+                var isInvitation = !string.IsNullOrWhiteSpace(accountUser.InvitationCode);
                 if (entityState == EntityState.Added)
                 {
                     var isSameSelectedAccount = !string.IsNullOrWhiteSpace(requestUserAccountId) &&
@@ -186,7 +185,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                                                          await context.RequestUser.HasCavePermission(
                                                              PermissionPolicyKey.PlanarianAdmin, false);
                     if (!isSameSelectedAccount && !isVerifiedInvitationClaim && !isPlatformAdminCreatingAccount)
-                        throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+                        throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
                     break;
                 }
 
@@ -198,7 +197,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                         await InvitationTargetsCurrentUser(context, accountUser))
                         break;
 
-                    throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+                    throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
                 }
                 ValidateCurrentAndOriginalAccount(entity, accountUser.AccountId, requestUserAccountId, nameof(AccountUser.AccountId));
                 break;
@@ -346,7 +345,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 break;
 
             case nameof(State):
-                throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+                throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
         }
     }
 
@@ -372,7 +371,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
     {
         if (context.RequestUser == null ||
             !await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
-            throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+            throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
     }
 
     private static bool IsInvitationClaimPermissionTransition(
@@ -448,7 +447,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
         if ((!string.IsNullOrWhiteSpace(requestUserAccountId) && requestUserAccountId != entityAccountId) ||
             (!string.IsNullOrWhiteSpace(entityAccountId) && entityAccountId != requestUserAccountId))
         {
-            throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
+            throw RequestPolicyErrors.Forbidden("You do not have permission to modify this entity.");
         }
     }
 

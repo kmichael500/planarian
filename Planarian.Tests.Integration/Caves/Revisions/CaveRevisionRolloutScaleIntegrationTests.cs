@@ -3,6 +3,7 @@ using Npgsql;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Caves.Revisions;
 using Xunit;
+using Planarian.Operations.CaveRevisionHistory;
 
 namespace Planarian.Tests.Integration.Caves.Revisions;
 

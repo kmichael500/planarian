@@ -6,6 +6,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Revisions;
 using Xunit;
 using static Planarian.Tests.MigrationTestSupport;
+using Planarian.Operations.CaveRevisionHistory;
 
 namespace Planarian.Tests;
 

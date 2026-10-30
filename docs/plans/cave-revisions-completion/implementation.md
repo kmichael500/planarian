@@ -393,7 +393,7 @@ no-op retention, and absence of a standalone published GeoJSON bypass.
 Primary files:
 
 - `Planarian/Planarian.Model/Database/Revisions/CavePublishedSnapshotV1.cs`
-- `Planarian/Planarian/Modules/Caves/Revisions/CavePublishedSnapshotRepository.cs`
+- `Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs`
 - `Planarian/Planarian.Model/Database/Revisions/CaveRevisionDiffService.cs`
 - revision view models under `Planarian/Planarian/Modules/Caves/Models/`
 - `Planarian.Web/src/Modules/Caves/Models/CaveRevisionVm.ts`

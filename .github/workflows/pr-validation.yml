@@ -13,23 +13,45 @@ on:
       - "tools/Planarian.Dev/**"
       - "docker/dev/**"
       - ".devcontainer/**"
+      - ".config/**"
       - "compose.yaml"
       - "dev"
       - "package.json"
       - "*.md"
       - "scripts/**"
-      - ".github/workflows/pr-validation.yml"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Validate repository documentation
         env:
           PLANARIAN_DOC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 scripts/validate-repository-docs.py --base-sha "$PLANARIAN_DOC_BASE_SHA"
-      - uses: actions/setup-node@v4
+      - name: Check coordinated deployment planner and task syntax
+        run: |
+          python3 -m unittest discover -s scripts/deploy -p 'test_*.py' -v
+          find scripts/deploy/tasks -type f -name '*.sh' -print0 |
+            while IFS= read -r -d '' task; do bash -n "$task"; done
+      - name: Reject edits to migrations already present on the PR base
+        env:
+          PLANARIAN_DEPLOY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/deploy/plan.py --previous "$PLANARIAN_DEPLOY_BASE_SHA" --head "$GITHUB_SHA"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ">=22.13.0 <23"
           cache: npm
@@ -45,7 +67,7 @@ jobs:
         working-directory: Planarian.Web
         env:
           REACT_APP_API_ORIGIN_MAPPINGS: '{"localhost":"https://localhost:7111"}'
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 8.0.x
       - run: dotnet tool restore

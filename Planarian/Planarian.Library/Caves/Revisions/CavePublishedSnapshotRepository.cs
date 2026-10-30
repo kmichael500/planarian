@@ -28,9 +28,10 @@ public sealed class CavePublishedSnapshotRepository
     }
 
     /// <summary>
-    /// Trusted deployment-only entry point. Normal request paths must derive tenant scope from RequestUser.
+    /// Trusted non-request entry point for explicitly account-scoped system work.
+    /// Normal request paths must derive tenant scope from RequestUser.
     /// </summary>
-    internal static CavePublishedSnapshotRepository ForRevisionRollout(PlanarianDbContext db, string accountId) =>
+    internal static CavePublishedSnapshotRepository ForTrustedAccountScope(PlanarianDbContext db, string accountId) =>
         new(db, accountId);
 
     public async Task<CavePublishedSnapshotV1> BuildAsync(string caveId, CancellationToken cancellationToken = default)

@@ -6,6 +6,7 @@ using Planarian.Modules.Account.Model;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
+using Planarian.Operations.CaveRevisionHistory;
 
 using Planarian.Tests;
 

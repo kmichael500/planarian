@@ -1,0 +1,506 @@
+name: "Planarian: Coordinated deployment"
+# Stable run title records the deployment environment and selected ref.
+run-name: "Planarian ${{ github.event_name == 'push' && 'Development' || inputs.target }} release: ${{ github.ref_name }}"
+
+# main deploys automatically to Development. Manual Development releases may
+# use any selected branch/ref. Production remains an explicit tagged release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to deploy (Production requires a release tag)"
+        type: choice
+        required: true
+        default: Development
+        options: [Development, Production]
+      force_all:
+        description: "Also redeploy API, web and run pending migrations"
+        type: boolean
+        default: false
+      backup_confirmed:
+        description: "I verified recoverability/backup before production database changes"
+        type: boolean
+        default: false
+      resume_maintenance:
+        description: "Resume a failed maintenance release while the API is intentionally stopped"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Serialize the WHOLE release, including last-success detection. Do not cancel a
+# running database migration when a new commit arrives. GitHub may replace
+# a pending run; the next run diffs against the last successful release.
+concurrency:
+  group: planarian-deploy-${{ github.event_name == 'push' && 'Development' || inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Identify release components
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+      state_environment: ${{ steps.target.outputs.state_environment }}
+      api: ${{ steps.changes.outputs.api }}
+      web: ${{ steps.changes.outputs.web }}
+      database: ${{ steps.changes.outputs.database }}
+      tasks: ${{ steps.changes.outputs.tasks }}
+      has_tasks: ${{ steps.changes.outputs.has_tasks }}
+      maintenance: ${{ steps.changes.outputs.maintenance }}
+      any: ${{ steps.changes.outputs.any }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: target
+        name: Validate target and release intent
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          INPUT_TARGET: ${{ inputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == push ]]; then
+            [[ "$GIT_REF" == refs/heads/main ]] || exit 1
+            target=Development
+          else
+            target="$INPUT_TARGET"
+            if [[ "$target" == Development ]]; then
+              :
+            elif [[ "$target" == Production ]]; then
+              [[ "$GIT_REF" == refs/tags/planarian-release-v* ]] || {
+                echo "::error::Production releases must run from a planarian-release-v* tag."; exit 1;
+              }
+            else
+              echo "::error::Unknown deployment target"; exit 1
+            fi
+          fi
+          if [[ "$target" == Development ]]; then
+            state_environment=planarian-release-state-development
+          else
+            state_environment=planarian-release-state-production
+          fi
+          echo "environment=$target" >> "$GITHUB_OUTPUT"
+          echo "state_environment=$state_environment" >> "$GITHUB_OUTPUT"
+
+      - name: Read durable coordinated deployment history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE_ENVIRONMENT: ${{ steps.target.outputs.state_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          gh api graphql --paginate --slurp \
+            -F owner="$owner" -F name="$repo" -F environment="$STATE_ENVIRONMENT" \
+            -f query='
+              query($owner: String!, $name: String!, $environment: String!, $endCursor: String) {
+                repository(owner: $owner, name: $name) {
+                  deployments(
+                    first: 100,
+                    after: $endCursor,
+                    environments: [$environment],
+                    orderBy: {field: CREATED_AT, direction: DESC}
+                  ) {
+                    totalCount
+                    nodes {
+                      commitOid
+                      createdAt
+                      state
+                      task
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                  }
+                }
+              }' > "$RUNNER_TEMP/planarian-deployments.json"
+
+      - name: Plan required components
+        id: changes
+        env:
+          FORCE_ALL: ${{ inputs.force_all }}
+          RESUME_MAINTENANCE: ${{ inputs.resume_maintenance }}
+          TARGET: ${{ steps.target.outputs.environment }}
+        run: |
+          args=()
+          if [[ "$FORCE_ALL" == true ]]; then args+=(--force-all); fi
+          if [[ "$RESUME_MAINTENANCE" == true ]]; then args+=(--resume-maintenance); fi
+          if [[ "$TARGET" == Development ]]; then args+=(--allow-non-ancestor); fi
+          python3 scripts/deploy/plan.py \
+            --deployments-file "$RUNNER_TEMP/planarian-deployments.json" \
+            --head "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT" "${args[@]}"
+
+      - name: Validate maintenance-resume intent
+        if: inputs.resume_maintenance == true && steps.changes.outputs.maintenance != 'true'
+        run: |
+          echo "::error::resume_maintenance is only valid for a registered maintenance release task."
+          exit 1
+
+      - name: Require recovery acknowledgment for production database changes
+        if: steps.target.outputs.environment == 'Production' && steps.changes.outputs.database == 'true'
+        env:
+          BACKUP_CONFIRMED: ${{ inputs.backup_confirmed }}
+        run: |
+          [[ "$BACKUP_CONFIRMED" == true ]] || {
+            echo "::error::Production database changes require confirmed recoverability."; exit 1;
+          }
+
+      - name: Release plan summary
+        env:
+          TARGET: ${{ steps.target.outputs.environment }}
+          API: ${{ steps.changes.outputs.api }}
+          WEB: ${{ steps.changes.outputs.web }}
+          DATABASE: ${{ steps.changes.outputs.database }}
+          TASKS: ${{ steps.changes.outputs.tasks }}
+          MAINTENANCE: ${{ steps.changes.outputs.maintenance }}
+        run: |
+          echo "### $TARGET coordinated release" >> "$GITHUB_STEP_SUMMARY"
+          echo "API: $API · Web: $WEB · Database: $DATABASE · Tasks: $TASKS · Maintenance: $MAINTENANCE" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy selected components
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    permissions:
+      contents: read
+      deployments: write
+    # A repository-level runner label can select a trusted VNet-connected runner
+    # without changing the workflow for private PostgreSQL deployments.
+    runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    environment:
+      name: ${{ needs.plan.outputs.environment }}
+    env:
+      RELEASE_API_PUBLISH_DIR: ${{ github.workspace }}/planarian-api-publish
+      RELEASE_OPERATIONS_PUBLISH_DIR: ${{ github.workspace }}/planarian-operations-publish
+      ASPNETCORE_ENVIRONMENT: Production
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+      AZURE_API_HEALTH_URL: ${{ vars.AZURE_API_HEALTH_URL }}
+      AZURE_WEB_HEALTH_URL: ${{ vars.AZURE_WEB_HEALTH_URL }}
+      # Azure Login recommends suppressing default CLI stdout in CI logs.
+      # Commands that intentionally read a value use an explicit --output.
+      AZURE_CORE_OUTPUT: none
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # Fail before stopping an app or applying any database change if the
+      # required release configuration is missing.
+      - name: Check configuration before making changes
+        env:
+          API: ${{ needs.plan.outputs.api }}
+          WEB: ${{ needs.plan.outputs.web }}
+          DATABASE: ${{ needs.plan.outputs.database }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          STATIC_DEPLOY_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          API_ORIGIN_MAPPINGS: ${{ vars.REACT_APP_API_ORIGIN_MAPPINGS }}
+          MIGRATION_CONNECTION_STRING: ${{ secrets.DATABASE_MIGRATION_CONNECTION_STRING }}
+          UMAMI_WEBSITE_ID: ${{ vars.REACT_APP_UMAMI_WEBSITE_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          require() { [[ -n "$2" ]] || { echo "::error::Missing required release configuration: $1"; exit 1; }; }
+          require_command() { command -v "$1" >/dev/null || { echo "::error::Deployment runner is missing required command: $1"; exit 1; }; }
+          [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] || {
+            echo "::error::Planarian deployment requires a Linux x86_64 runner."; exit 1;
+          }
+          require_command gh
+          require_command python3
+          require_command curl
+          if [[ "$API" == true ]]; then
+            require_command az
+            require_command zip
+            require AZURE_CREDENTIALS "$AZURE_CREDENTIALS"
+            require AZURE_RESOURCE_GROUP "$AZURE_RESOURCE_GROUP"
+            require AZURE_WEBAPP_NAME "$AZURE_WEBAPP_NAME"
+            require AZURE_API_HEALTH_URL "$AZURE_API_HEALTH_URL"
+            [[ "$AZURE_API_HEALTH_URL" == https://* ]] || { echo "::error::Health URL must use HTTPS"; exit 1; }
+          fi
+          if [[ "$WEB" == true ]]; then
+            require AZURE_STATIC_WEB_APPS_API_TOKEN "$STATIC_DEPLOY_TOKEN"
+            require REACT_APP_API_ORIGIN_MAPPINGS "$API_ORIGIN_MAPPINGS"
+            require AZURE_WEB_HEALTH_URL "$AZURE_WEB_HEALTH_URL"
+            [[ "$AZURE_WEB_HEALTH_URL" == https://* ]] || { echo "::error::Web health URL must use HTTPS"; exit 1; }
+            if [[ "${{ needs.plan.outputs.environment }}" == Production ]]; then
+              require REACT_APP_UMAMI_WEBSITE_ID "$UMAMI_WEBSITE_ID"
+            fi
+          fi
+          if [[ "$DATABASE" == true ]]; then
+            require DATABASE_MIGRATION_CONNECTION_STRING "$MIGRATION_CONNECTION_STRING"
+            require AZURE_API_HEALTH_URL "$AZURE_API_HEALTH_URL"
+            [[ "$AZURE_API_HEALTH_URL" == https://* ]] || { echo "::error::Health URL must use HTTPS"; exit 1; }
+          fi
+
+      - name: Preflight registered release tasks
+        if: needs.plan.outputs.has_tasks == 'true'
+        env:
+          TASKS: ${{ needs.plan.outputs.tasks }}
+          RESUME_MAINTENANCE: ${{ inputs.resume_maintenance }}
+          ConnectionStrings__default: ${{ secrets.DATABASE_MIGRATION_CONNECTION_STRING }}
+        run: python3 scripts/deploy/run_tasks.py --tasks-json "$TASKS" --phase preflight
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        if: needs.plan.outputs.api == 'true' || needs.plan.outputs.database == 'true' || needs.plan.outputs.has_tasks == 'true'
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: needs.plan.outputs.web == 'true' || needs.plan.outputs.api == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Planarian.Web/package-lock.json
+
+      - name: Install frontend dependencies for selected artifacts
+        if: needs.plan.outputs.web == 'true' || needs.plan.outputs.api == 'true'
+        working-directory: Planarian.Web
+        run: npm ci
+
+      - name: Prepare shared routes for API build
+        if: needs.plan.outputs.api == 'true'
+        working-directory: Planarian.Web
+        run: npm run prepare:client-routes
+
+      - name: Build API artifact
+        if: needs.plan.outputs.api == 'true'
+        run: |
+          dotnet restore Planarian/Planarian/Planarian.csproj
+          dotnet publish Planarian/Planarian/Planarian.csproj \
+            --configuration Release --no-restore --output "$RELEASE_API_PUBLISH_DIR"
+
+      - name: Package API artifact
+        if: needs.plan.outputs.api == 'true'
+        run: |
+          (cd "$RELEASE_API_PUBLISH_DIR" && zip -qr "$RUNNER_TEMP/planarian-api.zip" .)
+
+      - name: Build operations artifact
+        if: needs.plan.outputs.has_tasks == 'true'
+        run: |
+          dotnet restore Planarian/Planarian.Operations/Planarian.Operations.csproj
+          dotnet publish Planarian/Planarian.Operations/Planarian.Operations.csproj \
+            --configuration Release --no-restore --output "$RELEASE_OPERATIONS_PUBLISH_DIR"
+
+      - name: Build web artifact
+        if: needs.plan.outputs.web == 'true'
+        working-directory: Planarian.Web
+        env:
+          REACT_APP_API_ORIGIN_MAPPINGS: ${{ vars.REACT_APP_API_ORIGIN_MAPPINGS }}
+          REACT_APP_UMAMI_WEBSITE_ID: ${{ needs.plan.outputs.environment == 'Production' && vars.REACT_APP_UMAMI_WEBSITE_ID || '' }}
+        run: npm run build
+
+      - name: Validate model and build one-shot EF migration bundle
+        if: needs.plan.outputs.database == 'true'
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          DOTNET_ENVIRONMENT: Production
+        run: |
+          dotnet tool restore
+          dotnet restore Planarian/Planarian.Migrations/Planarian.Migrations.csproj
+          dotnet tool run dotnet-ef migrations has-pending-model-changes \
+            --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --context PlanarianDbContext --configuration Release
+          dotnet tool run dotnet-ef migrations bundle \
+            --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --context PlanarianDbContext --configuration Release \
+            --self-contained --target-runtime linux-x64 \
+            --output "$RUNNER_TEMP/planarian-efbundle"
+
+      - name: Sign in to Azure
+        if: needs.plan.outputs.api == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Verify hosted API configuration
+        if: needs.plan.outputs.api == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          forwarded_headers="$(az webapp config appsettings list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --query "[?name=='ASPNETCORE_FORWARDEDHEADERS_ENABLED'].value | [0]" \
+            --output tsv)"
+          [[ "${forwarded_headers,,}" == true ]] || {
+            echo "::error::Azure App Service must already have ASPNETCORE_FORWARDEDHEADERS_ENABLED=true."
+            exit 1
+          }
+
+      - name: Begin durable coordinated release record
+        id: release_record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ needs.plan.outputs.environment }}
+          STATE_ENVIRONMENT: ${{ needs.plan.outputs.state_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployment_id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/deployments" \
+            -f ref="$GITHUB_SHA" \
+            -f task="planarian-coordinated-release" \
+            -f environment="$STATE_ENVIRONMENT" \
+            -f description="Planarian coordinated $TARGET release" \
+            -F auto_merge=false \
+            -F 'required_contexts[]' \
+            --jq '.id')"
+          [[ "$deployment_id" =~ ^[0-9]+$ ]] || {
+            echo "::error::GitHub did not return a valid deployment id."; exit 1;
+          }
+          log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+            -f state=in_progress \
+            -f description="Planarian coordinated release in progress" \
+            -f log_url="$log_url" \
+            -F auto_inactive=false \
+            --silent
+          echo "id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare registered maintenance tasks
+        if: needs.plan.outputs.maintenance == 'true'
+        env:
+          TASKS: ${{ needs.plan.outputs.tasks }}
+          RESUME_MAINTENANCE: ${{ inputs.resume_maintenance }}
+          ConnectionStrings__default: ${{ secrets.DATABASE_MIGRATION_CONNECTION_STRING }}
+        run: python3 scripts/deploy/run_tasks.py --tasks-json "$TASKS" --phase before-migrations
+
+      - name: Apply pending EF migrations
+        if: needs.plan.outputs.database == 'true'
+        env:
+          # The migrations design-time factory reads ConnectionStrings:default.
+          # Keep the scoped database secret out of the process command line.
+          ConnectionStrings__default: ${{ secrets.DATABASE_MIGRATION_CONNECTION_STRING }}
+          ASPNETCORE_ENVIRONMENT: Production
+          DOTNET_ENVIRONMENT: Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP/planarian-efbundle"
+          "$RUNNER_TEMP/planarian-efbundle"
+
+      - name: Run registered release tasks
+        if: needs.plan.outputs.has_tasks == 'true'
+        env:
+          TASKS: ${{ needs.plan.outputs.tasks }}
+          ConnectionStrings__default: ${{ secrets.DATABASE_MIGRATION_CONNECTION_STRING }}
+        run: python3 scripts/deploy/run_tasks.py --tasks-json "$TASKS" --phase run
+
+      - name: Verify API health after database-only migration
+        if: needs.plan.outputs.database == 'true' && needs.plan.outputs.api != 'true'
+        run: |
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-connrefused \
+            --connect-timeout 10 --max-time 25 \
+            --output /dev/null "$AZURE_API_HEALTH_URL"
+
+      - name: Deploy API
+        if: needs.plan.outputs.api == 'true'
+        shell: bash
+        env:
+          MAINTENANCE: ${{ needs.plan.outputs.maintenance }}
+        run: |
+          set -euo pipefail
+          # A maintenance task may intentionally keep the API stopped until the
+          # matching artifact is fully installed.
+          restart=true
+          if [[ "$MAINTENANCE" == true ]]; then restart=false; fi
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --src-path "$RUNNER_TEMP/planarian-api.zip" \
+            --type zip --restart "$restart"
+
+      - name: Complete registered maintenance tasks
+        if: needs.plan.outputs.maintenance == 'true'
+        env:
+          TASKS: ${{ needs.plan.outputs.tasks }}
+        run: python3 scripts/deploy/run_tasks.py --tasks-json "$TASKS" --phase after-api-deploy
+
+      - name: Verify API health before publishing frontend
+        if: needs.plan.outputs.api == 'true'
+        run: |
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-connrefused \
+            --connect-timeout 10 --max-time 25 \
+            --output /dev/null "$AZURE_API_HEALTH_URL"
+
+      - name: Deploy web
+        if: needs.plan.outputs.web == 'true'
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: Planarian.Web/build
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+
+      - name: Verify web health
+        if: needs.plan.outputs.web == 'true'
+        run: |
+          curl --fail --silent --show-error \
+            --retry 8 --retry-delay 5 --retry-connrefused \
+            --connect-timeout 10 --max-time 25 \
+            --output /dev/null "$AZURE_WEB_HEALTH_URL"
+
+      - name: Record successful coordinated deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_ID: ${{ steps.release_record.outputs.id }}
+          TARGET: ${{ needs.plan.outputs.environment }}
+          API: ${{ needs.plan.outputs.api }}
+          WEB: ${{ needs.plan.outputs.web }}
+          DATABASE: ${{ needs.plan.outputs.database }}
+          TASKS: ${{ needs.plan.outputs.tasks }}
+          MAINTENANCE: ${{ needs.plan.outputs.maintenance }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "### Successful $TARGET deployment: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "API: $API · Web: $WEB · Database: $DATABASE · Tasks: $TASKS · Maintenance: $MAINTENANCE" >> "$GITHUB_STEP_SUMMARY"
+          log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state=success \
+            -f description="Planarian coordinated release succeeded" \
+            -f log_url="$log_url" \
+            -F auto_inactive=false \
+            --silent
+
+      - name: Mark durable deployment record failed
+        if: failure() && steps.release_record.outputs.id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_ID: ${{ steps.release_record.outputs.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state=failure \
+            -f description="Planarian coordinated release failed" \
+            -f log_url="$log_url" \
+            -F auto_inactive=false \
+            --silent
+
+      - name: Report recovery boundary on partial failure
+        if: failure()
+        run: |
+          echo "::warning::Release failed. Do not assume the database, API, or web automatically rolled back."
+          echo "For maintenance releases, verify the actual App Service state before recovery: a failure before maintenance completion leaves it stopped, while a later failure may occur after the matching new API has already started. Resume only from the exact failed release commit." >> "$GITHUB_STEP_SUMMARY"

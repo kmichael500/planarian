@@ -27,6 +27,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Planarian.Library\Planarian.Library.csproj" />
         <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj"/>
         <ProjectReference Include="..\Planarian.Migrations\Planarian.Migrations.csproj"
                           PrivateAssets="all"

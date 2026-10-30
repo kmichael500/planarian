@@ -3,6 +3,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Modules.Caves.Revisions;
 using Xunit;
+using Planarian.Operations.CaveRevisionHistory;
 
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
@@ -20,19 +21,14 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         var caveA2 = await CaveTestDataFactory.AddCaveAsync(database, accountA, "legacy002a", "Legacy A2", 2);
         var caveB1 = await CaveTestDataFactory.AddCaveAsync(database, accountB, "legacy001b", "Legacy B1", 1);
 
-        await using var rolloutDb = database.CreateDbContext("rollout", accountA.AccountId);
-        var rollout = new CaveRevisionRolloutRepository(rolloutDb);
-        var incomplete = await Assert.ThrowsAsync<InvalidOperationException>(() => rollout.EnsureCompleteAsync());
-        Assert.Contains("3 Cave(s) have no current revision", incomplete.Message, StringComparison.Ordinal);
-
-        var result = await rollout.InitializeAsync();
+        var result = await CaveRevisionRolloutRepository.InitializeAsync(database.ConnectionString);
 
         Assert.False(result.AlreadyComplete);
         Assert.Equal(3, result.InitializedCaveCount);
         Assert.Equal(2, result.BatchCount);
-        await rollout.EnsureCompleteAsync();
 
-        var caves = await rolloutDb.Caves.IgnoreQueryFilters().AsNoTracking()
+        await using var verifyDb = database.CreateDbContext("verify", accountA.AccountId);
+        var caves = await verifyDb.Caves.IgnoreQueryFilters().AsNoTracking()
             .Where(cave => cave.Id == caveA1.CaveId || cave.Id == caveA2.CaveId || cave.Id == caveB1.CaveId)
             .OrderBy(cave => cave.Id)
             .ToListAsync();
@@ -41,7 +37,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         Assert.All(caves, cave => Assert.Null(cave.ModifiedOn));
         Assert.All(caves, cave => Assert.Null(cave.ModifiedByUserId));
 
-        var revisions = await rolloutDb.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
+        var revisions = await verifyDb.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
             .Where(revision => revision.CaveId == caveA1.CaveId || revision.CaveId == caveA2.CaveId ||
                                revision.CaveId == caveB1.CaveId)
             .OrderBy(revision => revision.CaveId)
@@ -62,12 +58,12 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         Assert.Equal("Legacy A2", names[caveA2.CaveId]);
         Assert.Equal("Legacy B1", names[caveB1.CaveId]);
 
-        var rerun = await rollout.InitializeAsync();
+        var rerun = await CaveRevisionRolloutRepository.InitializeAsync(database.ConnectionString);
         Assert.True(rerun.AlreadyComplete);
         Assert.Equal(0, rerun.InitializedCaveCount);
         Assert.Equal(0, rerun.BatchCount);
         Assert.Equal(result.RevisionHistoryStartedOn, rerun.RevisionHistoryStartedOn);
-        Assert.Equal(3, await rolloutDb.CaveRevisions.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(3, await verifyDb.CaveRevisions.IgnoreQueryFilters().CountAsync());
     }
 
 
@@ -196,4 +192,5 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         Assert.Empty(await verify.CaveRevisions.IgnoreQueryFilters()
             .Where(revision => revision.CaveId == uninitialized.CaveId).ToListAsync());
     }
+
 }

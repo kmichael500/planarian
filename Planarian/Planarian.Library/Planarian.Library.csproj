@@ -4,12 +4,19 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>10</LangVersion>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj" />
+    </ItemGroup>
 
     <ItemGroup>
-      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+      <InternalsVisibleTo Include="Planarian.Operations" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
+      <PackageReference Include="NetTopologySuite" Version="2.5.0" />
     </ItemGroup>
 
 
