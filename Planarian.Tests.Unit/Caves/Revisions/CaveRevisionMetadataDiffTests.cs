@@ -8,6 +8,24 @@ public sealed class CaveRevisionMetadataDiffTests
     private readonly CaveRevisionDiffService _diff = new();
 
     [Fact]
+    public void ReferenceMetadataWireIdentifiersRemainStable()
+    {
+        // Keep these expectations literal: the frontend parses this serialized path vocabulary independently.
+        Assert.Equal("State", CaveRevisionDiffWireContract.State);
+        Assert.Equal("County", CaveRevisionDiffWireContract.County);
+        Assert.Equal("Tags", CaveRevisionDiffWireContract.Tags);
+        Assert.Equal("Entrances", CaveRevisionDiffWireContract.Entrances);
+        Assert.Equal("Files", CaveRevisionDiffWireContract.Files);
+        Assert.Equal("LocationQuality", CaveRevisionDiffWireContract.LocationQuality);
+        Assert.Equal("FileType", CaveRevisionDiffWireContract.FileType);
+        Assert.Equal("NameAtRevision", CaveRevisionDiffWireContract.NameAtRevision);
+        Assert.Equal("DisplayIdAtRevision", CaveRevisionDiffWireContract.DisplayIdAtRevision);
+        Assert.Equal("AbbreviationAtRevision", CaveRevisionDiffWireContract.AbbreviationAtRevision);
+        Assert.Equal("LocationQualityNameAtRevision", CaveRevisionDiffWireContract.LocationQualityNameAtRevision);
+        Assert.Equal("FileTypeNameAtRevision", CaveRevisionDiffWireContract.FileTypeNameAtRevision);
+    }
+
+    [Fact]
     public void LocationQualityRenameIsMetadataChangeAndBroadEntranceChange()
     {
         var before = Snapshot() with

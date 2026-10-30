@@ -9,6 +9,27 @@ namespace Planarian.Model.Database.Revisions;
 public sealed record ReferenceMetadataChange(string Path, string StableId, string Property,
     string? PreviousValue, string? CurrentValue);
 
+/// <summary>
+/// Stable serialized identifiers consumed by the Cave revision-diff API and frontend presentation.
+/// These values are a wire contract and must not change merely because a CLR snapshot member is renamed.
+/// </summary>
+public static class CaveRevisionDiffWireContract
+{
+    public const string State = "State";
+    public const string County = "County";
+    public const string Tags = "Tags";
+    public const string Entrances = "Entrances";
+    public const string Files = "Files";
+    public const string LocationQuality = "LocationQuality";
+    public const string FileType = "FileType";
+
+    public const string NameAtRevision = "NameAtRevision";
+    public const string DisplayIdAtRevision = "DisplayIdAtRevision";
+    public const string AbbreviationAtRevision = "AbbreviationAtRevision";
+    public const string LocationQualityNameAtRevision = "LocationQualityNameAtRevision";
+    public const string FileTypeNameAtRevision = "FileTypeNameAtRevision";
+}
+
 public sealed record CaveEntranceChange(
     string EntranceId,
     IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars,
@@ -49,10 +70,10 @@ public sealed class CaveRevisionDiffService
         var metadata = new List<ReferenceMetadataChange>();
         AddScalar(nameof(CavePublishedSnapshotV1.Name), previous.Name, current.Name);
         AddScalar(nameof(CavePublishedSnapshotV1.AlternateNames), previous.AlternateNames, current.AlternateNames);
-        CompareReference(nameof(CavePublishedSnapshotV1.State), previous.State, current.State,
-            nameof(SnapshotReference.NameAtRevision), nameof(SnapshotReference.AbbreviationAtRevision));
-        CompareReference(nameof(CavePublishedSnapshotV1.County), previous.County, current.County,
-            nameof(SnapshotReference.NameAtRevision), nameof(SnapshotReference.DisplayIdAtRevision));
+        CompareReference(CaveRevisionDiffWireContract.State, previous.State, current.State,
+            CaveRevisionDiffWireContract.NameAtRevision, CaveRevisionDiffWireContract.AbbreviationAtRevision);
+        CompareReference(CaveRevisionDiffWireContract.County, previous.County, current.County,
+            CaveRevisionDiffWireContract.NameAtRevision, CaveRevisionDiffWireContract.DisplayIdAtRevision);
         AddScalar(nameof(CavePublishedSnapshotV1.CountyNumber), previous.CountyNumber, current.CountyNumber);
         AddScalar(nameof(CavePublishedSnapshotV1.LengthFeet), previous.LengthFeet, current.LengthFeet);
         AddScalar(nameof(CavePublishedSnapshotV1.DepthFeet), previous.DepthFeet, current.DepthFeet);
@@ -67,7 +88,7 @@ public sealed class CaveRevisionDiffService
         var addedTags = current.Tags.Where(t => !oldTags.ContainsKey((t.Role, t.TagTypeId))).OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList();
         var removedTags = previous.Tags.Where(t => !newTags.ContainsKey((t.Role, t.TagTypeId))).OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList();
         foreach (var key in oldTags.Keys.Intersect(newTags.Keys))
-            AddTagMetadata($"{nameof(CavePublishedSnapshotV1.Tags)}/{key.Role}", oldTags[key], newTags[key]);
+            AddTagMetadata($"{CaveRevisionDiffWireContract.Tags}/{key.Role}", oldTags[key], newTags[key]);
 
         var oldEntrances = previous.Entrances.ToDictionary(e => e.Id);
         var newEntrances = current.Entrances.ToDictionary(e => e.Id);
@@ -126,16 +147,16 @@ public sealed class CaveRevisionDiffService
             {
                 var oldValue = property switch
                 {
-                    nameof(SnapshotReference.NameAtRevision) => oldReference.NameAtRevision,
-                    nameof(SnapshotReference.DisplayIdAtRevision) => oldReference.DisplayIdAtRevision,
-                    nameof(SnapshotReference.AbbreviationAtRevision) => oldReference.AbbreviationAtRevision,
+                    CaveRevisionDiffWireContract.NameAtRevision => oldReference.NameAtRevision,
+                    CaveRevisionDiffWireContract.DisplayIdAtRevision => oldReference.DisplayIdAtRevision,
+                    CaveRevisionDiffWireContract.AbbreviationAtRevision => oldReference.AbbreviationAtRevision,
                     _ => throw new ArgumentOutOfRangeException(nameof(property))
                 };
                 var newValue = property switch
                 {
-                    nameof(SnapshotReference.NameAtRevision) => newReference.NameAtRevision,
-                    nameof(SnapshotReference.DisplayIdAtRevision) => newReference.DisplayIdAtRevision,
-                    nameof(SnapshotReference.AbbreviationAtRevision) => newReference.AbbreviationAtRevision,
+                    CaveRevisionDiffWireContract.NameAtRevision => newReference.NameAtRevision,
+                    CaveRevisionDiffWireContract.DisplayIdAtRevision => newReference.DisplayIdAtRevision,
+                    CaveRevisionDiffWireContract.AbbreviationAtRevision => newReference.AbbreviationAtRevision,
                     _ => throw new ArgumentOutOfRangeException(nameof(property))
                 };
                 if (oldValue != newValue) metadata.Add(new ReferenceMetadataChange(path, oldReference.Id, property, oldValue, newValue));
@@ -145,7 +166,7 @@ public sealed class CaveRevisionDiffService
         void AddTagMetadata(string path, SnapshotTagReference oldTag, SnapshotTagReference newTag)
         {
             if (oldTag.NameAtRevision != newTag.NameAtRevision)
-                metadata.Add(new ReferenceMetadataChange(path, oldTag.TagTypeId, nameof(SnapshotTagReference.NameAtRevision), oldTag.NameAtRevision, newTag.NameAtRevision));
+                metadata.Add(new ReferenceMetadataChange(path, oldTag.TagTypeId, CaveRevisionDiffWireContract.NameAtRevision, oldTag.NameAtRevision, newTag.NameAtRevision));
         }
 
         CaveEntranceChange CompareEntrance(CaveEntranceSnapshotV1 oldEntrance, CaveEntranceSnapshotV1 newEntrance, string entranceId)
@@ -164,13 +185,15 @@ public sealed class CaveRevisionDiffService
 
             if (oldEntrance.LocationQualityTagId == newEntrance.LocationQualityTagId &&
                 oldEntrance.LocationQualityNameAtRevision != newEntrance.LocationQualityNameAtRevision)
-                metadata.Add(new ReferenceMetadataChange($"{nameof(CavePublishedSnapshotV1.Entrances)}/{entranceId}/LocationQuality", oldEntrance.LocationQualityTagId,
-                    nameof(CaveEntranceSnapshotV1.LocationQualityNameAtRevision), oldEntrance.LocationQualityNameAtRevision, newEntrance.LocationQualityNameAtRevision));
+                metadata.Add(new ReferenceMetadataChange(
+                    $"{CaveRevisionDiffWireContract.Entrances}/{entranceId}/{CaveRevisionDiffWireContract.LocationQuality}",
+                    oldEntrance.LocationQualityTagId, CaveRevisionDiffWireContract.LocationQualityNameAtRevision,
+                    oldEntrance.LocationQualityNameAtRevision, newEntrance.LocationQualityNameAtRevision));
 
             var oldTags = oldEntrance.Tags.ToDictionary(t => (t.Role, t.TagTypeId));
             var newTags = newEntrance.Tags.ToDictionary(t => (t.Role, t.TagTypeId));
             foreach (var key in oldTags.Keys.Intersect(newTags.Keys))
-                AddTagMetadata($"{nameof(CavePublishedSnapshotV1.Entrances)}/{entranceId}/{nameof(CaveEntranceSnapshotV1.Tags)}/{key.Role}", oldTags[key], newTags[key]);
+                AddTagMetadata($"{CaveRevisionDiffWireContract.Entrances}/{entranceId}/{CaveRevisionDiffWireContract.Tags}/{key.Role}", oldTags[key], newTags[key]);
 
             return new CaveEntranceChange(entranceId, nestedScalars,
                 newEntrance.Tags.Where(tag => !oldTags.ContainsKey((tag.Role, tag.TagTypeId))).OrderBy(tag => tag.Role).ThenBy(tag => tag.TagTypeId).ToList(),
@@ -189,8 +212,10 @@ public sealed class CaveRevisionDiffService
             AddNestedScalar(nameof(CaveFileSnapshotV1.Name), oldFile.Name, newFile.Name);
             AddNestedScalar(nameof(CaveFileSnapshotV1.Extension), oldFile.Extension, newFile.Extension);
             if (oldFile.FileTypeTagId == newFile.FileTypeTagId && oldFile.FileTypeNameAtRevision != newFile.FileTypeNameAtRevision)
-                metadata.Add(new ReferenceMetadataChange($"{nameof(CavePublishedSnapshotV1.Files)}/{fileId}/FileType", oldFile.FileTypeTagId,
-                    nameof(CaveFileSnapshotV1.FileTypeNameAtRevision), oldFile.FileTypeNameAtRevision, newFile.FileTypeNameAtRevision));
+                metadata.Add(new ReferenceMetadataChange(
+                    $"{CaveRevisionDiffWireContract.Files}/{fileId}/{CaveRevisionDiffWireContract.FileType}",
+                    oldFile.FileTypeTagId, CaveRevisionDiffWireContract.FileTypeNameAtRevision,
+                    oldFile.FileTypeNameAtRevision, newFile.FileTypeNameAtRevision));
             return new CaveFileChange(fileId, nestedScalars);
 
             void AddNestedScalar(string name, object? oldValue, object? newValue)
