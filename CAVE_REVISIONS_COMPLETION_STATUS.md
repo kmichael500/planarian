@@ -1,17 +1,61 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — TYPED IDENTIFIER POST-MERGE VALIDATION COMPLETE**
+**Status:** **FEATURE COMPLETION INTEGRATED AND ACCEPTED — READY FOR A SEPARATE MERGE INTO `main`**. GAP-014 inactive-account sweeping remains intentionally deferred.
 **Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `455386de` (`fix(caves): preserve revision diff wire contracts`), following typed-identifier merge `4328ad55`; earlier package evidence remains SHA-pinned to the source that produced it.
+**Completion HEAD reviewed:** `62bf08ba06b0afafa655b643155d0be1b4317942` (final reviewed code + durable-docs tree; the following ledger-only commit records that review without changing implementation). Agent 2/3 accepted `52f2c593` before GAP-015, whose integrated source commit is `f004ae48fcd88fbc415bb9cb4363794c2d52f418`. Earlier package evidence remains SHA-pinned to its own source.
 **Typed-identifier refresh:** 2026-10-29; the original `dc34b128` package is merged, then post-merge adversarial review fixed serialized revision-diff path coupling and aligned the raw-member architecture guard with the documented exact-`nameof` exception in `455386de`.
 **Permission-policy refresh:** 2026-10-29; `e0b90a60` centralizes Account/Cave role semantics, hardens unsupported-key handling, moves current browser authorization to a versioned server-effective projection, and retains a version-gated compatibility adapter for independently deployed older APIs.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 199 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 648 files changed, 104,544 insertions, 8,189 deletions
+**Historical branch-distance/diff statistics:** omitted from the live summary because they drift with each completion merge; use `git rev-list --left-right --count main...feature/cave-revisions-completion` and `git diff --stat main...feature/cave-revisions-completion` to obtain current values.
+
+## 2026-10-29 — Agent 4 final integration and acceptance — DONE + VALIDATED
+
+**Integration code SHA:** `f004ae48fcd88fbc415bb9cb4363794c2d52f418` on baseline
+`52f2c5935958c2ab484e779b140533bacd21eb5f`. Durable documentation was reconciled at
+`62bf08ba06b0afafa655b643155d0be1b4317942`. This status-only closeout records exact
+run provenance, without claiming that any older broad suite was rerun.
+
+Integrated GAP-015's seven-file source/test package and one additional repository boundary. Object creation,
+relational publication, and staging persistence may each succeed despite a lost acknowledgement. On any
+upload-once failure after object-creation attempt, the service now queues `UnpublishedFileRemoval` debt,
+discards EF's possibly rolled-back tracked changes before separately persisting that debt, and performs
+live-reference-checked cleanup. The repository explicitly ignores read/permission filters while qualifying
+same-account live Files by AccountId; it also protects cross-account live references. No direct compensation
+can delete the bytes of a File whose PostgreSQL transaction committed but whose response was lost.
+
+**Tests run on final integrated code, all green:**
+
+- `dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj -c Release --no-restore --filter 'FullyQualifiedName~CaveAggregateAssetIntegrationTests|FullyQualifiedName~CaveChangeRequestConcurrencyIntegrationTests|FullyQualifiedName~CaveChangeRequestStagedFileIntegrationTests|FullyQualifiedName~ExternalFileCleanupIntegrationTests|FullyQualifiedName~CaveChangeRequestFilePublicationIntegrationTests' --logger 'console;verbosity=minimal'` — **61/61 passed**. Includes concurrent approval/claim assertions, ambiguous create, confirmed commit with lost acknowledgement, and staged SaveChanges acknowledgement lost.
+- `dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj -c Release --no-restore --filter 'FullyQualifiedName~UnprivilegedCleanupCannotDeleteBytesReferencedByHiddenLiveCaveFile' --logger 'console;verbosity=minimal'` — **1/1 passed**, explicitly validating live-File protection despite missing Cave View permissions. The first version of this added test used an overlength fixture ID; it was corrected before the passing final run.
+- `dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj --configuration Release --no-restore --filter 'FullyQualifiedName~ApplicationArchitectureTests|FullyQualifiedName~TypedIdentifierUsageContractTests|FullyQualifiedName~FileResponseSecurityTests|FullyQualifiedName~FileNamePolicyTests|FullyQualifiedName~CaveRevisionMetadataDiffTests' --logger 'console;verbosity=minimal'` — **69/69 passed**.
+- `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` — **passed, 0 warnings, 0 errors**.
+- `python3 scripts/validate-repository-docs.py --base-sha e342691c82f1bb6549be903d3a8f94a5d2560ac2` and `git diff --check` — **passed** following ledger reconciliation.
+
+**Accepted independent audit evidence at `52f2c593`:** Agent 2 found no separate P0/P1
+architecture, tenant, migration, import, archive, storage, or mutation-path blocker;
+architecture tests **14/14**, EF pending-model validation and documentation/build checks passed.
+Agent 3 ran the supported `npm run test:browser:e2e`: **20/20 passed, no failures/retries**
+(**10/10 Chromium**, **10/10 WebKit**), browser-harness safety **1/1**, and reviewed the matching
+PR workflow's engine installation, changed-path triggers, failure behavior, and report retention.
+No CI implementation change was necessary.
+
+**Historical broader suites (not final-tree reruns):** the earlier `4328ad55` tree passed backend
+unit **521/521**, disposable PostgreSQL integration **651/651**, frontend Jest **395/395**,
+TypeScript and frontend production builds. The `52f2c593` pre-integration audit independently
+passed Release build/EF checks. No frontend, migration, or browser runtime implementation was
+modified in the final GAP-015 integration; repeating the full suites was not justified.
+
+**Residual boundaries:** GAP-014's periodic discovery for completely inactive accounts is
+intentionally deferred; active/opportunistic cleanup is covered and retryable. The precise mixed
+published-File removal vs staged approval interleaving has source/locking review but no retained
+deterministic test and is not misrepresented as executed. A total database outage can prevent
+new cleanup-debt recording and requires operational recovery; live Azure and independent
+non-cooperating writer deployment cases remain separate operational boundaries. No code or
+migration is merged into `main` by this feature-branch integration.
 
 ## 2026-10-29 — Typed identifier post-merge adversarial validation — DONE + VALIDATED
 
@@ -150,7 +194,7 @@ Follow the repository workflow router and project rules first:
 - `docs/plans/cave-revisions-completion/implementation.md`
 - `docs/plans/cave-revisions-completion/validation.md`
 
-The completion-plan README is still marked **active pre-merge implementation plan**, so its target-state requirements still apply.
+The completion-plan README now preserves the implemented design/acceptance history; durable architecture documents describe current behavior. Merging this feature branch to `main` remains a separate action.
 
 ## Status legend
 
@@ -163,13 +207,17 @@ The completion-plan README is still marked **active pre-merge implementation pla
 
 # Executive assessment
 
-The branch is **substantially built**. The core revision/proposal/file/import architecture is coherent and considerably stronger than the size of the diff suggests. This is not a branch that needs a broad redesign.
+**Final implementation verdict: no independent P0/P1 blocker remains on the integrated completion branch.**
+The completed revision/proposal/File/import architecture has passed its final architecture and browser audits, with
+the separate GAP-015 File retry/race patch reviewed and hardened during final integration. The branch is ready for
+a separate PR/merge into `main`; it has not been merged into `main` by this work.
 
-No known Cave-revision implementation blocker remains in the current working tree. The former Cave-detail line-plot mutation surface has been removed, and the Reset Account destructive-safety package is merged into the completion branch.
-
-The **P0 implementation/validation checklist is now complete in this package**. GAP-001 adds a strict current-main v32 database preservation census plus a separate revision-rollout preservation boundary; the package still needs to be included in the branch's final adversarial validation pass.
-
-The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, current-main migration/rollout preservation, shared-interceptor compatibility, durable external cleanup, archive generation/runtime behavior, and the production Azure Blob adapter against Azurite. The remaining high-value risks are P1/P2 work outside the core publication machinery: real-browser integration, account-switch cache isolation, other mixed-version deployment/runtime boundaries, and live-provider/deployment behavior that an emulator cannot prove.
+The audit evidence is scoped: Chromium and WebKit browser E2E passed 10/10 each; unit/integration/frontend suites
+recorded at earlier commits are historical, not automatically rerun on every later documentation change. The
+final integration adds targeted real-PostgreSQL tests for an acknowledged object with an uncertain database commit
+and for staged-row persistence with a lost save acknowledgement. Live Azure policy/network/retention behavior
+and independent non-cooperating deployment writers are genuine external validation boundaries, not known
+application defects. GAP-014's inactive-account periodic sweeper is deliberately deferred as storage hygiene.
 
 ## Reviewed scope size
 
@@ -219,14 +267,14 @@ These counts explain why the review treated this as a shared-system change rathe
 | Tag/County administration revision interaction | **DONE + VALIDATED** | Rename/merge behavior has direct rollback, tenant-isolation, proposal-staleness, no-op, lock-order/writer-interleaving, 13-family/16-path Tag coverage, historical duplicate-preservation regression coverage, late multi-batch rollback, and 10,000-Cave rename + Tag/County merge scale coverage. |
 | Account settings atomicity / state constraints | **DONE + VALIDATED** | Integration tests prove atomic settings/state update and rollback on invalid state removal. |
 | File Name + Extension model | **DONE + VALIDATED** | Completion extends unchanged current-main v32 with a clean post-v32 migration. PostgreSQL coverage proves representative v32 data upgrades safely, preserves distinct legacy `FileName` values across an untouched upgrade/downgrade round trip, respects post-upgrade renames, and restores the v32 `FileName` schema contract without an accidental default. |
-| File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
+| File/PDF/vector read behavior | **DONE + VALIDATED** | Real Chromium/WebKit browser E2E (20/20) includes authenticated PDF.js, CORS/session headers, byte-range probe, and current map/line-plot retrieval. |
 | App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
 | Global `SaveChangesInterceptor` batching refactor | **DONE + VALIDATED** | Mechanical EntityBase coverage contract plus real-PostgreSQL matrix cover side-effect-free current/original AccountId and Cave/County/Entrance ownership, staged Files, foreign-tenant Added/Modified/Deleted states, mixed-batch atomicity, laundering/smuggling attempts, narrow AccountUser/User invitation exceptions including the unique null-`InvitationSentOn` recovery case, protected global/default writes, and bounded lookup counts. Unchanged Cave→County relationships avoid a redundant ownership SELECT while actual County moves remain validated. |
 | Account Reset rewrite | **DONE, PARTIAL VALIDATION** | The merged destructive-safety package tests the Reset graph, two-tenant noninterference, archive container removal, post-commit storage failures, immediate retry, and reset/archive admission. A transactional cleanup outbox, explicit retry endpoint/UI and PostgreSQL shared/exclusive account-maintenance leases cover API writes and background archives. Independent non-cooperating writers and live Azure smoke tests remain deployment validation boundaries. |
 | Account archive projection/runtime compatibility | **DONE + VALIDATED** | GAP-010 now covers actual `.tar.gz` generation/content, difficult File/line-plot data, explicit missing-file diagnostics, cancellation/retry, publication conflicts/ambiguity reconciliation, retention, tenant isolation, Reset/delete coordination, and pinned historical old/new publication behavior. Archive remains a current-state export with no restore contract. |
 | Unsaved-change guard | **DONE + VALIDATED** | Edit/Suggest/Revise tests cover blocked navigation, keep-editing, discard, asset-only dirty state, and `beforeunload`. |
 | Detail-page read-only Cave-owned state | **DONE + VALIDATED** | Cave detail exposes File viewing and the map but contains no direct File or line-plot publication path. Source review confirms the obsolete importer/modal wiring is gone; positive map and aggregate-authoring tests cover the behavior that remains supported. |
-| Durable completion docs / final acceptance checklist | **DONE, PARTIAL VALIDATION** | Durable architecture/status docs are refreshed to current implementation truth. The plan remains intentionally marked active pre-merge until the remaining validation gates are completed. |
+| Durable completion docs / final acceptance checklist | **DONE + VALIDATED** | Completion-plan historical guidance, final acceptance checklist, current-state architecture, browser/CI evidence, and GAP-014 deliberate deferral are reconciled during final integration. |
 
 # 2. Architecture and code-quality assessment
 
@@ -276,7 +324,7 @@ Snapshot design is intentionally user/logical-state oriented:
 
 1. The global `SaveChangesInterceptor` remains high-blast-radius infrastructure, but its Cave/account-domain switch coverage is now mechanically classified and the ownership mechanisms have a real-PostgreSQL compatibility/tenant-isolation matrix. Legacy Trip/Lead/Project entities and explicitly global/system records remain deliberately outside the Cave-completion ownership contract.
 2. The production `AzureBlobObjectStorage` adapter now has an automated isolated-Azurite contract covering the relevant byte/metadata, immutable-create, missing/delete, concurrent first-use, normalization, lazy-read race, snapshot, cancellation, and container-recreation semantics. Azurite is still an emulator, so live Azure account policy, retention, networking, and service-specific behavior remain deployment boundaries.
-3. Browser/runtime behavior outside the archive subsystem remains under-tested end to end. Archive generation/publication now has generated-content, cancellation/retry, tenant, retention, Reset/delete coordination, and pinned historical old/new storage-algorithm coverage under GAP-010. Independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
+3. Critical authenticated browser/runtime behavior is now covered by the real 20/20 Chromium/WebKit E2E suite, including account switching, conflicts, PDF.js, CSP/CORS, and hard refresh. Broader optional user journeys remain outside this smoke suite. Archive runtime has separate generated-content, cancellation/retry, tenant, retention, Reset/delete, and old/new publication coverage. Independent non-cooperating writers and live Azure remain deployment audit boundaries.
 
 ## Code quality
 
@@ -330,7 +378,7 @@ Static review found:
 - The obsolete `GeoJsonSaveModal.test.ts` wiring test was removed with the detail-page mutation surface. No permanent negative test asserts that the old button remains absent; supported behavior is covered positively by aggregate-authoring and map tests.
 - Frontend unit/component tests cannot prove real-browser behaviors such as cookies/CORS/preflight, PDF.js range traffic, CSP, hard refresh routing, or browser unload behavior end to end.
 
-The principal remaining test risk is therefore **runtime integration coverage**, not fake assertions.
+The critical real-browser contract is also covered by Playwright (20/20 across both engines). These limitations describe component tests in isolation, not the integrated test portfolio.
 
 # 4. Validation already completed
 
@@ -774,36 +822,35 @@ Account-dependent settings/reference caches are now scoped to the active account
 
 The real-browser tests additionally prove that dirty Account A authoring state cannot remain actionable during a switch and that submissions after switching use the target account context. Cross-browser validation also exposed and fixed the event-listener timing race by registering the switch coordinator before paint with `useLayoutEffect`.
 
-## GAP-014 — Abandoned authoring/staging lifecycle
+## GAP-014 — Safety-critical lifecycle complete; inactive-account sweeping explicitly deferred
 
-**Priority: P1/P2**
+**Priority: P2 storage/operations hygiene; not a merge blocker.**
 
-Unpublished authoring Files expire after 10 days and cleanup currently runs opportunistically during later staging/temp uploads. Proposal-linked staged Files are deliberately protected from ordinary expiration cleanup.
+Expired unlinked staged Files are cleaned **opportunistically** on subsequent staging/temp uploads. Relational
+removal commits durable `UnpublishedFileRemoval` responsibility before external deletion; failed provider
+deletion remains retryable. Proposal-linked staging is protected from ordinary expiration discovery, rejected/
+resolved request cleanup follows the current retention contract, and published Files have `ExpiresOn = null`
+and cannot be selected for staging expiration cleanup. Focused PostgreSQL tests cover expiration, pending
+references, provider failure/debt, published immutability, and post-commit cleanup.
 
-Add lifecycle tests for:
+There is **no periodic sweep for completely inactive accounts**. Such an account may retain expired unlinked
+staging until another cleanup opportunity arises. This is an accepted post-merge storage-hygiene/operations
+limitation, not an unproven Cave revision correctness or integrity property; durable
+`docs/architecture/files-and-storage.md` and `docs/cave-revisions.md` record the same limitation.
 
-- upload → close tab / never submit → eventually expires and is cleaned up;
-- DB row cleanup followed by storage-provider failure leaves safe/retryable cleanup debt;
-- proposal-linked staged File is not prematurely collected;
-- rejected/resolved request cleanup follows the chosen retention policy;
-- a published File has `ExpiresOn = null` and cannot be collected by staging cleanup;
-- stale authoring rows are eventually collected even if that same user never uploads again, or explicitly document that cleanup is only opportunistic.
+## GAP-015 — RESOLVED — File/object retry and race semantics
 
-The final point may require an operations/product decision: opportunistic cleanup alone can leave stale storage indefinitely for inactive accounts.
+**Scope:** Publication, ownership, duplicate decisions, immutable object writes, and durable post-commit cleanup. GAP-014's inactive-account sweeper remains deferred.
 
-## GAP-015 — File/object retry and race semantics
+The publication contract is **at-most-once relational mutation**, not replaying a successful HTTP result. If the response is lost after commit, a duplicate approval or terminal decision receives a controlled conflict/already-reviewed response; the client can reload the request's terminal status and approved revision. Exactly one revision and one review decision event are committed. The existing-Cave revision guard and PostgreSQL row locking serialize competing publications; creating a new Cave also locks the request before allocating its publication. Repeated identical direct saves use semantic no-op suppression.
 
-**Priority: P2 unless strict object immutability is chosen**
+A staged File can be claimed by one request only. Competing claims lock the File row, recheck existing request bindings, and fail the loser without publishing or copying its object. Published File identity and object address do not change on promotion; no duplicate File row/association is created. Concurrent publication/removal uses the same Cave revision conflict boundary; stale approval/direct-edit concurrency and published-File removal/cleanup have focused PostgreSQL tests. A dedicated mixed-operation File removal versus staged approval test was not retained because the attempted synchronization did not establish a deterministic interleaving; do not count that exact combination as independently tested.
 
-Make cross-system retry assumptions explicit for:
+Object creation is **create-only**, never replace-in-place. The provider-neutral `IObjectStorage` adapter's Azure implementation uses `IfNoneMatch = ETag.All`; an ambiguous successful create followed by a repeated upload receives a non-success condition response, rather than overwriting stored bytes. Existing Azurite adapter contract coverage proves immutable bytes and idempotent missing/delete behavior. If object creation or the subsequent relational publication appears to fail, upload-once File paths now queue tenant-qualified `UnpublishedFileRemoval` cleanup debt and perform a safe live-reference check before deleting bytes. An uncertain commit may in fact have published a File; cleanup preserves that object's bytes and clears stale debt without replaying tracked rolled-back mutations. Failed external cleanup retains debt; cleanup checks live references with explicit cross-account and unfiltered same-account queries. A database outage preventing cleanup-target persistence remains an external coordination limitation and is logged, not mistaken for a successful upload.
 
-- repeated finalize/publish;
-- simultaneous remove and publish;
-- two requests attempting to attach the same staged File;
-- retry after client timeout;
-- duplicate HTTP submissions.
+Post-commit object deletion is best effort with durable tenant-qualified `StorageCleanupTarget` debt recorded in the relational publication transaction. Missing objects are successful idempotent cleanups, while failed acknowledgement leaves debt for later bounded retries. Cleanup rechecks live File references before deletion, including cross-account references, so stale debt cannot delete a live object. No background sweeper is added.
 
-Existing proposal/File concurrency coverage is strong, but object-store idempotency assumptions deserve an explicit contract.
+Additional GAP-015 PostgreSQL tests: `ConcurrentDuplicateApprovalsCommitOneRevisionAndOneDecision` (including File ownership/bytes and a fresh retry after successful commit), `ConcurrentProposalsCannotClaimTheSameStagedFile`, and `AmbiguousStagedObjectCreateDoesNotLeaveUntrackedBytes` (immediate cleanup and durable debt/retry), plus `AmbiguousDirectCaveUploadCannotPublishOrLoseCleanupResponsibility` (failed direct upload does not publish or lose cleanup debt). Final integration also adds `LostCommitAcknowledgementDoesNotDeletePublishedFileOrReplayTrackedMutation` (confirmed commit with lost acknowledgement keeps File bytes/revision) and `LostStagingSaveAcknowledgementPreservesCommittedFileAndObject` (confirmed staged row keeps bytes despite lost acknowledgement). Existing focused coverage includes approval/rejection races, stale/direct publication conflicts, File publication without copy, stale cleanup/live-object guards, acknowledgement failure and retry, and immutable create-only Azure adapter behavior. This resolves the specified relational race/retry contract without a production redesign.
 
 ## GAP-016 — RESOLVED — Map/detail compatibility after old GeoJSON mutation removal
 
@@ -852,7 +899,7 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 - [x] Persist failed provider-neutral storage cleanup targets for safe later retry (transactional outbox + endpoint/UI).
 - [x] Add cross-replica account API mutation and archive coordination with PostgreSQL advisory leases (independent writers still need deployment audit).
 - [x] Freeze/rename the v29 migration test so it is explicitly historical rather than “exact main”.
-- [x] Refresh durable completion docs/checklists to current implementation truth. Keep the plan active until remaining validation gates are complete.
+- [x] Refresh durable completion docs/checklists to accepted implementation truth; archive the plan as historical execution guidance.
 - [x] **GAP-001:** full current-main database preservation census, including a strict 41-table v32 migration boundary and separate rollout preservation boundary.
 
 ## P1 — Strongly recommended before merge because failures can be silent or cross-cutting
@@ -872,13 +919,17 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 
 ## P2 — Hardening that can be consciously deferred if documented
 
-- [ ] Abandoned staging cleanup lifecycle / inactive-account orphan strategy.
-- [ ] Object-store retry/race/idempotency hardening.
+- [ ] **Explicitly deferred GAP-014:** periodic cleanup/discovery for completely inactive accounts (not safety-critical active lifecycle).
+- [x] GAP-015 object-store retry/race/idempotency hardening, including ambiguous object creation and post-commit acknowledgement.
 - [ ] Clean changed-file frontend lint warnings where low risk.
 - [ ] Consider post-merge workflow-oriented split of very large services only if it materially improves maintenance.
 - [ ] Broader browser coverage after the small critical smoke suite is established.
 
-# 12. Recommended final validation sequence after fixes
+# 12. Historical final validation sequence
+
+The steps below were the intended completion-wide validation plan. Recorded commands and results in the
+final integration evidence section distinguish actual final-tree executions from earlier SHA-pinned
+broad suites; no broad run is claimed merely because it appeared on this checklist.
 
 After P0 implementation is complete:
 
@@ -941,7 +992,7 @@ Do not mark this branch merge-ready until every applicable item below is true or
 - [x] Fake-storage business tests for the affected cleanup workflows remain green in the focused and aggregate-cleanup regression suites.
 - [x] Production object-storage adapter has a real automated Azurite contract suite.
 - [x] Immutable Cave/File object creation is provider-enforced create-only; a retry/path bug cannot silently overwrite an existing object address, and failed create does not compensate-delete pre-existing bytes.
-- [ ] Staged/published/removed-history/expired File lifecycle remains mutually exclusive and proven.
+- [x] Staged/published/removed-history/expired File lifecycle remains mutually exclusive and proven by PostgreSQL lifecycle, cleanup, and GAP-015 tests. Periodic discovery for fully inactive accounts is explicitly deferred under GAP-014.
 
 ## Cross-cutting compatibility
 
@@ -963,10 +1014,10 @@ Do not mark this branch merge-ready until every applicable item below is true or
 ## Documentation/reporting
 
 - [x] `docs/cave-revisions.md` describes implemented truth.
-- [ ] completion plan README/checklist no longer claims an active incomplete state once actually complete.
-- [x] this ledger is refreshed through the GAP-001 preservation-census package; refresh again after the branch's final adversarial validation.
-- [ ] exact final test/build commands and results are recorded.
-- [ ] no validation is claimed merely because a related test exists.
+- [x] Completion plan README/checklist describes accepted implementation and retains historical normative gates.
+- [x] Ledger reconciled against Agent 2 architecture/safety and Agent 3 browser/CI audits.
+- [x] Final integration test/build commands and results are recorded separately from historical package runs.
+- [x] Validation claims distinguish source/test existence, earlier SHA-pinned execution, and final-tree runs.
 
 # 14. Important review limitations and boundaries
 
@@ -978,39 +1029,30 @@ Specifically:
 - disposable repository-owned PostgreSQL/PostGIS databases were used for integration/migration experiments;
 - no Azure production resources were modified;
 - live Azure Blob Storage was not exercised; business workflows use a deterministic fake and the production adapter is validated separately against Azurite;
-- no real-browser end-to-end suite was run;
+- real-browser E2E ran 20/20 green on audited `52f2c593` (10 Chromium, 10 WebKit), not rerun merely for these docs/integration hardening changes;
 - no full real account archive round-trip/restore was proven;
 - the synthetic migration preservation census now explicitly seeds and checks every current-main v32 model table; it is still synthetic data rather than a sanitized restored real-world database;
 - dependency-audit results were informational and inherited vulnerabilities remain a separate security-maintenance concern.
 
-# 15. Notes for the next agent
+# 15. Future maintenance / release handoff
 
-Start by reading this ledger and the authoritative completion-plan documents. Re-check branch HEAD and `main` before trusting the SHAs/counts recorded above.
+The completion branch is now ready for an independently reviewed PR/merge to `main`. Do not treat
+this historical package as an instruction to re-add browser/PDF tests, repeat account-switch work,
+or build GAP-014's periodic sweeper before merge. The existing archive/Reset warning remains important:
+account containers include archives and import transport, not only Cave Files.
 
-Do not begin with a broad refactor.
+Potential post-merge work: optional inactive-account staged-File discovery/sweep (GAP-014);
+independent-writer and live Azure deployment integration; broader browser user journeys and
+low-risk existing frontend lint debt. GAP-015's mixed simultaneous published-File removal versus
+staged approval was reviewed, but a deterministic dedicated interleaving test was not retained;
+do not misrepresent it as a passed test.
 
-Recommended next work order:
+# 16. Final integration verdict
 
-1. add the small critical browser/PDF smoke suite;
-2. finish account-switch/cache isolation and the remaining read/stale-client validation gaps;
-3. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
+**ARCHITECTURE/SAFETY/BROWSER ACCEPTANCE COMPLETE FOR `feature/cave-revisions-completion`.**
+No independent P0/P1 blocker remains after GAP-015's object-create and uncertain-database-commit
+compensation hardening. The supported upload-once File cleanup is durable, reference-checked, and
+tested against lost acknowledgements. Historical broad suites and browser E2E retain their
+exact commit provenance; final focused integration evidence is listed separately.
 
-
-When working on Reset Account, do not assume the whole account container contains only current Cave Files. Current code also uses that container for account archives and import transport. Trace every producer/prefix before changing container cleanup behavior.
-
-When adding tests, prefer **state/invariant assertions** over mock-call assertions. A passing test should answer “what durable/user-visible safety property is guaranteed?” rather than only “which method was called?”
-
-# 16. Current overall verdict
-
-**IMPLEMENTATION BLOCKERS RESOLVED; PRE-MERGE VALIDATION REMAINS.**
-
-The branch's core architecture is not the reason it is blocked. The revision/proposal/import/File-publication model is generally strong, and the existing integration suite contains unusually meaningful coverage.
-
-Remaining merge risk is concentrated in:
-
-- live Azure/provider deployment behavior beyond the isolated Azurite contract;
-- real-browser integration;
-- account-switch/client-cache isolation;
-- independent-writer/live-provider deployment boundaries beyond the repository-owned cleanup contracts proven here.
-
-The P0 checklist is complete through the GAP-001 preservation-census package. Add the highest-value P1 safety tests and then perform one fresh adversarial pass rather than assuming the previous green suite proves the corrected branch.
+**Not merged into `main`.** Merging to `main` is a separate release action.
