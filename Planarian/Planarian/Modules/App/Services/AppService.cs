@@ -6,6 +6,7 @@ using Planarian.Modules.App.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
+using Planarian.Modules.Notifications.Hubs;
 
 namespace Planarian.Modules.App.Services;
 
@@ -28,7 +29,7 @@ public class AppService : ServiceBase<AppRepository>
         var apiBaseUrl = _apiRequestOrigin.GetOrigin();
         var result = new AppInitializeVm(
             apiBaseUrl,
-            $"{apiBaseUrl}/api/notificationHub",
+            $"{apiBaseUrl}{NotificationHubContract.Route}",
             _serverOptions.SupportName,
             _serverOptions.SupportEmail);
 

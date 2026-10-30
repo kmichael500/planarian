@@ -9,11 +9,19 @@ export type QueuedFileUploadStatus =
   | "failed"
   | "canceled";
 
+export type ChunkedUploadSessionStatus =
+  | "created"
+  | "uploading"
+  | "uploaded"
+  | "finalizing"
+  | "completed"
+  | "canceled";
+
 export interface ChunkedUploadSession {
   sessionId: string;
   uploadedBytes: number;
   totalBytes: number;
-  status?: string;
+  status?: ChunkedUploadSessionStatus;
 }
 
 export interface ChunkedUploaderConfig {

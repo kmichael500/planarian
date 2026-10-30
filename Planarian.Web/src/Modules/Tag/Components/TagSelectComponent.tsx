@@ -3,22 +3,22 @@ import { useEffect, useState } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import { TagType, TagTypeDisplayNames } from "../Models/TagType";
+import { TagSelectSource, TagSelectType, TagType, TagTypeDisplayNames } from "../Models/TagType";
 import { sortSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
 import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
 export interface TagSelectComponentProps extends Omit<SelectProps<string>, "mode"> {
-  tagType: TagType;
+  tagType: TagSelectType;
   projectId?: string;
   allowCustomTags?: boolean;
   mode?: "multiple";
 }
 
-export const getTagSelectPlaceholder = (tagType: TagType) =>
+export const getTagSelectPlaceholder = (tagType: TagSelectType) =>
   `Select ${TagTypeDisplayNames[tagType] ?? splitCamelCase(tagType) ?? "tag"}`;
 
 export const resolveTagSelectMode = (
-  tagType: TagType,
+  tagType: TagSelectType,
   allowCustomTags: boolean,
   mode?: "multiple"
 ): SelectProps<string>["mode"] => {
@@ -43,7 +43,7 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   useEffect(() => {
     const getTags = async () => {
       switch (tagType) {
-        case TagType.ProjectMember:
+        case TagSelectSource.ProjectMember:
           if (!projectId) {
             throw new Error("Project id is required");
           }

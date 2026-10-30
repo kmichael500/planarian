@@ -1,8 +1,7 @@
 export enum TagType {
-  Default = "User",
+  Default = "Default",
   Trip = "Trip",
   Photo = "Photo",
-  ProjectMember = "User",
   Geology = "Geology",
   GeologicAge = "GeologicAge",
   PhysiographicProvince = "PhysiographicProvince",
@@ -18,6 +17,13 @@ export enum TagType {
   CaveOther = "CaveOther",
 }
 
-export const TagTypeDisplayNames: Partial<Record<TagType, string>> = {
+export enum TagSelectSource {
+  ProjectMember = "ProjectMember",
+}
+
+export type TagSelectType = TagType | TagSelectSource;
+
+export const TagTypeDisplayNames: Partial<Record<TagSelectType, string>> = {
   [TagType.Archeology]: "Archaeology",
+  [TagSelectSource.ProjectMember]: "User",
 };

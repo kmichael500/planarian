@@ -5,6 +5,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
@@ -91,7 +92,7 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
         var filter = new FilterQuery();
         var advanced = new FilterQuery
         {
-            Conditions = [new QueryCondition("Name", QueryOperator.Contains, "Cave")]
+            Conditions = [new QueryCondition(nameof(CaveSearchParamsVm.Name), QueryOperator.Contains, "Cave")]
         };
         var reads = new (string Name, Func<Task> Read)[]
         {
@@ -107,7 +108,8 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
                 await map.GetLinePlotIds(36, 34, -85, -87, 12, default), plotId, foreignPlotId)),
             ("Map line plot GeoJSON", async () => Assert.NotNull(await map.GetLinePlotGeoJson(plotId, default))),
             ("Published line plots", async () => Assert.Single(await repository.GetCaveLinePlotsAsync(cave.CaveId, default))),
-            ("File metadata", async () => Assert.NotNull(await fileRepository.GetFileVm(file.FileId))),
+            ("File metadata", async () => Assert.Equal("Document",
+                (await fileRepository.GetFileVm(file.FileId))?.FileTypeKey)),
             ("File authorization metadata", async () => Assert.NotNull(
                 await fileRepository.GetFileAuthorizationContext(file.FileId))),
             ("File view response setup", async () => Assert.NotNull(

@@ -42,8 +42,6 @@ const getFeatureKeyLabel = (key: FeatureKey): string => {
       return "Cave: Other Tags";
     case FeatureKey.EnabledFieldCaveNarrative:
       return "Cave: Narrative";
-    case FeatureKey.EnabledFieldCaveDistance:
-      return "Cave: Distance";
     case FeatureKey.EnabledFieldEntranceCoordinates:
       return "Entrance: Coordinates";
     case FeatureKey.EnabledFieldEntranceElevation:
@@ -68,6 +66,8 @@ const getFeatureKeyLabel = (key: FeatureKey): string => {
       return "Entrance: Other Tags";
     case FeatureKey.EnabledFieldEntranceDescription:
       return "Entrance: Description";
+    case FeatureKey.ExportEnabled:
+      return "Export";
     default:
       return key;
   }

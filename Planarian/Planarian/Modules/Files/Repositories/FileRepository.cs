@@ -122,7 +122,7 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             Id = e.Id,
             Name = e.Name,
             Extension = e.Extension,
-            FileTypeKey = e.FileTypeTag.Key,
+            FileTypeKey = e.FileTypeTag.Name,
             FileTypeTagId = e.FileTypeTagId
         });
     }

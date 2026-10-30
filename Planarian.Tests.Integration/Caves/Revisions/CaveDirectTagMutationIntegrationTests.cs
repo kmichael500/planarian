@@ -37,15 +37,15 @@ public sealed class CaveDirectTagMutationIntegrationTests(PostgresTestServer fix
         }
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
-        await AssertSingleAsync(verify.GeologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Geology);
-        await AssertSingleAsync(verify.GeologicAgeTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.GeologicAge);
-        await AssertSingleAsync(verify.MapStatusTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.MapStatus);
-        await AssertSingleAsync(verify.PhysiographicProvinceTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Province);
-        await AssertSingleAsync(verify.ArcheologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Archeology);
-        await AssertSingleAsync(verify.BiologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Biology);
-        await AssertSingleAsync(verify.CaveOtherTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Other);
-        await AssertSingleAsync(verify.CartographerNameTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Cartographer);
-        await AssertSingleAsync(verify.CaveReportedByNameTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.ReportedBy);
+        await AssertSingleAsync(verify.GeologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Geology, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.GeologicAgeTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.GeologicAge, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.MapStatusTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.MapStatus, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.PhysiographicProvinceTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Province, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.ArcheologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Archeology, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.BiologyTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Biology, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.CaveOtherTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Other, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.CartographerNameTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.Cartographer, tag => tag.TagTypeId);
+        await AssertSingleAsync(verify.CaveReportedByNameTags.Where(tag => tag.CaveId == tenant.CaveId), newTags.ReportedBy, tag => tag.TagTypeId);
 
         var revisions = await verify.CaveRevisions.AsNoTracking()
             .Where(revision => revision.CaveId == tenant.CaveId)
@@ -101,11 +101,12 @@ public sealed class CaveDirectTagMutationIntegrationTests(PostgresTestServer fix
             await Add(TagTypeKeyConstant.People, "cartographer", 8),
             await Add(TagTypeKeyConstant.People, "reporter", 9));
     }
-    private static async Task AssertSingleAsync<T>(IQueryable<T> query, string expectedTagId)
+    private static async Task AssertSingleAsync<T>(IQueryable<T> query, string expectedTagId,
+        Func<T, string> tagTypeId)
         where T : class
     {
         var row = Assert.Single(await query.ToListAsync());
-        Assert.Equal(expectedTagId, row.GetType().GetProperty("TagTypeId")!.GetValue(row));
+        Assert.Equal(expectedTagId, tagTypeId(row));
     }
 
     private sealed record CaveTagSet(string Geology, string GeologicAge, string MapStatus,

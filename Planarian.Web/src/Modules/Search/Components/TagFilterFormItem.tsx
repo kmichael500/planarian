@@ -1,14 +1,14 @@
 import { QueryOperator } from "../Services/QueryBuilder";
 import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
-import { TagType } from "../../Tag/Models/TagType";
+import { TagSelectType } from "../../Tag/Models/TagType";
 import { Form, SelectProps } from "antd";
 
 export interface TagFilterFormItemProps<T extends object>
   extends FilterFormItemProps<T>,
     SelectProps<string> {
   projectId?: string;
-  tagType: TagType;
+  tagType: TagSelectType;
 }
 
 const TagFilterFormItem = <T extends object>({

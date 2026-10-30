@@ -5,6 +5,7 @@ import {
   HubConnectionState,
 } from "@microsoft/signalr";
 import { AppOptions } from "../../Services/AppService";
+import { NotificationHubEvent, NotificationHubMethod } from "./NotificationHubContract";
 
 interface UseSignalRGroupOptions {
   groupName: string | null;
@@ -50,7 +51,7 @@ function useSignalRGroup({
         return;
       }
 
-      await newConnection.invoke("JoinGroup", currentGroupName);
+      await newConnection.invoke(NotificationHubMethod.JoinGroup, currentGroupName);
       hasJoinedGroupRef.current = currentGroupName;
       await onConnectedRef.current?.();
     });
@@ -69,7 +70,7 @@ function useSignalRGroup({
       onNotificationRef.current?.(notification);
     };
 
-    connection.on("ReceiveNotification", receiveNotificationHandler);
+    connection.on(NotificationHubEvent.ReceiveNotification, receiveNotificationHandler);
     connection
       .start()
       .then(async () => {
@@ -79,7 +80,7 @@ function useSignalRGroup({
 
         const currentGroupName = groupNameRef.current;
         if (currentGroupName) {
-          await connection.invoke("JoinGroup", currentGroupName);
+          await connection.invoke(NotificationHubMethod.JoinGroup, currentGroupName);
           hasJoinedGroupRef.current = currentGroupName;
         }
 
@@ -98,12 +99,12 @@ function useSignalRGroup({
         connection.state === HubConnectionState.Connected
       ) {
         connection
-          .invoke("LeaveGroup", hasJoinedGroupRef.current)
+          .invoke(NotificationHubMethod.LeaveGroup, hasJoinedGroupRef.current)
           .catch((e) => console.error("Error leaving group: ", e));
         hasJoinedGroupRef.current = null;
       }
 
-      connection.off("ReceiveNotification", receiveNotificationHandler);
+      connection.off(NotificationHubEvent.ReceiveNotification, receiveNotificationHandler);
       connection
         .stop()
         .catch((e) => console.error("Error stopping the connection: ", e));
@@ -122,11 +123,11 @@ function useSignalRGroup({
       }
 
       if (previousGroupName) {
-        await connection.invoke("LeaveGroup", previousGroupName);
+        await connection.invoke(NotificationHubMethod.LeaveGroup, previousGroupName);
       }
 
       if (groupName) {
-        await connection.invoke("JoinGroup", groupName);
+        await connection.invoke(NotificationHubMethod.JoinGroup, groupName);
       }
 
       hasJoinedGroupRef.current = groupName;

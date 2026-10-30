@@ -1,8 +1,10 @@
+import type { ChunkedUploadSessionStatus } from "../../../Shared/Components/FileUploader/types";
+
 export interface ImportFileUploadSession {
   sessionId: string;
   uploadedBytes: number;
   totalBytes: number;
-  status: string;
+  status: ChunkedUploadSessionStatus;
 }
 
 export interface ImportFileRequest {

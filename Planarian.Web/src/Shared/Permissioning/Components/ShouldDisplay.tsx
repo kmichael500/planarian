@@ -1,10 +1,13 @@
 import React, { ReactNode, useCallback, useContext } from "react";
-import { FeatureKey } from "../../../Modules/Account/Models/FeatureSettingVm";
+import {
+  ComputedFeatureKey,
+  DisplayFeatureKey,
+} from "../../../Modules/Account/Models/FeatureSettingVm";
 import { PermissionKey } from "../../../Modules/Authentication/Models/PermissionKey";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 
 interface ShouldDisplayProps {
-  featureKey?: FeatureKey;
+  featureKey?: DisplayFeatureKey;
   permissionKey?: PermissionKey;
   children?: ReactNode;
 }
@@ -29,8 +32,8 @@ export const useFeatureEnabled = () => {
   const { hasPermission, permissions } = useContext(AppContext);
 
   const isFeatureEnabled = useCallback(
-    (featureKey?: FeatureKey | null | undefined, permissionKey?: PermissionKey): boolean => {
-      if (featureKey === FeatureKey.EnabledFieldCaveDistance) {
+    (featureKey?: DisplayFeatureKey | null | undefined, permissionKey?: PermissionKey): boolean => {
+      if (featureKey === ComputedFeatureKey.CaveDistance) {
         return true;
       }
 

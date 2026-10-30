@@ -9,6 +9,7 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { FileVm } from "../../Files/Models/FileVm";
+import { FileAccessAction } from "../../Files/Services/FileService";
 import { AxiosProgressEvent } from "axios";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
@@ -171,22 +172,22 @@ const CaveService = {
   async DeleteAuthoringStagedFile(fileId: string): Promise<void> {
     await HttpClient.delete(`api/files/staged/${encodeURIComponent(fileId)}`);
   },
-  GetAuthoringStagedFileUrl(fileId: string, action: "view" | "download"): string {
+  GetAuthoringStagedFileUrl(fileId: string, action: FileAccessAction): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
       `api/files/staged/${encodeURIComponent(fileId)}/${action}`
     );
   },
   StartAuthoringStagedFileDownload(fileId: string): void {
-    HttpHelpers.NavigateToApiUrl(`api/files/staged/${encodeURIComponent(fileId)}/download`);
+    HttpHelpers.NavigateToApiUrl(`api/files/staged/${encodeURIComponent(fileId)}/${FileAccessAction.Download}`);
   },
-  GetStagedChangeRequestFileUrl(requestId: string, fileId: string, action: "view" | "download" = "download"): string {
+  GetStagedChangeRequestFileUrl(requestId: string, fileId: string, action: FileAccessAction = FileAccessAction.Download): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
       `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}/${action}`
     );
   },
   StartStagedChangeRequestFileDownload(requestId: string, fileId: string): void {
     HttpHelpers.NavigateToApiUrl(
-      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}/download`
+      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}/${FileAccessAction.Download}`
     );
   },
   async GetMyChangeRequests(pageNumber = 1, pageSize = 10, status?: CaveChangeRequestStatus,

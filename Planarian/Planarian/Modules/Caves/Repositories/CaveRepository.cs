@@ -6,6 +6,7 @@ using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
@@ -1137,9 +1138,16 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         {
             var ids = typed.Select(tagTypeId).Distinct(StringComparer.Ordinal).ToList();
             if (ids.Count == 0) return;
-            await set.Where(tag => EF.Property<string>(tag, "CaveId") == caveId &&
-                                   EF.Property<Cave>(tag, "Cave").AccountId == RequestUser.AccountId &&
-                                   ids.Contains(EF.Property<string>(tag, "TagTypeId")))
+
+            var entityType = DbContext.Model.GetRequiredEntityType<T>();
+            var caveReference = entityType.GetRequiredReferenceTo<Cave>();
+            var caveIdProperty = caveReference.GetDependentPropertyForPrincipalProperty<string>(nameof(EntityBase.Id));
+            var tagTypeReference = entityType.GetRequiredReferenceTo<TagType>();
+            var tagTypeIdProperty =
+                tagTypeReference.GetDependentPropertyForPrincipalProperty<string>(nameof(EntityBase.Id));
+            await set.Where(tag => EF.Property<string>(tag, caveIdProperty.Name) == caveId &&
+                                   EF.Property<Cave>(tag, caveReference.Name).AccountId == RequestUser.AccountId &&
+                                   ids.Contains(EF.Property<string>(tag, tagTypeIdProperty.Name)))
                 .ExecuteDeleteAsync(cancellationToken);
         }
 
@@ -1150,10 +1158,18 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             var ids = rows.Select(tagTypeId).Distinct(StringComparer.Ordinal).ToList();
             if (ids.Count == 0) return;
             var entranceIds = rows.Select(entranceId).Distinct(StringComparer.Ordinal).ToList();
-            await set.Where(tag => entranceIds.Contains(EF.Property<string>(tag, "EntranceId")) &&
-                                   EF.Property<Entrance>(tag, "Entrance").CaveId == caveId &&
-                                   EF.Property<Entrance>(tag, "Entrance").Cave.AccountId == RequestUser.AccountId &&
-                                   ids.Contains(EF.Property<string>(tag, "TagTypeId")))
+
+            var entityType = DbContext.Model.GetRequiredEntityType<T>();
+            var entranceReference = entityType.GetRequiredReferenceTo<Entrance>();
+            var entranceIdProperty =
+                entranceReference.GetDependentPropertyForPrincipalProperty<string>(nameof(EntityBase.Id));
+            var tagTypeReference = entityType.GetRequiredReferenceTo<TagType>();
+            var tagTypeIdProperty =
+                tagTypeReference.GetDependentPropertyForPrincipalProperty<string>(nameof(EntityBase.Id));
+            await set.Where(tag => entranceIds.Contains(EF.Property<string>(tag, entranceIdProperty.Name)) &&
+                                   EF.Property<Entrance>(tag, entranceReference.Name).CaveId == caveId &&
+                                   EF.Property<Entrance>(tag, entranceReference.Name).Cave!.AccountId == RequestUser.AccountId &&
+                                   ids.Contains(EF.Property<string>(tag, tagTypeIdProperty.Name)))
                 .ExecuteDeleteAsync(cancellationToken);
         }
 

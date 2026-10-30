@@ -7,6 +7,7 @@ import {
   CaveScalarChangeVm,
   CaveSnapshotVm,
   SnapshotTagReference,
+  SnapshotTagRole,
 } from "../Models/CaveRevisionVm";
 
 export type DiffValueFormat = "text" | "stringList" | "distance" | "number" | "date" | "boolean" | "coordinates" | "reference";
@@ -114,7 +115,7 @@ const caveScalarDefinitions: Record<string, { label: string; format: DiffValueFo
   IsArchived: { label: "Archived", format: "boolean" },
 };
 
-export const roleLabels: Record<string, string> = {
+export const roleLabels: Record<SnapshotTagRole, string> = {
   Geology: "Geology",
   GeologicAge: "Geologic Age",
   PhysiographicProvince: "Physiographic Province",
@@ -222,7 +223,7 @@ const referenceLabel = (snapshot: CaveSnapshotVm | undefined, path: string) => {
 const makeTagGroup = (role: string, added: SnapshotTagReference[], removed: SnapshotTagReference[],
   metadata: ReferenceMetadataPresentation[]): TagChangeGroup => ({
     role,
-    label: roleLabels[role] ?? safeLabel(role),
+    label: roleLabels[role as SnapshotTagRole] ?? safeLabel(role),
     removed: removed.filter(tag => tag.role === role).sort((a, b) => a.nameAtRevision.localeCompare(b.nameAtRevision) || a.tagTypeId.localeCompare(b.tagTypeId)),
     added: added.filter(tag => tag.role === role).sort((a, b) => a.nameAtRevision.localeCompare(b.nameAtRevision) || a.tagTypeId.localeCompare(b.tagTypeId)),
     metadata,
@@ -362,7 +363,7 @@ export const buildCaveRevisionDiffPresentation = (
       });
     }
     metadataByField.forEach((metadata, key) => {
-      if (roleLabels[key] || fields.some(field => field.key === key)) return;
+      if (key in roleLabels || fields.some(field => field.key === key)) return;
       const definition = entranceDefinitions[key];
       if (definition) fields.push({ key, label: definition.label, previous: undefined, current: undefined,
         format: definition.format, metadata });

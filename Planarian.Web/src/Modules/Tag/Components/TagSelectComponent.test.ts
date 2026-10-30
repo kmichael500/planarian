@@ -1,4 +1,4 @@
-import { TagType } from "../Models/TagType";
+import { TagSelectSource, TagType } from "../Models/TagType";
 import { getTagSelectPlaceholder, resolveTagSelectMode } from "./TagSelectComponent";
 
 it("enables Ant tags mode only through People custom-tag policy", () => {
@@ -16,4 +16,5 @@ it("enables Ant tags mode only through People custom-tag policy", () => {
 it("uses display copy for legacy tag-type wire names", () => {
   expect(getTagSelectPlaceholder(TagType.Archeology)).toBe("Select Archaeology");
   expect(getTagSelectPlaceholder(TagType.GeologicAge)).toBe("Select Geologic Age");
+  expect(getTagSelectPlaceholder(TagSelectSource.ProjectMember)).toBe("Select User");
 });

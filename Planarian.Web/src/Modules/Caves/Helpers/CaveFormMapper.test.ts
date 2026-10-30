@@ -22,6 +22,20 @@ it.each([
   expect(form.countyNumber).toBe(number);
 });
 
+it("maps known serialized tag roles and ignores unrecognized future roles", () => {
+  const form = snapshotToForm({
+    ...snapshot,
+    tags: [
+      { role: "Geology", tagTypeId: "rock", nameAtRevision: "Limestone" },
+      { role: "Biology", tagTypeId: "bats", nameAtRevision: "Bats" },
+      { role: "FutureRole", tagTypeId: "future", nameAtRevision: "Future tag" },
+    ],
+  });
+  expect(form.geologyTagIds).toEqual(["rock"]);
+  expect(form.biologyTagIds).toEqual(["bats"]);
+  expect(form.otherTagIds).toEqual([]);
+});
+
 it("adds active staged files to a current-Cave stale rereview baseline", () => {
   const form = snapshotToForm(snapshot, undefined, undefined, [{
     id: "staged", name: "Staged", extension: ".pdf",
@@ -80,7 +94,7 @@ it("carries the file extension into authoring state", () => {
   };
 
   expect(caveToForm(cave).files).toEqual([{
-    id: "file", name: "Map", extension: ".PDF", fileTypeTagId: "map", fileTypeKey: "Map",
+    id: "file", name: "Map", extension: ".PDF", fileTypeTagId: "map", fileTypeKey: FileTypeKey.Map,
   }]);
 });
 

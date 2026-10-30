@@ -26,7 +26,6 @@ export enum FeatureKey {
   EnabledFieldCaveCartographerNameTags = "EnabledFieldCaveCartographerNameTags",
   EnabledFieldCaveOtherTags = "EnabledFieldCaveOtherTags",
   EnabledFieldCaveNarrative = "EnabledFieldCaveNarrative",
-  EnabledFieldCaveDistance = "EnabledFieldCaveDistance",
 
   EnabledFieldEntranceCoordinates = "EnabledFieldEntranceCoordinates",
   EnabledFieldEntranceElevation = "EnabledFieldEntranceElevation",
@@ -40,4 +39,11 @@ export enum FeatureKey {
   EnabledFieldEntranceHydrologyTags = "EnabledFieldEntranceHydrologyTags",
   EnabledFieldEntranceOtherTags = "EnabledFieldEntranceOtherTags",
   EnabledFieldEntranceDescription = "EnabledFieldEntranceDescription",
+  ExportEnabled = "ExportEnabled",
 }
+
+export enum ComputedFeatureKey {
+  CaveDistance = "EnabledFieldCaveDistance",
+}
+
+export type DisplayFeatureKey = FeatureKey | ComputedFeatureKey;

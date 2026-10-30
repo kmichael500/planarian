@@ -1,3 +1,6 @@
+export type CaveRevisionSource = "SystemBaseline" | "ManagerEdit" | "UserSubmission" | "Import" | "System";
+export type CaveRevisionOperation = "Baseline" | "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
+
 export interface CaveRevisionListItemVm {
   id: string;
   caveId: string;
@@ -5,8 +8,8 @@ export interface CaveRevisionListItemVm {
   publishedOn: string;
   actorUserId?: string;
   actorName?: string;
-  source: "SystemBaseline" | "ManagerEdit" | "UserSubmission" | "Import" | "System";
-  operation: "Baseline" | "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
+  source: CaveRevisionSource;
+  operation: CaveRevisionOperation;
   changeRequestId?: string;
   importBatchId?: string;
   changeRequestSubmitterUserId?: string;
@@ -20,6 +23,14 @@ export interface CaveRevisionHistoryVm {
   currentRevisionId?: string;
   revisions: CaveRevisionListItemVm[];
 }
+
+// Mirrors the backend SnapshotTagRole enum's serialized names. Keep incoming role
+// data as string so unrecognized roles from future server versions remain readable.
+export type SnapshotTagRole =
+  | "Geology" | "GeologicAge" | "MapStatus" | "PhysiographicProvince"
+  | "Archeology" | "Biology" | "CaveOther" | "Cartographer"
+  | "CaveReportedBy" | "EntranceStatus" | "EntranceHydrology"
+  | "FieldIndication" | "EntranceReportedBy" | "EntranceOther";
 
 export interface SnapshotTagReference {
   role: string;

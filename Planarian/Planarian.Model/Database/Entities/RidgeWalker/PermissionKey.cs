@@ -11,10 +11,10 @@ public static class PermissionKey
 
 public static class PermissionPolicyKey
 {
-    public const string View = "View";
-    public const string Manager = "Manager";
-    public const string PlanarianAdmin = "PlanarianAdmin";
-    public const string Admin = "Admin";
+    public const string View = PermissionKey.View;
+    public const string Manager = PermissionKey.Manager;
+    public const string PlanarianAdmin = PermissionKey.PlanarianAdmin;
+    public const string Admin = PermissionKey.Admin;
     public const string AdminManager = "AdminManager"; // Not actually in the database
     public const string Export = "Export"; // Not actually in the database
 }

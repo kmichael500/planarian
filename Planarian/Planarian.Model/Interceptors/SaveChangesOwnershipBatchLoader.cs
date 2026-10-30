@@ -1,10 +1,12 @@
-using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Planarian.Model.Database.Extensions;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Interceptors;
 
@@ -103,12 +105,14 @@ internal static class SaveChangesOwnershipBatchLoader
         foreach (var entry in changed)
         {
             var ownerAccountId = ExpectedParentAccountId(entry.Entity, requestAccountId, invitationClaims);
-            AddOwnershipLink(entry, "CaveId", "Cave", typeof(Cave), ownerAccountId, caveLinks);
-            AddOwnershipLink(entry, "CountyId", "County", typeof(County), ownerAccountId, countyLinks);
-            AddOwnershipLink(entry, "EntranceId", "Entrance", typeof(Entrance), ownerAccountId, entranceLinks);
+            AddOwnershipLinks(entry, typeof(Cave), ownerAccountId, caveLinks);
+            AddOwnershipLinks(entry, typeof(County), ownerAccountId, countyLinks);
+            AddOwnershipLinks(entry, typeof(Entrance), ownerAccountId, entranceLinks);
 
             if (entry.Entity is CaveChangeRequestStagedFile)
-                foreach (var id in CurrentAndOriginalIds(entry, "FileId"))
+                foreach (var id in CurrentAndOriginalIds(entry,
+                             entry.Metadata.FindProperty(nameof(CaveChangeRequestStagedFile.FileId))
+                             ?? throw new InvalidOperationException("Staged-file ownership metadata is missing FileId.")))
                     stagedFileIds.Add(id);
         }
 
@@ -406,38 +410,33 @@ internal static class SaveChangesOwnershipBatchLoader
         return ownedIds;
     }
 
-    private static void AddOwnershipLink(
+    private static void AddOwnershipLinks(
         EntityEntry entry,
-        string foreignKeyName,
-        string navigationName,
-        Type navigationType,
+        Type principalType,
         string? ownerAccountId,
         ICollection<OwnershipLink> links)
     {
-        // A Cave is directly account-owned, and SaveChanges separately validates both its current
-        // and original AccountId. Rechecking an unchanged CountyId on every unrelated Cave update
-        // adds one ownership SELECT per bulk-revision batch without protecting a relationship
-        // transition. New Caves and actual County moves still validate the County relationship.
-        if (entry.Entity is Cave &&
-            foreignKeyName == nameof(Cave.CountyId) &&
-            entry.State == EntityState.Modified &&
-            !entry.Property(nameof(Cave.CountyId)).IsModified)
-            return;
+        foreach (var reference in entry.Metadata.GetReferencesTo(principalType))
+        {
+            var property = reference.GetDependentPropertyForPrincipalProperty<string>(nameof(EntityBase.Id));
 
-        var type = entry.Entity.GetType();
-        var foreignKey = type.GetProperty(foreignKeyName, BindingFlags.Public | BindingFlags.Instance);
-        var navigation = type.GetProperty(navigationName, BindingFlags.Public | BindingFlags.Instance);
-        if (foreignKey?.PropertyType != typeof(string) || navigation?.PropertyType != navigationType)
-            return;
+            // A Cave is directly account-owned, and SaveChanges separately validates both its current
+            // and original AccountId. Rechecking an unchanged County relationship on every unrelated
+            // Cave update adds one ownership SELECT per bulk-revision batch without protecting a
+            // relationship transition. New Caves and actual County moves still validate it.
+            if (entry.Entity is Cave && principalType == typeof(County) &&
+                entry.State == EntityState.Modified && !entry.Property(property.Name).IsModified)
+                continue;
 
-        var validationIds = CurrentAndOriginalIds(entry, foreignKeyName);
-        if (validationIds.Count > 0)
-            links.Add(new OwnershipLink(entry.Entity, validationIds, ownerAccountId));
+            var validationIds = CurrentAndOriginalIds(entry, property);
+            if (validationIds.Count > 0)
+                links.Add(new OwnershipLink(entry.Entity, validationIds, ownerAccountId));
+        }
     }
 
-    private static IReadOnlyList<string> CurrentAndOriginalIds(EntityEntry entry, string propertyName)
+    private static IReadOnlyList<string> CurrentAndOriginalIds(EntityEntry entry, IProperty propertyMetadata)
     {
-        var property = entry.Property(propertyName);
+        var property = entry.Property(propertyMetadata.Name);
         var currentId = property.CurrentValue as string;
         string? originalId = null;
         if (entry.State is EntityState.Modified or EntityState.Deleted)

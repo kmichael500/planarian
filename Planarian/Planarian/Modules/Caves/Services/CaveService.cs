@@ -96,16 +96,32 @@ public class CaveService : ServiceBase<CaveRepository>
         return await Repository.IsCountyNumberInUse(countyId, countyNumber, caveId);
     }
 
+    internal static HashSet<FeatureKey>? ParseExportFields(IEnumerable<string>? exportFields)
+    {
+        if (exportFields is null) return null;
+
+        var parsed = new HashSet<FeatureKey>();
+        foreach (var value in exportFields)
+        {
+            if (Enum.TryParse<FeatureKey>(value, ignoreCase: true, out var key) &&
+                Enum.IsDefined(key) &&
+                string.Equals(key.ToString(), value, StringComparison.OrdinalIgnoreCase))
+                parsed.Add(key);
+        }
+
+        return parsed;
+    }
+
     public async Task<byte[]> ExportCavesGpx(FilterQuery filterQuery, string? permissionKey,
         CancellationToken cancellationToken = default)
     {
         var featureSettings = await _featureSettingRepository.GetFeatureSettings(cancellationToken);
         var featureDict = featureSettings.ToDictionary(fs => fs.Key, fs => fs.IsEnabled);
-        var exportFieldSet = filterQuery.ExportFields?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var exportFieldSet = ParseExportFields(filterQuery.ExportFields);
 
         bool Include(FeatureKey key) =>
             featureDict.TryGetValue(key, out var enabled) && enabled &&
-            (exportFieldSet == null || exportFieldSet.Contains(key.ToString()));
+            (exportFieldSet == null || exportFieldSet.Contains(key));
 
         var exportData = await Repository.GetCavesForExport(filterQuery, permissionKey);
 
@@ -433,11 +449,11 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         var featureSettings = await _featureSettingRepository.GetFeatureSettings(cancellationToken);
         var featureDict = featureSettings.ToDictionary(fs => fs.Key, fs => fs.IsEnabled);
-        var exportFieldSet = filterQuery.ExportFields?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var exportFieldSet = ParseExportFields(filterQuery.ExportFields);
 
         bool Include(FeatureKey key) =>
             featureDict.TryGetValue(key, out var enabled) && enabled &&
-            (exportFieldSet == null || exportFieldSet.Contains(key.ToString()));
+            (exportFieldSet == null || exportFieldSet.Contains(key));
 
         var caves = await Repository.GetCavesForExport(filterQuery, permissionKey);
 

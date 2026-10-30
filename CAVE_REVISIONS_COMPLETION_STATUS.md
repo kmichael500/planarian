@@ -1,9 +1,10 @@
 # Cave Revisions Completion Status and Validation Ledger
 
 **Branch:** `feature/cave-revisions-completion`
-**Status:** **ACTIVE PRE-MERGE — PERMISSION POLICY CENTRALIZATION VALIDATED**
+**Status:** **ACTIVE PRE-MERGE — TYPED IDENTIFIER HARDENING VALIDATED**
 **Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `e0b90a60` (`refactor(auth): centralize permission policy semantics`). This package is based directly on completion HEAD `d07458ee`; earlier package evidence remains SHA-pinned to the source that produced it.
+**Completion HEAD reviewed:** `dc34b128` (`refactor: harden typed identifier contracts`). This package is based directly on completion HEAD `499f255f`; earlier package evidence remains SHA-pinned to the source that produced it.
+**Typed-identifier refresh:** 2026-10-29; `dc34b128` replaces fragile CLR/EF member-name strings with typed/model-derived metadata, hardens finite cross-stack string contracts, and preserves intentionally open-ended or external identifiers as strings.
 **Permission-policy refresh:** 2026-10-29; `e0b90a60` centralizes Account/Cave role semantics, hardens unsupported-key handling, moves current browser authorization to a versioned server-effective projection, and retains a version-gated compatibility adapter for independently deployed older APIs.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-28; migration + PostgreSQL-foundation coverage is green for the nullable proposal-base migration, including explicit fail-closed downgrade behavior while creation proposal versions exist. Final exact-tree suite counts are recorded in the package section below.
@@ -11,6 +12,33 @@
 **Merge base:** current `main` above
 **Branch distance at baseline review:** 199 commits ahead of `main`, 0 behind
 **Three-dot diff at baseline review:** 648 files changed, 104,544 insertions, 8,189 deletions
+
+## 2026-10-29 — Typed identifier and cross-stack contract hardening — DONE + VALIDATED
+
+The original audit work was preserved as commit `28a350a3` (`refactor: harden typed identifier contracts`) and reconciled onto completion HEAD `499f255f` as `dc34b128`. The 65-file package cherry-picked without manual conflict resolution, including the files also changed by the newer new-Cave, storage, browser-E2E, and permission-policy packages.
+
+Implemented behavior:
+
+- Generic EF/reflection code no longer duplicates known CLR member names where typed access, `nameof`, or EF relationship metadata can express the contract. Reusable relationship metadata mechanics live in `Planarian.Model/Database/Extensions`, while domain-specific ownership policy remains in the interceptor/repositories.
+- A repository architecture contract prevents new raw EF/reflection member-name strings in the covered production paths and separately verifies the SaveChanges interceptor entity classification.
+- Finite backend-owned wire vocabularies that are mirrored in TypeScript are explicit and covered by `CrossStackStringContractTests`, including permissions, feature keys, revision/proposal states, tag roles, upload statuses, query operators, SignalR names, and API error types.
+- Client-only computed Cave distance is separated from persisted/server `FeatureKey` values, project-member selection is separated from database TagType values, and File type display names remain intentionally open-ended because accounts can configure them.
+- Export-field parsing accepts only defined server `FeatureKey` values, rejects numeric enum text/unknown keys/client pseudo-features, and preserves the existing case-insensitive compatibility behavior.
+- Settings State/County permission-filter endpoints validate the small supported filter vocabulary rather than allowing an unknown value to fall through to the unfiltered path. This remains a narrow endpoint-input contract layered on top of the newer centralized `PermissionPolicy`.
+- SignalR route/event names and Azure Blob error codes use centralized/typed contracts where appropriate, while external protocol/database identifiers that are compatibility boundaries remain explicit strings.
+- Durable data-access/testing guidance now records the typed-member/EF-metadata boundary and the cross-stack finite-string contract rule.
+
+Validation evidence on the exact reconciled tree:
+
+- Focused backend unit/architecture/permission slice: **56/56 passed**, covering typed identifier usage, cross-stack mirrors, EF metadata helpers, Settings permission-filter validation, SaveChanges interceptor coverage, and the current centralized permission policy.
+- TypeScript `tsc --noEmit`: **passed**.
+- Focused frontend Cave/Tag Jest slice: **30/30 passed**; frontend pretest also passed client-route generator **6/6** and CSP configuration **5/5**.
+- Real PostgreSQL/PostGIS SaveChanges/interceptor compatibility and ownership slice: **58/58 passed**.
+- Real PostgreSQL Settings permission-scope slice: **4/4 passed**.
+- Real PostgreSQL Cave read-integrity slice: **4/4 passed**, including the broad search/map/files/history/proposals/authoring no-domain-write contract.
+- Real PostgreSQL direct Cave-tag mutation: **1/1 passed**.
+- Export-field contract tests: **2/2 passed**.
+- No migration/model change was introduced. The focused validation was intentionally used instead of redundantly rerunning the already-green full backend/browser suites because the package's high-blast-radius interactions are directly exercised by the slices above.
 
 ## 2026-10-29 — Permission-policy centralization — DONE + VALIDATED
 

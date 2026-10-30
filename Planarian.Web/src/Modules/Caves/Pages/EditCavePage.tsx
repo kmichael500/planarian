@@ -8,6 +8,7 @@ import { CaveService } from "../Service/CaveService";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
+import { CaveProposalAuthoringConflictVm } from "../Models/CaveChangeRequestVm";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { caveToForm } from "../Helpers/CaveFormMapper";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
@@ -72,8 +73,8 @@ const EditCavePage: React.FC = () => {
       message.success(`'${values?.name}' has been updated successfully`);
       unsaved.markClean();
       navigate(`/caves/${cave?.id}`);
-    } catch (e: any) {
-      const error = e as ApiErrorResponse & { conflictKind?: string };
+    } catch (e: unknown) {
+      const error = e as ApiErrorResponse & Partial<CaveProposalAuthoringConflictVm>;
       if (error.statusCode === 409 && error.conflictKind === "PublishedCaveChanged") {
         message.warning("This Cave changed after you opened the editor. Reload before saving so you do not overwrite newer changes.");
       } else {
