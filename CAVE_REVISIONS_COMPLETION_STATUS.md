@@ -12,6 +12,43 @@
 **Merge base:** current `main` above
 **Historical branch-distance/diff statistics:** omitted from the live summary because they drift with each completion merge; use `git rev-list --left-right --count main...feature/cave-revisions-completion` and `git diff --stat main...feature/cave-revisions-completion` to obtain current values.
 
+## 2026-10-29 — Single post-v32 Cave Revisions migration consolidation
+
+The feature-only migration chain was consolidated into **one migration after the unmodified
+`20260831132210_v32` main baseline**: `20261029194500_CaveRevisionsCompletion`.
+The seven interim Cave revisions, feature-setting backfill, Reset cleanup, unified storage
+cleanup, new-Cave proposals, permission projection, and permission-identity migrations
+were not shipped/applied to any application database per the release constraint. Their
+custom SQL transformations, fail-closed checks, and reverse-order downgrade operations
+are preserved in the new migration. The final EF model snapshot remains unchanged.
+
+The exact v32 → feature migration and feature migration → v32 transition is now the only supported
+feature deployment/downgrade boundary. Migration tests that previously paused at
+intermediate unshipped schema steps now arrange legacy seed data in v32 before applying
+the feature migration. The pre-release-only retained-File/Reset-debt conversion
+intermediates are not a deployed upgrade path; final cleanup storage schema is tested
+directly from v32 instead. Existing v32 census/preservation, filename round trip,
+proposal downgrade refusal, feature-setting provenance, and permission-identity
+fail-closed coverage remain required.
+
+This changes only migration assembly and migration-test compatibility, not the
+application's Cave revision, proposal, File, or authorization runtime contracts.
+No existing application database was accessed. **Final migration-only validation:**
+`dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj -c Release --no-build --no-restore
+--filter 'FullyQualifiedName~MigrationUpgradeIntegrationTests|FullyQualifiedName~FeatureSettingMigrationIntegrationTests|FullyQualifiedName~FileMetadataMigrationIntegrationTests|FullyQualifiedName~FileOwnershipMigrationIntegrationTests|FullyQualifiedName~CurrentMainDatabasePreservationMigrationIntegrationTests'`
+passed **33/33** against disposable PostgreSQL/PostGIS. `dotnet build
+Planarian.Tests.Integration/Planarian.Tests.Integration.csproj -c Release --no-restore` passed
+with zero errors/warnings. EF `migrations list` identifies only v32 plus
+`20261029194500_CaveRevisionsCompletion`; `migrations has-pending-model-changes`
+reports no pending changes. Both forward and reverse EF-generated SQL scripts were
+compared to the seven-migration chain at pre-consolidation HEAD `95db8e6d`:
+after removing only history-row DML and transaction markers, the up (443 nonempty
+SQL lines) and down (166 nonempty SQL lines) are **exactly identical**.
+The final migration records a single `__EFMigrationsHistory` row.
+Repository docs validation and `git diff --check` also passed.
+The earlier full frontend/browser suites were not rerun because runtime, frontend,
+and browser implementation are unchanged by this migration-only adjustment.
+
 ## 2026-10-29 — Agent 4 final integration and acceptance — DONE + VALIDATED
 
 **Integration code SHA:** `f004ae48fcd88fbc415bb9cb4363794c2d52f418` on baseline

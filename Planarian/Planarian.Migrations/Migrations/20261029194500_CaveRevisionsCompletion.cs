@@ -1,16 +1,20 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Planarian.Migrations.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Adds Cave revision and proposal persistence, File metadata and cleanup,
+    /// authoring defaults, and tenant-safe permission contracts.
+    /// </summary>
     public partial class CaveRevisionsCompletion : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Cave revision and File schema
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Caves_Users_ReportedByUserId",
                 table: "Caves");
@@ -732,11 +736,520 @@ namespace Planarian.Migrations.Migrations
                 principalTable: "CaveRevisions",
                 principalColumns: new[] { "AccountId", "CaveId", "Id" },
                 onDelete: ReferentialAction.Restrict);
+
+            // Entrance feature defaults
+
+            // Track exact rows inserted by this migration. The deterministic FeatureSetting
+            // ID alone is not provenance: a preexisting setting can legitimately already
+            // have that ID, in which case Up must leave it alone and Down must not delete it.
+            migrationBuilder.CreateTable(
+                name: "__BackfillEntranceOtherFeatureSettingRows",
+                columns: table => new
+                {
+                    AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    FeatureSettingId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK___BackfillEntranceOtherFeatureSettingRows", x => x.AccountId);
+                });
+
+            migrationBuilder.Sql("""
+                WITH inserted AS (
+                    INSERT INTO "FeatureSettings" ("Id", "AccountId", "Key", "IsEnabled", "IsDefault", "CreatedOn")
+                    SELECT substr(md5(account."Id" || ':EnabledFieldEntranceOtherTags'), 1, 10),
+                           account."Id", 'EnabledFieldEntranceOtherTags', true, false, NOW()
+                    FROM "Accounts" AS account
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM "FeatureSettings" AS setting
+                        WHERE setting."AccountId" = account."Id"
+                          AND setting."Key" = 'EnabledFieldEntranceOtherTags')
+                    RETURNING "Id", "AccountId"
+                )
+                INSERT INTO "__BackfillEntranceOtherFeatureSettingRows" ("AccountId", "FeatureSettingId")
+                SELECT "AccountId", "Id"
+                FROM inserted;
+                """);
+
+            // Durable account cleanup
+
+            migrationBuilder.CreateTable(
+                name: "AccountResetCleanupTargets",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    StoragePartition = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    StorageKey = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    IsContainer = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccountResetCleanupTargets", x => x.Id);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId",
+                table: "AccountResetCleanupTargets",
+                column: "AccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId_StoragePartition_Stora~",
+                table: "AccountResetCleanupTargets",
+                columns: new[] { "AccountId", "StoragePartition", "StorageKey", "IsContainer" },
+                unique: true);
+
+            // File and account storage cleanup
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_AccountResetCleanupTargets",
+                table: "AccountResetCleanupTargets");
+
+            migrationBuilder.DropIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId",
+                table: "AccountResetCleanupTargets");
+
+            migrationBuilder.DropIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId_StoragePartition_Stora~",
+                table: "AccountResetCleanupTargets");
+
+            migrationBuilder.RenameTable(
+                name: "AccountResetCleanupTargets",
+                newName: "StorageCleanupTargets");
+
+            migrationBuilder.AddColumn<string>(
+                name: "Purpose",
+                table: "StorageCleanupTargets",
+                type: "character varying(100)",
+                maxLength: 100,
+                nullable: false,
+                defaultValue: "AccountReset");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_StorageCleanupTargets",
+                table: "StorageCleanupTargets",
+                column: "Id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StorageCleanupTargets_AccountId_Purpose",
+                table: "StorageCleanupTargets",
+                columns: new[] { "AccountId", "Purpose" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StorageCleanupTargets_AccountId_StoragePartition_StorageKey~",
+                table: "StorageCleanupTargets",
+                columns: new[] { "AccountId", "StoragePartition", "StorageKey", "IsContainer", "Purpose" },
+                unique: true);
+
+            // Preserve File storage addresses as durable cleanup debt before dropping
+            // temporary retained-object metadata.
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE
+                    retained record;
+                    candidate_id text;
+                    salt integer;
+                BEGIN
+                    FOR retained IN
+                        SELECT * FROM "RetainedCaveFileObjects"
+                        ORDER BY "AccountId" COLLATE "C", "FileId" COLLATE "C"
+                    LOOP
+                        IF EXISTS (
+                            SELECT 1 FROM "StorageCleanupTargets" target
+                            WHERE target."AccountId" = retained."AccountId"
+                              AND target."StoragePartition" = retained."StoragePartition"
+                              AND target."StorageKey" = retained."StorageKey"
+                              AND target."IsContainer" = false
+                              AND target."Purpose" = 'CaveAssetRemoval'
+                        ) THEN
+                            CONTINUE;
+                        END IF;
+
+                        salt := 0;
+                        LOOP
+                            candidate_id := substring(md5(
+                                retained."Id" || ':' || retained."AccountId" || ':' ||
+                                retained."StoragePartition" || ':' || retained."StorageKey" || ':' || salt::text
+                            ) from 1 for 10);
+                            EXIT WHEN NOT EXISTS (
+                                SELECT 1 FROM "StorageCleanupTargets" target
+                                WHERE target."Id" = candidate_id
+                            );
+                            salt := salt + 1;
+                        END LOOP;
+
+                        INSERT INTO "StorageCleanupTargets"
+                            ("Id", "AccountId", "StoragePartition", "StorageKey", "IsContainer", "Purpose",
+                             "CreatedByUserId", "ModifiedByUserId", "CreatedOn", "ModifiedOn")
+                        VALUES
+                            (candidate_id, retained."AccountId", retained."StoragePartition", retained."StorageKey",
+                             false, 'CaveAssetRemoval', retained."CreatedByUserId", retained."ModifiedByUserId",
+                             retained."CreatedOn", retained."ModifiedOn");
+                    END LOOP;
+                END $$;
+                """);
+
+            migrationBuilder.DropTable(
+                name: "RetainedCaveFileObjects");
+
+            // New Cave proposals
+
+            migrationBuilder.AlterColumn<string>(
+                name: "BaseRevisionId",
+                table: "CaveProposalVersions",
+                type: "character varying(10)",
+                maxLength: 10,
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "character varying(10)",
+                oldMaxLength: 10);
+
+            // Permission projection
+
+            // UserCavePermissions
+            migrationBuilder.Sql("""
+            DROP VIEW IF EXISTS "UserCavePermissions";
+            """);
+
+            migrationBuilder.Sql("""
+            CREATE
+            OR REPLACE VIEW "UserCavePermissions" AS
+            SELECT cp."AccountId",
+                   cp."UserId",
+                   c."Id" AS "CaveId",
+                   NULL::character varying AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   c."StateId"             AS "StateId"
+            FROM "CavePermission" cp
+                JOIN "Caves" c
+            ON c."AccountId"::text = cp."AccountId"::text AND
+                (cp."CaveId" IS NOT NULL AND cp."CaveId"::text = c."Id"::text OR
+                cp."CountyId" IS NOT NULL AND cp."CountyId"::text = c."CountyId"::text OR
+                cp."StateId" IS NOT NULL AND cp."StateId"::text = c."StateId"::text OR
+                cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
+                JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
+            WHERE p."PermissionType"::text = 'Cave'::text
+              AND p."Key"::text IN ('View'::text, 'Manager'::text)
+            UNION
+            SELECT cp."AccountId",
+                   cp."UserId",
+                   NULL::character varying AS "CaveId",
+                   ct."Id"                 AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   ct."StateId"            AS "StateId"
+            FROM "CavePermission" cp
+                JOIN "Counties" ct
+            ON ct."AccountId"::text = cp."AccountId"::text AND
+                (cp."CountyId" IS NOT NULL AND cp."CountyId"::text = ct."Id"::text OR
+                cp."StateId" IS NOT NULL AND cp."StateId"::text = ct."StateId"::text OR
+                cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
+                JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
+            WHERE p."PermissionType"::text = 'Cave'::text
+              AND p."Key"::text IN ('View'::text, 'Manager'::text)
+            UNION
+            SELECT up."AccountId",
+                   up."UserId",
+                   c."Id" AS "CaveId",
+                   NULL::character varying AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   c."StateId"             AS "StateId"
+            FROM "UserPermissions" up
+                JOIN "Caves" c
+            ON c."AccountId"::text = up."AccountId"::text
+                CROSS JOIN "Permissions" p
+            WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
+                FROM "Permissions"
+                WHERE "Permissions"."Key"::text = 'Admin'::text
+                  AND "Permissions"."PermissionType"::text = 'User'::text))
+              AND p."PermissionType"::text = 'Cave'::text
+              AND p."Key"::text IN ('View'::text, 'Manager'::text)
+            UNION
+            SELECT up."AccountId",
+                   up."UserId",
+                   NULL::character varying AS "CaveId",
+                   ct."Id"                 AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   ct."StateId"            AS "StateId"
+            FROM "UserPermissions" up
+                JOIN "Counties" ct
+            ON ct."AccountId"::text = up."AccountId"::text
+                CROSS JOIN "Permissions" p
+            WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
+                FROM "Permissions"
+                WHERE "Permissions"."Key"::text = 'Admin'::text
+                  AND "Permissions"."PermissionType"::text = 'User'::text))
+              AND p."PermissionType"::text = 'Cave'::text
+              AND p."Key"::text IN ('View'::text, 'Manager'::text);
+            """);
+
+            // Unique permission identity
+
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "Permissions"
+                        GROUP BY "PermissionType", "Key"
+                        HAVING COUNT(*) > 1
+                    ) THEN
+                        RAISE EXCEPTION
+                            'Cannot enforce permission identity because duplicate (PermissionType, Key) rows exist.';
+                    END IF;
+                END
+                $$;
+                """);
+
+            migrationBuilder.DropIndex(
+                name: "IX_Permissions_PermissionType_Key",
+                table: "Permissions");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Permissions_PermissionType_Key",
+                table: "Permissions",
+                columns: new[] { "PermissionType", "Key" },
+                unique: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Unique permission identity
+
+            migrationBuilder.DropIndex(
+                name: "IX_Permissions_PermissionType_Key",
+                table: "Permissions");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Permissions_PermissionType_Key",
+                table: "Permissions",
+                columns: new[] { "PermissionType", "Key" });
+
+            // Permission projection
+
+            // UserCavePermissions
+            migrationBuilder.Sql("""
+            DROP VIEW IF EXISTS "UserCavePermissions";
+            """);
+
+            migrationBuilder.Sql("""
+            CREATE
+            OR REPLACE VIEW "UserCavePermissions" AS
+            SELECT cp."AccountId",
+                   cp."UserId",
+                   c."Id" AS "CaveId",
+                   NULL::character varying AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   c."StateId"             AS "StateId"
+            FROM "CavePermission" cp
+                JOIN "Caves" c
+            ON c."AccountId"::text = cp."AccountId"::text AND
+                (cp."CaveId" IS NOT NULL AND cp."CaveId"::text = c."Id"::text OR
+                cp."CountyId" IS NOT NULL AND cp."CountyId"::text = c."CountyId"::text OR
+                cp."StateId" IS NOT NULL AND cp."StateId"::text = c."StateId"::text OR
+                cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
+                JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
+            WHERE p."PermissionType"::text = 'Cave'::text
+            UNION
+            SELECT cp."AccountId",
+                   cp."UserId",
+                   NULL::character varying AS "CaveId",
+                   ct."Id"                 AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   ct."StateId"            AS "StateId"
+            FROM "CavePermission" cp
+                JOIN "Counties" ct
+            ON ct."AccountId"::text = cp."AccountId"::text AND
+                (cp."CountyId" IS NOT NULL AND cp."CountyId"::text = ct."Id"::text OR
+                cp."StateId" IS NOT NULL AND cp."StateId"::text = ct."StateId"::text OR
+                cp."CaveId" IS NULL AND cp."CountyId" IS NULL AND cp."StateId" IS NULL)
+                JOIN "Permissions" p ON cp."PermissionId"::text = p."Id"::text
+            WHERE p."PermissionType"::text = 'Cave'::text
+            UNION
+            SELECT up."AccountId",
+                   up."UserId",
+                   c."Id" AS "CaveId",
+                   NULL::character varying AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   c."StateId"             AS "StateId"
+            FROM "UserPermissions" up
+                JOIN "Caves" c
+            ON c."AccountId"::text = up."AccountId"::text
+                CROSS JOIN "Permissions" p
+            WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
+                FROM "Permissions"
+                WHERE "Permissions"."Key"::text = 'Admin'::text))
+              AND p."PermissionType"::text = 'Cave'::text
+            UNION
+            SELECT up."AccountId",
+                   up."UserId",
+                   NULL::character varying AS "CaveId",
+                   ct."Id"                 AS "CountyId",
+                   p."Key"                 AS "PermissionKey",
+                   p."Id"                  AS "PermissionId",
+                   ct."StateId"            AS "StateId"
+            FROM "UserPermissions" up
+                JOIN "Counties" ct
+            ON ct."AccountId"::text = up."AccountId"::text
+                CROSS JOIN "Permissions" p
+            WHERE (up."PermissionId"::text IN (SELECT "Permissions"."Id"
+                FROM "Permissions"
+                WHERE "Permissions"."Key"::text = 'Admin'::text))
+              AND p."PermissionType"::text = 'Cave'::text;
+            """);
+
+            // New Cave proposals
+
+            // A creation proposal has no published base revision, so it cannot be represented by
+            // the pre-feature schema. Fail closed with an actionable message instead of relying on
+            // an incidental NOT NULL violation from ALTER TABLE.
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "CaveProposalVersions"
+                        WHERE "BaseRevisionId" IS NULL
+                    ) THEN
+                        RAISE EXCEPTION
+                            'Cannot downgrade CaveRevisionsCompletion while new-Cave proposal versions exist.';
+                    END IF;
+                END
+                $$;
+                """);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "BaseRevisionId",
+                table: "CaveProposalVersions",
+                type: "character varying(10)",
+                maxLength: 10,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "character varying(10)",
+                oldMaxLength: 10,
+                oldNullable: true);
+
+            // File and account storage cleanup
+
+            // Ordinary File-cleanup targets are the only durable addresses for bytes awaiting
+            // deletion. Refuse to erase or reinterpret that cleanup debt during a downgrade.
+            migrationBuilder.Sql("""
+                DO $$ BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM "StorageCleanupTargets"
+                        WHERE "Purpose" IN ('CaveAssetRemoval', 'UnpublishedFileRemoval')
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot downgrade with pending File storage cleanup';
+                    END IF;
+                END $$;
+                """);
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_StorageCleanupTargets",
+                table: "StorageCleanupTargets");
+
+            migrationBuilder.DropIndex(
+                name: "IX_StorageCleanupTargets_AccountId_Purpose",
+                table: "StorageCleanupTargets");
+
+            migrationBuilder.DropIndex(
+                name: "IX_StorageCleanupTargets_AccountId_StoragePartition_StorageKey~",
+                table: "StorageCleanupTargets");
+
+            migrationBuilder.DropColumn(
+                name: "Purpose",
+                table: "StorageCleanupTargets");
+
+            migrationBuilder.RenameTable(
+                name: "StorageCleanupTargets",
+                newName: "AccountResetCleanupTargets");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_AccountResetCleanupTargets",
+                table: "AccountResetCleanupTargets",
+                column: "Id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId",
+                table: "AccountResetCleanupTargets",
+                column: "AccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountResetCleanupTargets_AccountId_StoragePartition_Stora~",
+                table: "AccountResetCleanupTargets",
+                columns: new[] { "AccountId", "StoragePartition", "StorageKey", "IsContainer" },
+                unique: true);
+
+            migrationBuilder.CreateTable(
+                name: "RetainedCaveFileObjects",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    FileId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    StorageKey = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    StoragePartition = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RetainedCaveFileObjects", x => x.Id);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RetainedCaveFileObjects_AccountId_CaveId",
+                table: "RetainedCaveFileObjects",
+                columns: new[] { "AccountId", "CaveId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RetainedCaveFileObjects_AccountId_FileId",
+                table: "RetainedCaveFileObjects",
+                columns: new[] { "AccountId", "FileId" },
+                unique: true);
+
+            // Durable account cleanup
+
+            // Downgrading with pending targets would erase the only durable addresses
+            // of blobs still awaiting deletion. Require cleanup first.
+            migrationBuilder.Sql("""
+                DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM "AccountResetCleanupTargets") THEN
+                        RAISE EXCEPTION 'Cannot downgrade with pending account reset cleanup';
+                    END IF;
+                END $$;
+                """);
+            migrationBuilder.DropTable(
+                name: "AccountResetCleanupTargets");
+
+            // Entrance feature defaults
+
+            migrationBuilder.Sql("""
+                DELETE FROM "FeatureSettings" AS setting
+                USING "__BackfillEntranceOtherFeatureSettingRows" AS inserted
+                WHERE setting."AccountId" = inserted."AccountId"
+                  AND setting."Id" = inserted."FeatureSettingId"
+                  AND setting."Key" = 'EnabledFieldEntranceOtherTags';
+                """);
+
+            migrationBuilder.DropTable(
+                name: "__BackfillEntranceOtherFeatureSettingRows");
+
+            // Cave revision and File schema
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Caves_CaveRevisions_AccountId_Id_CurrentRevisionId",
                 table: "Caves");

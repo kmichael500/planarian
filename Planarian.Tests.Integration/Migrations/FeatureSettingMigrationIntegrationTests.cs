@@ -1,7 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Planarian.Model.Database.Entities.RidgeWalker;
-using Planarian.Model.Shared;
 using Xunit;
 using static Planarian.Tests.MigrationTestSupport;
 
@@ -16,12 +13,10 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
     public async Task EntranceOtherBackfillRollbackPreservesEveryPreexistingOverride(
         bool useGeneratedIdCollision)
     {
-        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            $"{nameof(EntranceOtherBackfillRollbackPreservesEveryPreexistingOverride)}_{useGeneratedIdCollision}");
-        var completion = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
-        await database.MigrateAsync(completion);
-        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        // The v32 upgrade must preserve an existing
+        // override created before the upgrade.
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, $"{nameof(EntranceOtherBackfillRollbackPreservesEveryPreexistingOverride)}_{useGeneratedIdCollision}");
 
         await using (var seed = new NpgsqlConnection(database.ConnectionString))
         {
@@ -36,7 +31,7 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
                     @account, 'EnabledFieldEntranceOtherTags', false, false, now())
                 """, seed);
             command.Parameters.AddWithValue("collide", useGeneratedIdCollision);
-            command.Parameters.AddWithValue("account", account.AccountId);
+            command.Parameters.AddWithValue("account", "mainacct01");
             await command.ExecuteNonQueryAsync();
         }
 
@@ -54,7 +49,7 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
                 where setting."AccountId"=@account
                   and setting."Key"='EnabledFieldEntranceOtherTags'
                 """, afterUp);
-            command.Parameters.AddWithValue("account", account.AccountId);
+            command.Parameters.AddWithValue("account", "mainacct01");
             await using var reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.False(reader.GetBoolean(0));
@@ -62,24 +57,26 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
             Assert.True(reader.GetBoolean(2));
         }
 
-        await database.MigrateAsync(completion);
+        await database.MigrateAsync(CurrentMainBaselineMigration);
 
-        await using var verify = database.CreateDbContext("verify", account.AccountId);
-        var setting = await verify.FeatureSettings.SingleAsync(row =>
-            row.AccountId == account.AccountId &&
-            row.Key == FeatureKey.EnabledFieldEntranceOtherTags);
-        Assert.False(setting.IsEnabled);
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var commandAfterDown = new NpgsqlCommand("""
+            select "IsEnabled", "IsDefault"
+            from "FeatureSettings"
+            where "AccountId"='mainacct01' and "Key"='EnabledFieldEntranceOtherTags'
+            """, verify);
+        await using var restored = await commandAfterDown.ExecuteReaderAsync();
+        Assert.True(await restored.ReadAsync());
+        Assert.False(restored.GetBoolean(0));
+        Assert.False(restored.GetBoolean(1));
     }
 
     [Fact]
     public async Task EntranceOtherBackfillTracksAndRollsBackOnlyRowsItCreated()
     {
-        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(EntranceOtherBackfillTracksAndRollsBackOnlyRowsItCreated));
-        var completion = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
-        await database.MigrateAsync(completion);
-        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, nameof(EntranceOtherBackfillTracksAndRollsBackOnlyRowsItCreated));
 
         await database.MigrateAsync(null);
 
@@ -92,10 +89,9 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
                 from "FeatureSettings" setting
                 join "__BackfillEntranceOtherFeatureSettingRows" inserted
                   on inserted."AccountId" = setting."AccountId"
-                where setting."AccountId"=@account
+                where setting."AccountId"='mainacct01'
                   and setting."Key"='EnabledFieldEntranceOtherTags'
                 """, afterUp);
-            afterUpCommand.Parameters.AddWithValue("account", account.AccountId);
             await using var afterUpReader = await afterUpCommand.ExecuteReaderAsync();
             Assert.True(await afterUpReader.ReadAsync());
             Assert.True(afterUpReader.GetBoolean(0));
@@ -103,7 +99,7 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
             Assert.False(afterUpReader.GetBoolean(2));
         }
 
-        await database.MigrateAsync(completion);
+        await database.MigrateAsync(CurrentMainBaselineMigration);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
         await verify.OpenAsync();
@@ -111,10 +107,9 @@ public sealed class FeatureSettingMigrationIntegrationTests(PostgresTestServer f
             select
               not exists (
                 select 1 from "FeatureSettings"
-                where "AccountId"=@account and "Key"='EnabledFieldEntranceOtherTags'),
+                where "AccountId"='mainacct01' and "Key"='EnabledFieldEntranceOtherTags'),
               to_regclass('public."__BackfillEntranceOtherFeatureSettingRows"') is null
             """, verify);
-        command.Parameters.AddWithValue("account", account.AccountId);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.True(reader.GetBoolean(0));

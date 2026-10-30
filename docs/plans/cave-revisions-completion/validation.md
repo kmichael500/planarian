@@ -387,8 +387,9 @@ Acceptance conditions verified:
 - [x] Approval publishes the exact selected immutable proposal version.
 - [x] Rejection creates no published revision.
 
-- [x] Downgrade across `SupportNewCaveProposals` fails closed with an explicit compatibility error while any creation
-      proposal version has null `BaseRevisionId`; the failed downgrade leaves both schema and proposal data unchanged.
+- [x] Downgrade from the Cave Revisions completion migration to the `main` v32 boundary fails closed with an explicit
+      `SupportNewCaveProposals` compatibility error while a creation proposal version has null `BaseRevisionId`;
+      the failed downgrade leaves the feature schema, migration history, and proposal data unchanged.
 
 ### Architecture/security/compatibility
 - [x] Services/workflow coordinators do not acquire direct DbContext/Npgsql ownership.

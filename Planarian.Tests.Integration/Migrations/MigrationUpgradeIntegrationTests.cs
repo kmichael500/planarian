@@ -49,12 +49,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         var completion = migrations.FindIndex(migration =>
             migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
-        var backfill = migrations.FindIndex(migration =>
-            migration.EndsWith("_BackfillEntranceOtherFeatureSetting", StringComparison.Ordinal));
-
         Assert.True(baseline >= 0, $"Expected current main baseline migration {CurrentMainBaselineMigration} was not found.");
         Assert.Equal(baseline + 1, completion);
-        Assert.Equal(completion + 1, backfill);
+        Assert.Equal(migrations.Count - 1, completion);
 
         await database.MigrateAsync(migrations[baseline]);
         var v32Schema = await CapturePublicSchemaContractAsync(database);
@@ -198,11 +195,11 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         await using var database = await CreateCurrentMainV32DatabaseAsync(
             fixture, nameof(NewCaveProposalMigrationRefusesDowngradeWhileCreationProposalExists));
         var migrations = database.GetMigrationNames().ToList();
-        var supportIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_SupportNewCaveProposals", StringComparison.Ordinal));
-        Assert.True(supportIndex > 0);
+        var completion = migrations.Single(migration =>
+            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
+        Assert.Equal(completion, migrations.Last());
 
-        await database.MigrateAsync(migrations[supportIndex]);
+        await database.MigrateAsync(null);
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
@@ -224,9 +221,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         }
 
         var exception = await Assert.ThrowsAsync<PostgresException>(() =>
-            database.MigrateAsync(migrations[supportIndex - 1]));
+            database.MigrateAsync(CurrentMainBaselineMigration));
         Assert.Equal(PostgresErrorCodes.RaiseException, exception.SqlState);
-        Assert.Contains("Cannot downgrade SupportNewCaveProposals", exception.MessageText);
+        Assert.Contains("Cannot downgrade CaveRevisionsCompletion", exception.MessageText);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
         await verify.OpenAsync();
@@ -238,8 +235,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
                 exists(select 1 from "CaveProposalVersions"
                        where "Id"='newprop001' and "BaseRevisionId" is null),
                 exists(select 1 from "__EFMigrationsHistory"
-                       where "MigrationId" like '%_SupportNewCaveProposals')
+                       where "MigrationId" = @completion)
             """, verify);
+        command.Parameters.AddWithValue("completion", completion);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.True(reader.GetBoolean(0));
@@ -253,19 +251,8 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     {
         await using var database = await CreateCurrentMainV32DatabaseAsync(
             fixture, nameof(PermissionDomainMigrationRemovesMalformedAdminExpansionWithoutBreakingRealAdmin));
-        var migrations = database.GetMigrationNames().ToList();
-        var supportIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_SupportNewCaveProposals", StringComparison.Ordinal));
-        var hardeningIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_HardenPermissionDomainProjection", StringComparison.Ordinal));
-        var identityIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_EnforcePermissionDomainIdentity", StringComparison.Ordinal));
-        Assert.True(supportIndex >= 0);
-        Assert.Equal(supportIndex + 1, hardeningIndex);
-        Assert.Equal(hardeningIndex + 1, identityIndex);
-
-        await database.MigrateAsync(migrations[supportIndex]);
-
+        // Seed malformed and valid permissions in the existing v32 schema,
+        // then verify the Cave revisions upgrade tightens the projection.
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
@@ -314,7 +301,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             Assert.True(beforeReader.GetInt64(1) > 0);
         }
 
-        await database.MigrateAsync(migrations[hardeningIndex]);
+        await database.MigrateAsync(null);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
         await verify.OpenAsync();
@@ -330,8 +317,6 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         Assert.Equal(0, afterReader.GetInt64(0));
         Assert.True(afterReader.GetInt64(1) > 0);
         await afterReader.DisposeAsync();
-
-        await database.MigrateAsync(migrations[identityIndex]);
 
         await using var identityVerify = new NpgsqlConnection(database.ConnectionString);
         await identityVerify.OpenAsync();
@@ -359,16 +344,8 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     {
         await using var database = await CreateCurrentMainV32DatabaseAsync(
             fixture, nameof(PermissionDomainIdentityMigrationFailsClosedOnLegacySameDomainDuplicates));
-        var migrations = database.GetMigrationNames().ToList();
-        var hardeningIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_HardenPermissionDomainProjection", StringComparison.Ordinal));
-        var identityIndex = migrations.FindIndex(migration =>
-            migration.EndsWith("_EnforcePermissionDomainIdentity", StringComparison.Ordinal));
-        Assert.True(hardeningIndex >= 0);
-        Assert.Equal(hardeningIndex + 1, identityIndex);
-
-        await database.MigrateAsync(migrations[hardeningIndex]);
-
+        // Duplicates exist before upgrading v32; one atomic feature migration
+        // must refuse the entire upgrade without leaving any partial schema objects.
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
@@ -383,7 +360,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         }
 
         var failure = await Assert.ThrowsAsync<PostgresException>(
-            () => database.MigrateAsync(migrations[identityIndex]));
+            () => database.MigrateAsync(null));
         Assert.Equal("P0001", failure.SqlState);
         Assert.Contains("duplicate (PermissionType, Key) rows exist", failure.MessageText);
 
@@ -400,70 +377,51 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             )
             """, verify);
         Assert.False((bool)(await index.ExecuteScalarAsync())!);
+        await using var history = new NpgsqlCommand(
+            "select count(*) from \"__EFMigrationsHistory\" where \"MigrationId\" = @migration", verify);
+        history.Parameters.AddWithValue("migration", database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal)));
+        Assert.Equal(0L, await history.ExecuteScalarAsync());
+        await using var noFeatureTable = new NpgsqlCommand(
+            "select to_regclass('public.\"CaveRevisions\"') is null", verify);
+        Assert.True((bool)(await noFeatureTable.ExecuteScalarAsync())!);
     }
 
 
     [Fact]
-    public async Task StorageCleanupMigrationPreservesResetDebtAndConvertsRetainedFilesToAssetCleanupDebt()
+    public async Task CurrentMainV32UpgradeBuildsUnifiedCleanupSchemaWithoutTransientTables()
     {
-        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(StorageCleanupMigrationPreservesResetDebtAndConvertsRetainedFilesToAssetCleanupDebt));
-        var previous = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_AccountResetCleanupOutbox", StringComparison.Ordinal));
-        await database.MigrateAsync(previous);
-
-        await using (var connection = new NpgsqlConnection(database.ConnectionString))
-        {
-            await connection.OpenAsync();
-            await using var seed = new NpgsqlCommand("""
-                insert into "AccountResetCleanupTargets"
-                    ("Id","AccountId","StoragePartition","StorageKey","IsContainer","CreatedOn")
-                values ('sameid0001','mainacct01','portable-store','reset/pending',false,now());
-
-                insert into "RetainedCaveFileObjects"
-                    ("Id","AccountId","CaveId","FileId","StoragePartition","StorageKey","CreatedOn")
-                values ('sameid0001','mainacct01','maincave01','removed001','portable-store','files/removed.pdf',now());
-                """, connection);
-            await seed.ExecuteNonQueryAsync();
-        }
-
+        await using var database = await CreateCurrentMainV32DatabaseAsync(
+            fixture, nameof(CurrentMainV32UpgradeBuildsUnifiedCleanupSchemaWithoutTransientTables));
         await database.MigrateAsync(null);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
         await verify.OpenAsync();
-        await using (var rows = new NpgsqlCommand("""
-            select "Purpose", "StoragePartition", "StorageKey"
-            from "StorageCleanupTargets"
-            where "AccountId"='mainacct01'
-            order by "Purpose" collate "C", "StorageKey" collate "C"
-            """, verify))
-        await using (var reader = await rows.ExecuteReaderAsync())
-        {
-            var actual = new List<(string Purpose, string Partition, string Key)>();
-            while (await reader.ReadAsync())
-                actual.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
-            Assert.Equal(
-            [
-                ("AccountReset", "portable-store", "reset/pending"),
-                ("CaveAssetRemoval", "portable-store", "files/removed.pdf")
-            ], actual);
-        }
-
-        await using var removed = new NpgsqlCommand(
-            "select to_regclass('public.\"RetainedCaveFileObjects\"') is null", verify);
-        Assert.True((bool)(await removed.ExecuteScalarAsync())!);
+        await using var command = new NpgsqlCommand("""
+            select to_regclass('public."StorageCleanupTargets"') is not null,
+                   to_regclass('public."AccountResetCleanupTargets"') is null,
+                   to_regclass('public."RetainedCaveFileObjects"') is null,
+                   exists(select 1 from information_schema.columns
+                          where table_name='StorageCleanupTargets' and column_name='Purpose'),
+                   (select count(*) from "StorageCleanupTargets")
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.True(reader.GetBoolean(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.True(reader.GetBoolean(2));
+        Assert.True(reader.GetBoolean(3));
+        Assert.Equal(0L, reader.GetInt64(4));
     }
 
     [Theory]
     [InlineData("CaveAssetRemoval")]
     [InlineData("UnpublishedFileRemoval")]
+    [InlineData("AccountReset")]
     public async Task StorageCleanupMigrationRefusesDowngradeWhileOrdinaryFileCleanupDebtExists(string purpose)
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
             $"{nameof(StorageCleanupMigrationRefusesDowngradeWhileOrdinaryFileCleanupDebtExists)}_{purpose}");
-        var migrations = database.GetMigrationNames().ToList();
-        var previous = migrations.Single(migration =>
-            migration.EndsWith("_AccountResetCleanupOutbox", StringComparison.Ordinal));
         await database.MigrateAsync(null);
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
@@ -478,7 +436,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             await seed.ExecuteNonQueryAsync();
         }
 
-        await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(previous));
+        await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(CurrentMainBaselineMigration));
     }
 
 
