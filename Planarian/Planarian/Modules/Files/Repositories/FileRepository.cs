@@ -136,6 +136,13 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Called only after an object write/publication failed. A transaction may have rolled
+    /// back after EF accepted its tracked changes; never replay those changes while
+    /// recording independent object-cleanup responsibility.
+    /// </summary>
+    public void ForgetFailedObjectWriteTracking() => DbContext.ChangeTracker.Clear();
+
     public async Task<IReadOnlyList<StorageCleanupTarget>> QueueUnpublishedFileObjectCleanupAsync(
         IEnumerable<File> files, CancellationToken cancellationToken)
     {
@@ -271,7 +278,7 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     .Distinct(StringComparer.Ordinal).ToArray();
                 var normalizedPartition = partition.Key.ToLowerInvariant();
 
-                var ownKeys = await DbContext.Files.AsNoTracking()
+                var ownKeys = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
                     .Where(file => file.AccountId == RequestUser.AccountId &&
                                    file.BlobContainer != null &&
                                    file.BlobContainer.ToLower() == normalizedPartition &&

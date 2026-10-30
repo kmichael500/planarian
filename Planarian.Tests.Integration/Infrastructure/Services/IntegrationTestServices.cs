@@ -205,6 +205,7 @@ internal sealed class TestFileBlobStore : IObjectStorage
     private readonly HashSet<(string Container, string Key)> _deleteFailures = [];
 
     public bool FailWrites { get; set; }
+    public bool FailAfterCreate { get; set; }
     public bool FailDeletes { get; set; }
     public int DeleteIfExistsAttempts { get; private set; }
     public bool FailContainerDeletes { get; set; }
@@ -288,6 +289,7 @@ internal sealed class TestFileBlobStore : IObjectStorage
                 throw new IOException("The test object address already exists.");
             _content[(address.Partition, address.Key)] = copy.ToArray();
         }
+        if (FailAfterCreate) throw new IOException("The object was stored but upload acknowledgement was lost.");
     }
 
     public Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,

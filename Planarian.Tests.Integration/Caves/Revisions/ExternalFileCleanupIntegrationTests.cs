@@ -1,4 +1,6 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
@@ -12,6 +14,164 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AmbiguousStagedObjectCreateDoesNotLeaveUntrackedBytes(bool deletionFails)
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            $"{nameof(AmbiguousStagedObjectCreateDoesNotLeaveUntrackedBytes)}_{deletionFails}");
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.File, "Other", "other0000a");
+        var blobs = new TestFileBlobStore { FailAfterCreate = true, FailDeletes = deletionFails };
+
+        await using (var author = await CaveTestActor.CreateAsync(database, tenant.AccountId, "owner", blobs))
+        {
+            await using var content = new MemoryStream("persisted despite lost response"u8.ToArray());
+            await Assert.ThrowsAsync<IOException>(() => author.Services.Files.StageAuthoringFile(
+                content, "ambiguous.pdf", default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Empty(await verify.Files.Where(file => file.AccountId == tenant.AccountId).ToListAsync());
+        var debt = await verify.StorageCleanupTargets
+            .Where(target => target.AccountId == tenant.AccountId &&
+                             target.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval)
+            .ToListAsync();
+        if (deletionFails)
+        {
+            var target = Assert.Single(debt);
+            Assert.True(blobs.Contains(target.StoragePartition, target.StorageKey));
+            Assert.Equal("persisted despite lost response"u8.ToArray(),
+                blobs.Read(target.StoragePartition, target.StorageKey));
+
+            blobs.FailDeletes = false;
+            await using var retry = await CaveTestActor.CreateAsync(database, tenant.AccountId, "owner", blobs);
+            await retry.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([target.Id], default);
+        }
+        else
+        {
+            Assert.Empty(debt);
+        }
+        Assert.Empty(blobs.Keys);
+        verify.ChangeTracker.Clear();
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(target =>
+            target.AccountId == tenant.AccountId && target.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval));
+    }
+
+    [Fact]
+    public async Task AmbiguousDirectCaveUploadCannotPublishOrLoseCleanupResponsibility()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(AmbiguousDirectCaveUploadCannotPublishOrLoseCleanupResponsibility));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.File, "Other", "other0000a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+        var blobs = new TestFileBlobStore { FailAfterCreate = true, FailDeletes = true };
+
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager", blobs))
+        {
+            await using var content = new MemoryStream("direct upload payload"u8.ToArray());
+            await Assert.ThrowsAsync<IOException>(() =>
+                manager.Services.Files.UploadCaveFile(content, tenant.CaveId, "uncertain.pdf", default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.False(await verify.Files.AnyAsync(row => row.AccountId == tenant.AccountId &&
+                                                     row.CaveId == tenant.CaveId));
+        Assert.Equal(tenant.RevisionId, await verify.Caves.IgnoreQueryFilters()
+            .Where(row => row.AccountId == tenant.AccountId && row.Id == tenant.CaveId)
+            .Select(row => row.CurrentRevisionId).SingleAsync());
+        Assert.Single(await verify.CaveRevisions.IgnoreQueryFilters()
+            .Where(row => row.AccountId == tenant.AccountId && row.CaveId == tenant.CaveId).ToListAsync());
+
+        var target = Assert.Single(await verify.StorageCleanupTargets.Where(row =>
+            row.AccountId == tenant.AccountId &&
+            row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval).ToListAsync());
+        Assert.Equal("direct upload payload"u8.ToArray(),
+            blobs.Read(target.StoragePartition, target.StorageKey));
+
+        blobs.FailDeletes = false;
+        await using var retry = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager", blobs);
+        await retry.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([target.Id], default);
+        Assert.Empty(blobs.Keys);
+        verify.ChangeTracker.Clear();
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row => row.Id == target.Id));
+    }
+
+    [Fact]
+    public async Task LostCommitAcknowledgementDoesNotDeletePublishedFileOrReplayTrackedMutation()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(LostCommitAcknowledgementDoesNotDeletePublishedFileOrReplayTrackedMutation));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.File, "Other", "othercommit");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+        var blobs = new TestFileBlobStore();
+        var lostCommit = new LoseFirstCommitAcknowledgementInterceptor();
+        var bytes = "published even without acknowledgement"u8.ToArray();
+
+        await using (var db = database.CreateDbContext("manager", tenant.AccountId, lostCommit))
+        {
+            await CavePermissions.AuthenticateAsync(db, tenant.AccountId);
+            await using var content = new MemoryStream(bytes);
+            await Assert.ThrowsAnyAsync<Exception>(() =>
+                IntegrationTestServices.For(db, blobs).Files.UploadCaveFile(
+                    content, tenant.CaveId, "lost-commit.pdf", default));
+        }
+
+        Assert.True(lostCommit.Fired);
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var file = Assert.Single(await verify.Files.IgnoreQueryFilters()
+            .Where(row => row.AccountId == tenant.AccountId && row.CaveId == tenant.CaveId)
+            .ToListAsync());
+        Assert.Equal(bytes, blobs.Read(file.BlobContainer!, file.BlobKey!));
+        Assert.Single(blobs.Keys);
+        Assert.Equal(0, blobs.DeleteIfExistsAttempts);
+        Assert.Equal(2, await verify.CaveRevisions.IgnoreQueryFilters()
+            .CountAsync(row => row.AccountId == tenant.AccountId && row.CaveId == tenant.CaveId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+            row.AccountId == tenant.AccountId && row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval));
+    }
+
+    [Fact]
+    public async Task LostStagingSaveAcknowledgementPreservesCommittedFileAndObject()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(LostStagingSaveAcknowledgementPreservesCommittedFileAndObject));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.File, "Other", "otherstage");
+        var blobs = new TestFileBlobStore();
+        var lostSave = new LoseFirstFileSaveAcknowledgementInterceptor();
+        var bytes = "stage survived acknowledgement loss"u8.ToArray();
+
+        await using (var db = database.CreateDbContext("owner", tenant.AccountId, lostSave))
+        {
+            await CavePermissions.EnsureAccountUserAsync(db, tenant.AccountId);
+            await CavePermissions.AuthenticateAsync(db, tenant.AccountId);
+            await using var content = new MemoryStream(bytes);
+            await Assert.ThrowsAsync<IOException>(() =>
+                IntegrationTestServices.For(db, blobs).Files.StageAuthoringFile(
+                    content, "lost-stage.pdf", default));
+        }
+
+        Assert.True(lostSave.Fired);
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var file = Assert.Single(await verify.Files.IgnoreQueryFilters()
+            .Where(row => row.AccountId == tenant.AccountId && row.CaveId == null)
+            .ToListAsync());
+        Assert.NotNull(file.ExpiresOn);
+        Assert.Equal(bytes, blobs.Read(file.BlobContainer!, file.BlobKey!));
+        Assert.Single(blobs.Keys);
+        Assert.Equal(0, blobs.DeleteIfExistsAttempts);
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+            row.AccountId == tenant.AccountId && row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval));
+    }
+
     [Fact]
     public async Task CleanupAcknowledgementDoesNotDetachUnsavedCleanupDebt()
     {
@@ -236,5 +396,38 @@ public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixtu
         manager.Db.ChangeTracker.Clear();
         Assert.False(await manager.Db.StorageCleanupTargets.AnyAsync(item => item.Id == target.Id));
         Assert.False(blobs.Contains(partition, key));
+    }
+}
+
+internal sealed class LoseFirstCommitAcknowledgementInterceptor : DbTransactionInterceptor
+{
+    public bool Fired { get; private set; }
+
+    public override Task TransactionCommittedAsync(DbTransaction transaction,
+        TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+    {
+        if (!Fired)
+        {
+            Fired = true;
+            throw new IOException("PostgreSQL committed, but the application lost the acknowledgement.");
+        }
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class LoseFirstFileSaveAcknowledgementInterceptor : SaveChangesInterceptor
+{
+    public bool Fired { get; private set; }
+
+    public override ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData,
+        int result, CancellationToken cancellationToken = default)
+    {
+        if (!Fired && result > 0 && eventData.Context?.ChangeTracker.Entries<Planarian.Model.Database.Entities.RidgeWalker.File>()
+                .Any(entry => entry.Entity.BlobKey is not null) == true)
+        {
+            Fired = true;
+            throw new IOException("PostgreSQL saved the File, but the application lost the acknowledgement.");
+        }
+        return ValueTask.FromResult(result);
     }
 }

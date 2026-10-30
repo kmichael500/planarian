@@ -573,6 +573,102 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         Assert.Equal(versionId, reviewEvent.ProposalVersionId);
     }
 
+    [Fact]
+    public async Task ConcurrentDuplicateApprovalsCommitOneRevisionAndOneDecision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ConcurrentDuplicateApprovalsCommitOneRevisionAndOneDecision));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqualdup");
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.File, "Other", "otherapproval");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        var blobs = new TestFileBlobStore();
+        var fileBytes = "only one published object"u8.ToArray();
+        string requestId;
+        string versionId;
+        string fileId;
+        string partition;
+        string storageKey;
+        await using (var contributor = await CaveTestActor.CreateAsync(
+                         database, tenant.AccountId, "contributor", blobs))
+        {
+            requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Approve exactly once"), tenant.RevisionId, default);
+            await using var content = new MemoryStream(fileBytes);
+            fileId = (await contributor.Services.StageRequestFileForTestAsync(
+                requestId, content, "race.pdf", null, default)).Id;
+            versionId = await CurrentVersionAsync(contributor.Db, requestId);
+            var file = await contributor.Db.Files.SingleAsync(row => row.Id == fileId);
+            partition = file.BlobContainer!;
+            storageKey = file.BlobKey!;
+        }
+
+        var pause = new PauseChangeRequestUpdateInterceptor();
+        await using var firstDb = database.CreateDbContext("reviewer", tenant.AccountId, pause);
+        await using var secondDb = database.CreateDbContext("reviewer", tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(firstDb, tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(secondDb, tenant.AccountId);
+        await secondDb.Database.OpenConnectionAsync();
+        var secondPid = await PostgresLockAssertions.BackendPidAsync(secondDb);
+
+        var first = IntegrationTestServices.For(firstDb, blobs).CaveChangeRequests
+            .ApproveAsync(requestId, versionId, null, default);
+        await pause.ChangeRequestUpdateReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var duplicate = IntegrationTestServices.For(secondDb, blobs).CaveChangeRequests
+            .ApproveAsync(requestId, versionId, null, default);
+        try
+        {
+            await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, secondPid, duplicate);
+        }
+        finally
+        {
+            pause.ContinueUpdate.TrySetResult();
+        }
+
+        var approved = await first;
+        var loser = await CaptureAsync(duplicate);
+        Assert.Equal(CaveChangeRequestDecisionResult.Approved, approved.Result);
+        Assert.Null(loser.Decision);
+        Assert.IsType<CaveRevisionConflictException>(loser.Error);
+
+        // The client may have timed out after the first transaction committed.
+        // A fresh HTTP-equivalent retry must not publish a second revision.
+        await using (var retryDb = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(retryDb, tenant.AccountId);
+            var retried = await CaptureAsync(IntegrationTestServices.For(retryDb, blobs).CaveChangeRequests
+                .ApproveAsync(requestId, versionId, null, default));
+            Assert.Null(retried.Decision);
+            var terminal = Assert.IsType<ApiException>(retried.Error);
+            Assert.Equal(400, terminal.StatusCode);
+            Assert.Equal("This request has already been reviewed.", terminal.Message);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Approved, request.Status);
+        Assert.Equal(approved.PublishedRevisionId, request.ApprovedRevisionId);
+        Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
+        var reviewEvent = Assert.Single(await verify.CaveChangeRequestReviewEvents
+            .Where(row => row.ChangeRequestId == requestId).ToListAsync());
+        Assert.Equal(CaveChangeRequestReviewAction.Approved, reviewEvent.Action);
+        var publishedFile = await verify.Files.SingleAsync(row => row.Id == fileId);
+        Assert.Equal(tenant.CaveId, publishedFile.CaveId);
+        Assert.Null(publishedFile.ExpiresOn);
+        Assert.Equal((partition, storageKey), (publishedFile.BlobContainer, publishedFile.BlobKey));
+        Assert.False(await verify.CaveChangeRequestStagedFiles.AnyAsync(row => row.FileId == fileId));
+        var revision = await verify.CaveRevisions.SingleAsync(row => row.Id == approved.PublishedRevisionId);
+        Assert.Single(CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion).Files,
+            file => file.Id == fileId);
+        Assert.Single(blobs.Keys);
+        Assert.Equal(fileBytes, blobs.Read(partition, storageKey));
+    }
+
     private static async Task<(CaveChangeRequestDecisionVm? Decision, Exception? Error)> CaptureAsync(
         Task<CaveChangeRequestDecisionVm> task)
     {

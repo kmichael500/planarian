@@ -409,6 +409,46 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
     }
 
     [Fact]
+    public async Task UnprivilegedCleanupCannotDeleteBytesReferencedByHiddenLiveCaveFile()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(UnprivilegedCleanupCannotDeleteBytesReferencedByHiddenLiveCaveFile));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
+            fileId: "hiddenfl0a");
+        var blobs = new TestFileBlobStore();
+        blobs.Seed("test", "seed-a", [1, 2, 3]);
+
+        string cleanupId;
+        await using (var seed = database.CreateDbContext("cleanup-seeder", tenant.AccountId))
+        {
+            var debt = new StorageCleanupTarget
+            {
+                AccountId = tenant.AccountId,
+                StoragePartition = "test",
+                StorageKey = "seed-a",
+                Purpose = StorageCleanupPurpose.UnpublishedFileRemoval
+            };
+            seed.StorageCleanupTargets.Add(debt);
+            await seed.SaveChangesAsync();
+            cleanupId = debt.Id;
+        }
+
+        // Membership alone does not grant Cave View. Cleanup must bypass the
+        // read visibility filter but still qualify by AccountId.
+        await using (var otherMember = await CaveTestActor.CreateAsync(
+                         database, tenant.AccountId, "other-member", blobs))
+            await otherMember.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([cleanupId], default);
+
+        await using var verify = database.CreateDbContext("verify-hidden-cleanup", tenant.AccountId);
+        Assert.True(await verify.Files.IgnoreQueryFilters().AnyAsync(row =>
+            row.AccountId == tenant.AccountId && row.Id == file.FileId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row => row.Id == cleanupId));
+        Assert.True(blobs.Contains("test", "seed-a"));
+        Assert.Equal(0, blobs.DeleteIfExistsAttempts);
+    }
+
+    [Fact]
     public async Task CleanupTargetCannotDeleteBytesReferencedByForeignAccountLiveFile()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -711,6 +751,102 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         Assert.NotNull(file.ExpiresOn);
         Assert.Single(blobs.Keys);
     }
+
+    [Fact]
+    public async Task ConcurrentProposalsCannotClaimTheSameStagedFile()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ConcurrentProposalsCannotClaimTheSameStagedFile));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var location = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqualclaim");
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "otherclaim");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        var blobs = new TestFileBlobStore();
+
+        string fileId;
+        string fileTypeTagId;
+        string name;
+        await using (var author = await CaveTestActor.CreateAsync(database, tenant.AccountId,
+            "contributor", blobs))
+        {
+            await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("shared bytes"));
+            var staged = await author.Services.Files.StageAuthoringFile(content, "shared.pdf", default);
+            fileId = staged.Id;
+            fileTypeTagId = staged.FileTypeTagId;
+            name = staged.Name!;
+        }
+
+        var values = PublishableValues(tenant, location.Id, "Claim once");
+        values.Files = [new EditFileMetadataVm
+        {
+            Id = fileId,
+            FileTypeTagId = fileTypeTagId,
+            Name = name
+        }];
+
+        await using var blocker = database.CreateDbContext("blocker", tenant.AccountId);
+        await using var lockTransaction = await blocker.Database.BeginTransactionAsync();
+        await blocker.Files.FromSqlInterpolated(
+                $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {tenant.AccountId} AND \"Id\" = {fileId} FOR UPDATE")
+            .IgnoreQueryFilters().SingleAsync();
+
+        await using var first = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs);
+        await using var second = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs);
+        await first.Db.Database.OpenConnectionAsync();
+        await second.Db.Database.OpenConnectionAsync();
+        var firstPid = await PostgresLockAssertions.BackendPidAsync(first.Db);
+        var secondPid = await PostgresLockAssertions.BackendPidAsync(second.Db);
+
+        var createOne = first.ChangeRequests.CreateAsync(tenant.CaveId, values, tenant.RevisionId, default);
+        var createTwo = second.ChangeRequests.CreateAsync(tenant.CaveId, values, tenant.RevisionId, default);
+        try
+        {
+            await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, firstPid, createOne);
+            await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, secondPid, createTwo);
+        }
+        finally
+        {
+            await lockTransaction.CommitAsync();
+        }
+
+        var outcomes = await Task.WhenAll(CaptureClaimAsync(createOne), CaptureClaimAsync(createTwo));
+        Assert.Single(outcomes.Where(result => result.RequestId is not null));
+        var rejected = Assert.IsType<Planarian.Library.Exceptions.ApiException>(
+            Assert.Single(outcomes.Where(result => result.Error is not null)).Error);
+        Assert.Equal(400, rejected.StatusCode);
+        Assert.Equal("The staged file is already bound to another change request.", rejected.Message);
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var winnerRequestId = Assert.Single(outcomes.Where(result => result.RequestId is not null)).RequestId;
+        var association = Assert.Single(await verify.CaveChangeRequestStagedFiles
+            .Where(row => row.FileId == fileId).ToListAsync());
+        Assert.Equal(winnerRequestId, association.ChangeRequestId);
+        var persistedRequest = Assert.Single(await verify.CaveChangeRequests
+            .Where(row => row.CaveId == tenant.CaveId).ToListAsync());
+        Assert.Equal(winnerRequestId, persistedRequest.Id);
+        Assert.Single(await verify.CaveProposalVersions
+            .Where(row => row.ChangeRequestId == winnerRequestId).ToListAsync());
+        Assert.Equal(1, await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
+        var stagedFile = await verify.Files.SingleAsync(row => row.Id == fileId);
+        Assert.Null(stagedFile.CaveId);
+        Assert.NotNull(stagedFile.ExpiresOn);
+        Assert.Single(blobs.Keys);
+    }
+
+    private static async Task<(string? RequestId, Exception? Error)> CaptureClaimAsync(Task<string> creation)
+    {
+        try
+        {
+            return (await creation, null);
+        }
+        catch (Exception exception)
+        {
+            return (null, exception);
+        }
+    }
+
     [Fact]
     public async Task GenericStagedFileCannotBeReadOrDeletedByAnotherAccountUser()
     {

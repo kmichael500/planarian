@@ -107,14 +107,14 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = tagTypeId
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
-        var objectCreated = false;
+        var objectCreationAttempted = false;
 
         try
         {
             if (stream.CanSeek) stream.Position = 0;
+            objectCreationAttempted = true;
             await _objectStorage.CreateAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
-            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -132,9 +132,10 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            // Compensate only if this request completed object creation. A create-only collision
-            // belongs to another File and must never cause deletion of the pre-existing bytes.
-            if (objectCreated) await BestEffortDeleteObjectAsync(address);
+            // Object creation or the following database commit may have succeeded despite
+            // a lost acknowledgement. Never directly delete a potentially live File object.
+            if (objectCreationAttempted)
+                await ReconcileUncertainObjectCreateAsync(entity, address);
             throw;
         }
 
@@ -176,7 +177,7 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = tagTypeId
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
-        var objectCreated = false;
+        var objectCreationAttempted = false;
 
         try
         {
@@ -185,9 +186,9 @@ public class FileService : ServiceBase<FileRepository>
             var sourceContainer = await GetBlobContainerClient(RequestUser.AccountContainerName,
                 createIfNotExists: false);
             await using var source = await OpenBlobReadStream(sourceContainer, sourceBlobKey, cancellationToken);
+            objectCreationAttempted = true;
             await _objectStorage.CreateAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
-            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -205,7 +206,8 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            if (objectCreated) await BestEffortDeleteObjectAsync(address);
+            if (objectCreationAttempted)
+                await ReconcileUncertainObjectCreateAsync(entity, address);
             throw;
         }
 
@@ -310,14 +312,14 @@ public class FileService : ServiceBase<FileRepository>
             ExpiresOn = DateTime.UtcNow.AddDays(10)
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
-        var objectCreated = false;
+        var objectCreationAttempted = false;
 
         try
         {
             if (stream.CanSeek) stream.Position = 0;
+            objectCreationAttempted = true;
             await _objectStorage.CreateAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
-            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -329,7 +331,8 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            if (objectCreated) await BestEffortDeleteObjectAsync(address);
+            if (objectCreationAttempted)
+                await ReconcileUncertainObjectCreateAsync(entity, address);
             throw;
         }
 
@@ -575,6 +578,31 @@ public class FileService : ServiceBase<FileRepository>
 
         await Repository.SaveChangesAsync(cancellationToken);
         return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private async Task ReconcileUncertainObjectCreateAsync(File file, StorageObjectAddress address)
+    {
+        // A failed request may have stored bytes, committed a File row, or neither:
+        // provider and database acknowledgements can both be lost. Always reconcile
+        // through durable cleanup and live-reference checks, never direct deletion.
+        // Discard tracked transaction state before saving cleanup debt, or a rolled-back
+        // aggregate mutation might inadvertently be saved without its revision.
+        try
+        {
+            Repository.ForgetFailedObjectWriteTracking();
+            file.BlobContainer = address.Partition;
+            file.BlobKey = address.Key;
+            var targets = await Repository.QueueUnpublishedFileObjectCleanupAsync([file], CancellationToken.None);
+            await Repository.SaveChangesAsync(CancellationToken.None);
+            await CleanupUnpublishedFileRemovalTargetsAsync(
+                targets.Select(target => target.Id), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Unable to reconcile uncertain object creation for account {AccountId} at {StorageKey}",
+                RequestUser.AccountId, address.Key);
+        }
     }
 
     private async Task BestEffortDeleteObjectAsync(StorageObjectAddress address)
