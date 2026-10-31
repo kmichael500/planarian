@@ -47,7 +47,6 @@ const MiscAccountSettings = ({
     const fetchData = async () => {
       try {
         const settings = await AccountService.GetSettings();
-        // Set initial form values
         form.setFieldsValue(settings);
       } catch (error) {
         message.error("Error fetching settings.");

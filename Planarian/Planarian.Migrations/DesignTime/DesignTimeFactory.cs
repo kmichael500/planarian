@@ -12,9 +12,7 @@ public class DbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlanarianD
         var basePath = Directory.GetCurrentDirectory();
         var builder = new ConfigurationBuilder()
             .SetBasePath(basePath)
-            // A clean checkout (including CI) intentionally has no local migration
-            // settings file. Model inspection does not open a database connection,
-            // so keep the file optional and use a harmless design-time fallback.
+            // Clean checkouts have no local migration settings; model inspection can use a harmless fallback.
             .AddJsonFile("appsettings.Migrations.json", optional: true)
             .AddEnvironmentVariables();
 

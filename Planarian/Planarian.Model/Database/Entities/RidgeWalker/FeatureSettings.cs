@@ -38,8 +38,6 @@ public class FeatureSettingConfiguration : BaseEntityTypeConfiguration<FeatureSe
 
 }
 
-
-
 public enum FeatureKey
 {
     #region Cave Features
@@ -65,10 +63,7 @@ public enum FeatureKey
     EnabledFieldCaveOtherTags,
     EnabledFieldCaveNarrative,
 
-
     #endregion
-
-    #region Entrance Features
 
     EnabledFieldEntranceCoordinates,
     EnabledFieldEntranceElevation,
@@ -82,8 +77,6 @@ public enum FeatureKey
     EnabledFieldEntranceHydrologyTags,
     EnabledFieldEntranceDescription,
     EnabledFieldEntranceOtherTags
-
-    #endregion
 
     ,
     ExportEnabled

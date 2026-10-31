@@ -5,10 +5,7 @@ using Xunit;
 
 namespace Planarian.Tests.Unit.Caves.Revisions;
 
-/// <summary>
-/// Drift guard for the authoring contract. Persistence semantics are exercised by the real-PostgreSQL
-/// field-lifecycle integration tests; this class makes a newly added authoring field an explicit test decision.
-/// </summary>
+/// <summary>Drift guard requiring every authoring-contract field to be classified by the tests.</summary>
 public sealed class CaveAuthoringFieldCoverageTests
 {
     [Fact]

@@ -16,10 +16,9 @@ internal sealed record CaveRevisionRolloutResult(DateTime RevisionHistoryStarted
     int BatchCount, bool AlreadyComplete);
 
 /// <summary>
-/// One-time deployment bootstrap for Cave revision history. This is deliberately separate from ordinary request
-/// publication so a legacy Cave's first revision always means "revision history starts here", never "someone happened
-/// to open the editor first". The command is resumable while only rollout baselines exist, and fails closed after live
-/// revision publication has begun.
+/// One-time deployment bootstrap for Cave revision history. Keeping baseline creation outside request publication
+/// prevents ordinary editor traffic from establishing a legacy Cave's history boundary. The command is resumable while
+/// only rollout baselines exist and fails closed after live revision publication has begun.
 /// </summary>
 internal sealed class CaveRevisionRolloutRepository
 {

@@ -282,8 +282,8 @@ public sealed class CavePermissionMatrixIntegrationTests(PostgresTestServer fixt
             await seed.SaveChangesAsync();
             await CavePermissions.EnsureAccountUserAsync(seed, accountId);
 
-            // Deliberately bypass normal permission-management invariants. Authorization must
-            // reject the opposite PermissionType, cross-domain role keys, and unsupported future roles.
+            // Bypass permission-management invariants to verify authorization rejects the opposite
+            // PermissionType, cross-domain role keys, and unsupported future roles.
             seed.CavePermissions.AddRange(
                 new CavePermission
                 {

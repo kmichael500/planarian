@@ -42,9 +42,7 @@ public sealed class DataGeneratorIntegrationTests(PostgresTestServer fixture) : 
         await db.TagTypes.CountAsync(),
         await db.FeatureSettings.CountAsync());
 
-    // DataGenerator writes global reference data. Deliberately suppress the normal
-    // Planarian SaveChangesInterceptor so this test exercises PostgreSQL transaction
-    // rollback rather than application authorization.
+    // Suppress the tenant interceptor so this global-data test isolates PostgreSQL rollback.
     private sealed class TestSeedDbContext(DbContextOptions<PlanarianDbContext> options)
         : PlanarianDbContext(options)
     {

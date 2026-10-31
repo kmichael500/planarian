@@ -18,7 +18,7 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     [MaxLength(PropertyLength.Max)] public string AlternateNames { get; private set; } = "[]";
-    public int CountyNumber { get; set; } // max of highest cave number in county + 1
+    public int CountyNumber { get; set; }
     public double? LengthFeet { get; set; }
     public double? DepthFeet { get; set; }
     public double? MaxPitDepthFeet { get; set; }
@@ -115,11 +115,10 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasGeneratedTsVectorColumn<Cave>(
-            e => e.NarrativeSearchVector, // The computed column property
-            "english", // The text search configuration
-            e => e.Narrative // The source property for full-text search
+            e => e.NarrativeSearchVector,
+            "english",
+            e => e.Narrative
         );
-        // Create a GIN index on the generated tsvector column.
         builder.HasIndex(e => e.NarrativeSearchVector)
             .HasMethod("GIN");
 

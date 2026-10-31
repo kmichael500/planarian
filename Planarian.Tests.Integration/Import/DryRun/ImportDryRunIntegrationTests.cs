@@ -19,14 +19,12 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
     [InlineData(true)]
     public async Task CaveDryRunPlanningAndPreviewPersistNothing(bool sync)
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             $"{nameof(CaveDryRunPlanningAndPreviewPersistNothing)}_{sync}");
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var writes = new RejectWriteCommandInterceptor();
 
-        // Act
         await using (var db = database.CreateDbContext("a", tenant.AccountId, writes))
         {
             var import = new CaveImportTestHarness(db, db.RequestUser);
@@ -39,7 +37,6 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
             Assert.Single(plan.CountyCreations);
         }
 
-        // Assert
         Assert.Equal(before, await NormalizedDatabaseState.CaptureAllAsync(database));
         Assert.Empty(writes.Commands);
     }
@@ -49,14 +46,12 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
     [InlineData(true)]
     public async Task EntranceDryRunPlanningAndPreviewPersistNothing(bool sync)
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             $"{nameof(EntranceDryRunPlanningAndPreviewPersistNothing)}_{sync}");
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var writes = new RejectWriteCommandInterceptor();
 
-        // Act
         await using (var db = database.CreateDbContext("a", tenant.AccountId, writes))
         {
             var import = new EntranceImportTestHarness(db, db.RequestUser);
@@ -70,7 +65,6 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
                                                      tag.Name == "Distinctive");
         }
 
-        // Assert
         Assert.Equal(before, await NormalizedDatabaseState.CaptureAllAsync(database));
         Assert.Empty(writes.Commands);
     }

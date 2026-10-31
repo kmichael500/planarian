@@ -579,9 +579,7 @@ sealed class DevelopmentSeedDbContext(DbContextOptions<PlanarianDbContext> optio
 {
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Intentionally do not call PlanarianDbContext.OnConfiguring: this context seeds
-        // global reference data before an account/request user exists, so the normal
-        // tenant-aware SaveChangesInterceptor must not be installed here.
+        // Skip PlanarianDbContext.OnConfiguring: global seed data has no request tenant, so install no tenant interceptor.
         optionsBuilder.EnableSensitiveDataLogging();
     }
 }

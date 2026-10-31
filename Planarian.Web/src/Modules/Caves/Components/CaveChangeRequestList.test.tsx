@@ -68,7 +68,7 @@ it("surfaces stale requests as needing re-review without hiding their scope", ()
   expect(screen.getByText("2 cave fields · 1 file")).toBeInTheDocument();
 });
 
-it("uses an intentional reviewer-queue empty state", () => {
+it("shows the reviewer-queue empty state", () => {
   render(<MemoryRouter><CaveChangeRequestList requests={[]} review /></MemoryRouter>);
 
   expect(screen.getByText("No review submissions found")).toBeInTheDocument();

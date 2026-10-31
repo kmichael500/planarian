@@ -15,7 +15,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task ExistingLocationQualityAndStatusAreReusedAndPersistCanonicalNames()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ExistingLocationQualityAndStatusAreReusedAndPersistCanonicalNames));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -27,12 +26,10 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         var import = new EntranceImportTestHarness(db, db.RequestUser);
         var csv = EntranceCsv("Case,A01,1,true,35,-86,500,  survey grade  ,0,\"open, OPEN\",,,,,");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         await import.ExecuteAsync(plan, "case.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Empty(plan.TagCreations);
         var planned = Assert.Single(plan.Entrances);
         Assert.Equal((quality.Id, "Survey Grade"),
@@ -48,7 +45,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task CaseVariantsAcrossRowsCreateAndPersistOneEntranceTag()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaseVariantsAcrossRowsCreateAndPersistOneEntranceTag));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -57,11 +53,9 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
             "Primary,A01,1,true,35,-86,500,Survey Grade,0,Open,,,,,,",
             "Other,A01,1,false,35.1,-86.1,510,survey grade,0,OPEN,,,,,,");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         await import.ExecuteAsync(plan, "variants.csv");
 
-        // Assert
         var status = Assert.Single(plan.TagCreations, tag => tag.Key == TagTypeKeyConstant.EntranceStatus);
         Assert.Equal("Open", status.Name);
         Assert.All(plan.Entrances, entrance => Assert.Equal(status.Id, Assert.Single(entrance.Tags).TagTypeId));
@@ -72,7 +66,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task ForeignCustomEntranceTagIsNotAssociatedAndLocalIntentPersists()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(ForeignCustomEntranceTagIsNotAssociatedAndLocalIntentPersists));
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
@@ -81,13 +74,11 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             EntranceCsv("Case,A01,1,true,35,-86,500,Survey Grade,0,open,,,,,,"),
             syncExisting: false);
         await import.ExecuteAsync(plan, "foreign.csv");
 
-        // Assert
         var local = Assert.Single(plan.TagCreations, tag => tag.Key == TagTypeKeyConstant.EntranceStatus);
         Assert.NotEqual(foreign.Id, local.Id);
         Assert.Contains(Assert.Single(plan.Entrances).Tags, tag => tag.TagTypeId == local.Id);
@@ -97,7 +88,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task FullInsertPersistsScalarsTagsAndPostgisXyz()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(FullInsertPersistsScalarsTagsAndPostgisXyz));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -105,13 +95,11 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         var csv = EntranceCsv("Main,A01,1,true,35.123456,-86.654321,612.5,Survey Grade,22.5," +
                               "Open,Wet,Sink,2026-08-01,Surveyor,Full description,Distinctive");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         var planned = Assert.Single(plan.Entrances);
         await import.ExecuteAsync(plan, "full.csv");
         var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
 
-        // Assert
         var entrance = Assert.Single(snapshot.Entrances);
         Assert.Equal((planned.Id, "Main", true), (entrance.Id, entrance.Name, entrance.IsPrimary));
         Assert.Equal(35.123456, entrance.Latitude!.Value, 6);
@@ -133,7 +121,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task SyncReplacementPersistsOnePrimaryAndPublishesRevision()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncReplacementPersistsOnePrimaryAndPublishesRevision));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await EntranceTestData.AddEntranceAsync(database, tenant, "existing00");
@@ -144,13 +131,11 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         var csv = EntranceCsv("Replacement,A01,1,true,35.2,-86.2,520,Survey Grade,7.5," +
                               "Open,Wet,Sink,2026-08-02,Surveyor,Replacement description,Replacement Other");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
         var planned = Assert.Single(plan.Entrances);
         await import.ExecuteAsync(plan, "replace.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Equal(0, Assert.Single(plan.CreatePreview()).EntranceCountChange);
         var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var entrance = Assert.Single(snapshot.Entrances);
@@ -172,7 +157,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task SyncPreservesUnrelatedCaveAggregateAndRevisionPointer()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncPreservesUnrelatedCaveAggregateAndRevisionPointer));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await EntranceTestData.AddEntranceAsync(database, tenant, "existing00");
@@ -203,14 +187,12 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         var before = await snapshots.BuildAsync(unrelated.CaveId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             EntranceCsv("Replacement,A01,1,true,35.2,-86.2,520,Survey Grade,0,,,,,,,"),
             syncExisting: true);
         await import.ExecuteAsync(plan, "sync.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         var after = await snapshots.BuildAsync(unrelated.CaveId);
         Assert.Equal(CaveSnapshotJson.Serialize(before), CaveSnapshotJson.Serialize(after));
         var persisted = await db.Caves.IgnoreQueryFilters().AsNoTracking()
@@ -221,7 +203,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     [Fact]
     public async Task CommitAbortsIfTargetCaveChangesAfterPlanning()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CommitAbortsIfTargetCaveChangesAfterPlanning));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         EntranceImportPlan plan;
@@ -241,7 +222,6 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var execution = new EntranceImportTestHarness(db, db.RequestUser);
 
-        // Act / Assert
         await Assert.ThrowsAsync<CaveRevisionConflictException>(() => execution.ExecuteAsync(plan, "conflict.csv"));
         Assert.Empty(await db.Entrances.IgnoreQueryFilters().Where(row => row.CaveId == tenant.CaveId).ToListAsync());
     }

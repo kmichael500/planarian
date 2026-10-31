@@ -11,9 +11,7 @@ function ConfirmEmailPage() {
   const location = useLocation();
   const { refreshSession } = useContext(AppContext);
   const code = new URLSearchParams(location.search).get("code");
-  // Confirmation is intentionally automatic on page load. React StrictMode re-runs mount
-  // effects in development, so remember the attempted code for this mounted page to avoid
-  // submitting the same one-time confirmation code twice and showing contradictory feedback.
+  // StrictMode re-runs mount effects in development; do not consume a one-time code twice.
   const attemptedCodeRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {

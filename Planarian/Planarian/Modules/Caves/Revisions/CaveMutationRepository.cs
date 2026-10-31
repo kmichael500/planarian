@@ -10,12 +10,8 @@ namespace Planarian.Modules.Caves.Revisions;
 public sealed record CaveMutationResult(string CaveId, string? RevisionId, bool CreatedRevision);
 
 /// <summary>
-/// Captures the revision pointer/history state and the live published snapshot
-/// before a caller-owned transaction mutates a Cave aggregate. The previous
-/// revision snapshot is intentionally kept separate from the live snapshot:
-/// publication compares against immutable accepted history rather than assuming
-/// the current relational projection still matches the prior revision. Dedicated
-/// TagType/County label administration publishes its own affected-Cave revisions.
+/// Captures accepted revision state separately from live Cave state so publication compares against
+/// immutable history rather than assuming the current relational projection still matches it.
 /// </summary>
 public sealed record CaveMutationPreparation(
     string CaveId,
@@ -37,12 +33,7 @@ public sealed class CaveMutationRepository
         _snapshots = snapshots;
     }
 
-    /// <summary>
-    /// Executes relational Cave publication work inside the shared scoped transaction.
-    /// The outermost repository call owns begin/commit/rollback; nested workflow composition
-    /// (for example approval publishing Cave state plus request state) joins that transaction.
-    /// </summary>
-
+    /// <summary>Joins the current transaction when present; otherwise owns begin/commit/rollback.</summary>
     public async Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
@@ -51,10 +42,12 @@ public sealed class CaveMutationRepository
         return await ExecuteOwnedTransactionAsync(work, cancellationToken);
     }
 
+    /// <summary>Requires transaction ownership and fails if the DbContext already has a transaction.</summary>
     public Task ExecuteOwnedTransactionAsync(Func<CancellationToken, Task> work,
         CancellationToken cancellationToken = default) =>
         ExecuteOwnedTransactionAsync(async token => { await work(token); return true; }, cancellationToken);
 
+    /// <summary>Requires transaction ownership and fails if the DbContext already has a transaction.</summary>
     public async Task<T> ExecuteOwnedTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
@@ -75,11 +68,6 @@ public sealed class CaveMutationRepository
         }
     }
 
-    /// <summary>
-    /// Convenience path for a small synchronous Cave mutation. The coordinator
-    /// owns the transaction and delegates revision publication to the same
-    /// prepare/publish primitives used by larger service transactions.
-    /// </summary>
     public async Task<CaveMutationResult> PublishExistingAsync(string caveId, string? expectedRevisionId,
         CaveRevisionSource source, CaveRevisionOperation operation, Action<Cave> write,
         string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default)
@@ -104,10 +92,8 @@ public sealed class CaveMutationRepository
     }
 
     /// <summary>
-    /// Prepares an existing Cave for a larger mutation whose transaction is
-    /// already owned by the caller (manager edit, file publication, hard delete,
-    /// approval, etc.). Baseline establishment is therefore part of the same
-    /// atomic unit as the eventual write.
+    /// Captures the accepted revision and live snapshot for an existing Cave inside
+    /// the caller-owned mutation transaction. Missing rollout history fails closed.
     /// </summary>
     public async Task<CaveMutationPreparation> PrepareExistingAsync(string caveId, string? expectedRevisionId = null,
         CancellationToken cancellationToken = default)
@@ -118,8 +104,7 @@ public sealed class CaveMutationRepository
         var cave = await GetOwnedCaveAsync(caveId, cancellationToken);
         if (tracked is not null)
         {
-            // This DbContext may have loaded the Cave before waiting on County or TagType locks. EF tracking
-            // queries preserve already-tracked values, so refresh before evaluating the expected revision.
+            // A Cave may have been tracked before County/TagType locks; refresh it before checking the expected revision.
             await tracked.ReloadAsync(cancellationToken);
             cave = tracked.Entity;
         }
@@ -132,10 +117,8 @@ public sealed class CaveMutationRepository
     }
 
     /// <summary>
-    /// Publishes the post-mutation snapshot while the caller's transaction is
-    /// still active. No revision is created for a semantic no-op. The current
-    /// pointer must still match the preparation so stale/reentrant publication
-    /// fails instead of silently forking history.
+    /// Publishes the post-mutation snapshot in the caller transaction. Semantic no-ops create no revision,
+    /// and the current revision must still match the preparation.
     /// </summary>
     public async Task<CaveMutationResult> PublishPreparedAsync(CaveMutationPreparation preparation,
         CaveRevisionSource source, CaveRevisionOperation operation, string? changeRequestId = null,
@@ -160,10 +143,6 @@ public sealed class CaveMutationRepository
         return new CaveMutationResult(cave.Id, revision.Id, true);
     }
 
-    /// <summary>
-    /// Publishes the first revision for a Cave that the caller has already
-    /// persisted inside its active transaction.
-    /// </summary>
     public async Task<CaveMutationResult> PublishPersistedNewAsync(string caveId, CaveRevisionSource source,
         CaveRevisionOperation operation = CaveRevisionOperation.Create, string? changeRequestId = null,
         string? importBatchId = null, CancellationToken cancellationToken = default)
@@ -184,10 +163,7 @@ public sealed class CaveMutationRepository
     }
 
     /// <summary>
-    /// Writes a final tombstone revision after the caller has removed the Cave
-    /// aggregate but before its transaction commits. The tombstone stores the
-    /// live snapshot captured immediately before deletion, including effective
-    /// shared-reference labels, and remains linked to the prior revision.
+    /// Writes the final tombstone after relational removal, using the pre-delete live snapshot and prior revision link.
     /// </summary>
     public async Task<CaveMutationResult> PublishPreparedDeleteAsync(CaveMutationPreparation preparation,
         CaveRevisionSource source, string? changeRequestId = null, string? importBatchId = null,

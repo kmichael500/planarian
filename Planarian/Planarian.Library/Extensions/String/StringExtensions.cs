@@ -51,10 +51,6 @@ public static class StringExtensions
         return char.ToLowerInvariant(input[0]) + input.Substring(1);
     }
 
-    /// <summary>
-    /// Converts an enumerable of strings into a comma-separated string with "and" before the last element.
-    /// For example, { "apple", "banana", "cherry" } becomes "apple, banana, and cherry".
-    /// </summary>
     public static string ToCommaSeparatedString(this IEnumerable<string>? items)
     {
         if (items == null)
@@ -76,11 +72,6 @@ public static class StringExtensions
         return $"{allButLast}, and {last}";
     }
 
-    /// <summary>
-    /// Returns the specified default value if the string is null or consists only of whitespace;
-    /// otherwise returns the original string.
-    /// Default value is "-" unless specified otherwise.
-    /// </summary>
     public static string DefaultIfNullOrWhiteSpace(this string? input, string defaultValue = "-")
     {
         return string.IsNullOrWhiteSpace(input) ? defaultValue : input;

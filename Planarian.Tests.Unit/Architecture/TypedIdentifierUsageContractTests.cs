@@ -16,7 +16,7 @@ public sealed class TypedIdentifierUsageContractTests
             Path.Combine(root, "Planarian", "Planarian.Library")
         };
         var violations = new List<string>();
-        // Exact-contract nameof(...) lookups are intentionally allowed. The architecture rule rejects duplicated
+        // Exact-contract nameof(...) lookups are allowed. The architecture rule rejects duplicated
         // raw member spellings; generic relationship code is separately exercised against EF model metadata.
         var patterns = new[]
         {

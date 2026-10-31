@@ -18,7 +18,6 @@ public class CaveExportDto
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; }
         
-    // Tag groups
     public List<string> GeologyTags { get; set; } = [];
     public List<string> MapStatusTags { get; set; } = [];
     public List<string> GeologicAgeTags { get; set; } = [];
@@ -29,6 +28,5 @@ public class CaveExportDto
     public List<string> CaveReportedByTags { get; set; } = [];
     public List<string> CaveOtherTags { get; set; } = [];
         
-    // Entrances for this cave.
     public List<EntranceExportDto> Entrances { get; set; } = [];
 }

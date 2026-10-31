@@ -30,7 +30,7 @@ function showBootstrapError(): void {
 }
 
 function configureBootstrap(): void {
-  // Remove bearer credentials left by the pre-cookie browser authentication flow.
+  // Clear legacy bearer credentials before cookie-authenticated startup.
   localStorage.removeItem("token");
 
   const baseUrl = resolveApiBaseUrl({

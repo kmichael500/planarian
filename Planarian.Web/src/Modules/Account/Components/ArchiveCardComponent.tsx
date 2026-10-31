@@ -214,8 +214,7 @@ const ArchiveCardComponent: React.FC = () => {
                 ) : null}
             >
                 <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                    {/* Intentional: after a successful archive completes, keep the success state visible
-                        and hide the create action until the page is reloaded. */}
+                    {/* Keep completion visible and suppress another create action until reload. */}
                     <Typography.Paragraph>
                         Create and download an archive of your account data,
                         including caves, entrances, files, and line plots.

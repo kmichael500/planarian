@@ -10,7 +10,7 @@ interface DialogModalProps {
   onClose?: () => void;
   header?: string | React.ReactNode | (string | React.ReactNode)[];
   footer?: string | React.ReactNode | (string | React.ReactNode)[];
-  footerStyle?: React.CSSProperties; // New prop for footer style override
+  footerStyle?: React.CSSProperties;
   headerStyle?: React.CSSProperties;
   contentStyle?: React.CSSProperties;
   children?: React.ReactNode;
@@ -41,7 +41,6 @@ export function PlanarianModal({
 
   const [shouldRenderChildren, setShouldRenderChildren] = useState(false);
 
-  // For responsive full-screen on small devices
   const screens = useBreakpoint();
   const finalFullScreen = !screens.md || fullScreen;
 
@@ -61,12 +60,10 @@ export function PlanarianModal({
     ? [footerItems]
     : [];
 
-  // The first header item goes on the left, the rest on the right
   const leftHeaderItem = headerContent[0];
   const rightHeaderItems = headerContent.slice(1);
 
   const handleClose = () => {
-    // Restore scroll
     document.body.style.position = "";
     document.body.style.top = "";
     document.body.style.width = "";
@@ -82,27 +79,21 @@ export function PlanarianModal({
     if (!dialog) return;
 
     if (open && !dialog.open) {
-      // Preserve current scroll
       scrollPositionRef.current = window.scrollY;
 
-      // Lock body scroll
       document.body.style.position = "fixed";
       document.body.style.top = `-${scrollPositionRef.current}px`;
       document.body.style.width = "100%";
 
-      // Show the <dialog> now
       dialog.showModal();
 
-      // Wait until next frame so the dialog is definitely "open",
-      // then render children
+      // Delay child mounting until the native dialog is open.
       requestAnimationFrame(() => {
         setShouldRenderChildren(true);
       });
     } else if (!open && dialog.open) {
-      // Hide children right away
       setShouldRenderChildren(false);
 
-      // Then close the <dialog>
       dialog.close();
     }
   }, [open]);
@@ -128,7 +119,6 @@ export function PlanarianModal({
 
   const handleDialogClick: React.MouseEventHandler<HTMLDialogElement> = (e) => {
     if (dialogRef.current && e.target === dialogRef.current) {
-      // The user clicked outside the content
       onClose?.();
     }
   };
@@ -143,7 +133,6 @@ export function PlanarianModal({
         top: finalFullScreen ? "unset" : "50%",
         left: finalFullScreen ? "unset" : "50%",
         transform: finalFullScreen ? "none" : "translate(-50%, -50%)",
-        // Use flex layout to pin header/footer and scroll the content area
         display: "flex",
         flexDirection: "column",
         width: computedWidth,
@@ -189,10 +178,8 @@ export function PlanarianModal({
             alignItems: "center",
           }}
         >
-          {/* Left header item (if any) */}
           <div style={{ marginRight: "auto", minWidth: 0 }}>{leftHeaderItem}</div>
 
-          {/* Right side items + close button */}
           <Space>
             {rightHeaderItems.map((item, index) => (
               <div key={index}>{item}</div>

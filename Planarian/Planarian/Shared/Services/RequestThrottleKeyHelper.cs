@@ -24,9 +24,8 @@ public static class RequestThrottleKeyHelper
 
     public static string GetClientIpAddress(HttpContext? httpContext)
     {
-        // This is safe for the current direct-hosted deployment. If the app is later placed
-        // behind Cloudflare or another reverse proxy, forwarded-header middleware must be
-        // configured so RemoteIpAddress resolves to the actual client IP instead of the proxy.
+        // RemoteIpAddress is authoritative only after deployment proxy handling. Azure App Service
+        // startup requires forwarded headers so this resolves to the client rather than the proxy.
         var ipAddress = NormalizeIpAddress(httpContext?.Connection.RemoteIpAddress);
         if (string.IsNullOrWhiteSpace(ipAddress))
         {

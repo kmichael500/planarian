@@ -388,8 +388,7 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         // Only invalidate connections targeting this test's temporary database.
-        // Clearing all Npgsql pools here can interfere with other test classes
-        // that deliberately share the same process-level PostGIS container.
+        // Clearing all Npgsql pools can interfere with test classes sharing the process-level PostGIS container.
         using (var databaseConnection = new NpgsqlConnection(ConnectionString))
             NpgsqlConnection.ClearPool(databaseConnection);
 

@@ -2,7 +2,7 @@
 
 Destructive workflows deserve separate documentation because the safety question is not merely "did the database transaction succeed?" They often cross PostgreSQL and object storage.
 
-## General rule
+## Ordering
 
 When deletion affects both relational state and external objects:
 
@@ -115,7 +115,6 @@ responsibility before their original targets are purged. This preflight fails cl
 storage untouched rather than committing an unsafe or unrecoverable purge. Cross-tenant reference checks operate in
 bounded key batches to avoid one query per stored object.
 
-That ordering is intentional.
 
 ## Reset Account partial-success contract and recovery
 
@@ -129,8 +128,8 @@ crashes and failures leave durable targets for the administrator's
 `GET /api/account/reset/cleanup` status survives page refresh.
 
 Until all targets are cleared, the account's mutating HTTP requests are
-rejected. This matters: a retry must not erase new files uploaded into a
-previously deleted container or reuse an object key. Reads remain available.
+rejected so a retry cannot erase new files uploaded into a previously deleted
+container or reuse an object key. Reads remain available.
 The account's identity, users and feature settings remain intact.
 
 Reset and account archive creation use PostgreSQL **session-level advisory
@@ -151,7 +150,7 @@ account container**, even if the key does not appear in this account's own File
 table. Cleanup retries re-check foreign live-File references before deleting.
 The preflight and cleanup reference queries are bounded in key batches.
 
-Account container deletion intentionally removes stored archives, temporary
+Account container deletion removes stored archives, temporary
 archives and import transport files. Azure acknowledges the container-delete
 request before all physical cleanup necessarily finishes; a successful API result
 means the storage provider accepted the deletion, not that every byte is already
@@ -169,44 +168,21 @@ Storage operations and Postgres commits are not a distributed transaction;
 unavailability can leave recorded cleanup debt. Do not claim stronger
 guarantees without a deployment-level audit of every writer.
 
-## Account container also contains archives
+## Archives and Reset Account
 
-ArchiveJobCoordinator writes recent archives under the same account container using an archives/ prefix.
-
-ResetAccount removes the whole account container after relational reset.
-
-Therefore stored server-side account archives are currently removed by Reset Account as part of that container deletion.
-
-**Decision:** archives are intentionally deleted during Reset Account. They are
-current-state exports, not a protected recovery/backup channel. The UI explicitly
-warns that stored archives are deleted, and the integration tests assert that
-Account A's archive objects disappear while Account B's remain. Previously
-downloaded archive copies outside Planarian are unaffected.
+Server-side account archives share the account container and are deleted by Reset Account. They are current-state exports, not a protected recovery channel. Previously downloaded copies outside Planarian are unaffected.
 
 ## Archive jobs
 
-ArchiveJobCoordinator is a background in-process coordinator for account archive generation.
+`ArchiveJobCoordinator` publishes current-state account exports through Azure Blob Storage. Archive jobs use unique job-scoped temporary/final keys and an exclusive per-account archive lease so current application replicas do not publish or delete the same archive namespace concurrently. Final publication is atomic and refuses to overwrite an existing final object; ambiguous publication outcomes are reconciled against storage before success or failure is reported.
 
-It:
+Temporary/prune cleanup failure does not turn an already-published archive into a failed export. Stale temporary cleanup is age-gated for mixed-version rollout safety. Cleanup must also avoid temporary sources still needed by pending legacy copies. Large File exports use bounded-memory, source-version-pinned reads and fail the unpublished archive if a source changes mid-entry. This archive path remains Azure-specific and is separate from the provider-neutral `IObjectStorage` Cave/File boundary.
 
-- creates temporary archive objects;
-- writes current-state archive content;
-- promotes temp to final archive;
-- keeps a bounded recent set;
-- deletes old archives;
-- handles cancellation/cleanup.
-
-Each current-version archive operation uses a unique job-scoped key beneath both `archives/temp/` and `archives/`, so it cannot collide with another current job or with the historical timestamp-only key shape during a rolling deployment. The completed temporary archive is published with Azure server-side block-from-URI staging rather than relaying the archive through the Planarian process: `StageBlockFromUriAsync` copies source ranges into uncommitted destination blocks, every source request is ETag-pinned, and one `CommitBlockListAsync` guarded by `If-None-Match: *` makes the final blob visible atomically without overwriting an existing destination. The source URI carries a backend-only, blob-scoped, read-only service SAS generated fresh per block with a maximum one-hour validity interval; Planarian never returns that SAS to a browser. This is deliberately separate from the removed client-facing SAS file-access model. If publication fails after the final commit may have reached storage, the coordinator reconciles the temp and final bytes: identical content is treated as an idempotent success, a missing final is a known failure, a different final fails closed without overwrite, and an unverifiable result preserves the completed temp as recovery/cleanup debt. Uncommitted destination blocks from a pre-commit failure are not included by normal archive listing and Azure expires abandoned uncommitted blocks after seven days.
-
-Failure to delete a successfully published temporary object or prune an older archive does **not** retroactively report that completed export as failed; the extra object is safe storage debt and a later archive job retries cleanup. In addition to the shared maintenance lease, archive generation takes a separate exclusive per-account archive-job advisory lease, so new-version application replicas serialize archive jobs for that account. Archive deletion takes the same lease, preventing a delete handled by another current-version replica from racing publication. Legacy async-copy destinations are listed/downloaded/deleted only after their Blob Copy operation succeeds; ordinary uploads are identified by the absence of a Copy ID rather than by the emulator-sensitive CopyStatus enum alone. Failed/aborted legacy copy destinations are hidden from users and become best-effort cleanup candidates on a later archive job, while genuine pending copies remain protected. Abandoned `archives/temp/` cleanup also requires the temp object to be at least seven days old before another job may delete it and refuses to remove the source of a genuine pending legacy copy. That grace period is intentionally conservative: during a rolling deployment an older replica does not yet take the new archive-job lock, so a fresh temp object cannot safely be assumed abandoned merely because the new replica does not own it. Cancellation/failure cleanup of the current job's own temp key remains best-effort; an undeleted partial temporary archive is retried by a later job after it becomes stale.
-
-This path still uses Azure-specific Blob APIs and is **not** part of the provider-neutral IObjectStorage Cave/File boundary.
-
-The current implementation is a **current-state export**: `ExportService` writes `caves.csv`, `entrances.csv`, current live Cave Files, current CaveGeoJson line plots, and `missing-files.csv` when needed. A current File row with a missing storage key/container, a container that does not match the selected account, or an unavailable blob is represented in the missing-file manifest rather than silently omitted or resolved through another tenant's container. File generation uses a bounded eight-file prefetch window only for payloads up to 8 MiB each; larger blobs stream one at a time from an ETag-pinned seekable Azure read stream into the tar, avoiding both multi-gigabyte process buffers and local spool-file requirements. A large source that changes or disappears after tar writing begins fails the unpublished archive job rather than allowing generation to continue after a partial tar entry. Archive listing is also non-creating: reading an account with no Blob container returns no archives without manufacturing an empty container. Archive generation intentionally holds a shared maintenance lease so ordinary account authoring can continue; it is therefore **not** a transactionally frozen point-in-time snapshot across PostgreSQL and Blob Storage. Concurrent authoring may cause the export to observe nearby current states, and a payload removed during generation can appear in `missing-files.csv`. It does not export CaveRevision history, proposal/review history, or `StorageCleanupTarget` operational debt, and no restore workflow is defined. It should therefore not be described to users as a complete disaster-recovery backup unless that contract is expanded.
+Archives contain current Cave/Entrance data, current live Cave Files, current line plots, and a missing-file manifest when needed. They do not contain Cave revision history, proposal/review history, or cleanup debt, and archive generation is not a transactionally frozen snapshot across PostgreSQL and Blob Storage. No restore workflow is defined; archives are not a disaster-recovery backup.
 
 ## External cleanup failure model
 
-A safe destructive workflow should make these states understandable:
+The destructive workflow has four relational/external outcomes:
 
 | Relational result | External delete | Interpretation |
 | --- | --- | --- |
@@ -216,15 +192,3 @@ A safe destructive workflow should make these states understandable:
 | not committed | succeeds | **unsafe ordering; avoid** |
 
 The architecture is designed around the first three states.
-
-## Read the code in this order
-
-1. CaveService.DeleteCave
-2. CaveRepository.LockForHardDeleteAsync
-3. CaveRepository.DeleteAggregateForHardDeleteAsync
-4. CaveMutationRepository.PublishPreparedDeleteAsync
-5. AccountService.ResetAccount
-6. AccountRepository.ExecuteResetAsync
-7. AccountRepository.DeleteRevisionWorkflowForAccountAsync
-8. ArchiveJobCoordinator
-9. ImportService.Caves + CaveImportExecutionRepository sync deletion

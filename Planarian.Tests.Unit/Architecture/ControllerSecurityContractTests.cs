@@ -80,7 +80,7 @@ public sealed class ControllerSecurityContractTests
             if (isAllowlistedAnonymous)
             {
                 if (!allowsAnonymous)
-                    failures.Add($"{endpointId} is intentionally public but is not explicitly marked [AllowAnonymous].");
+                    failures.Add($"{endpointId} is a public endpoint but is not explicitly marked [AllowAnonymous].");
                 continue;
             }
 

@@ -7,7 +7,6 @@ export const TherionService = {
     const continuationPoints = readContinuationPoints(text);
     const stations = readStationPoints(text);
 
-    // Find the closest station for each continuation point
     continuationPoints.forEach((continuationPoint) => {
       continuationPoint.closestStation = findClosestStation(
         continuationPoint,
@@ -42,8 +41,6 @@ const readContinuationPoints = (text: string): ContinuationPoint[] => {
 
       const args = match[4];
 
-      // Extract argument name and value
-      // Extract argument name and value
       const argRegex = /(-[a-zA-Z]+)\s+(?:"([^"]+)"|(\S+))/g;
       for (const argMatch of args.matchAll(argRegex)) {
         const argName = argMatch[1].replace(/^-+/, "");
@@ -83,9 +80,6 @@ const readStationPoints = (text: string): Station[] => {
 
       const args = match[4];
 
-      // Extract argument name and value
-
-      // Extract argument name and value
       const argRegex = /(-[a-zA-Z]+)\s+(?:""([^""]+)""|(\S+))/g;
       for (const argMatch of Array.from(args.matchAll(argRegex))) {
         const argName = argMatch[1].replace(/-/g, "");
@@ -93,7 +87,7 @@ const readStationPoints = (text: string): Station[] => {
           ? argMatch[2].replace(/^"|"$/g, "")
           : argMatch[3];
 
-        argValue = argValue.replace(/^"|"$/g, ""); // remove leading and trailing quotes
+        argValue = argValue.replace(/^"|"$/g, "");
 
         if (argName === "name") {
           station.name = argValue;

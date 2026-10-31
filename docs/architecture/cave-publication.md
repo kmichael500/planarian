@@ -1,8 +1,7 @@
 # Cave publication
 
-This page explains the supported interactive Cave publication path: what is being mutated, where concurrency is checked, and how one accepted user action becomes one revision.
 
-The durable normative contract remains [Cave revision and proposal architecture](../cave-revisions.md).
+The durable normative contract remains [Cave revision and proposal invariants](../cave-revisions.md).
 
 ## Aggregate boundary
 
@@ -19,7 +18,7 @@ Cave
 
 The server does not treat these as independent publications. A File-only or line-plot-only change is still a Cave mutation.
 
-## Main components
+## Components
 
 - frontend EditCavePage / AddCaveComponent — author desired state;
 - CaveFormMapper — carries the revision the user actually loaded into ExpectedRevisionId;
@@ -101,7 +100,7 @@ sequenceDiagram
 
 Every Cave that already exists when revision history is enabled receives exactly one system-generated rollout revision before the new API serves requests. That revision uses `Source = SystemBaseline` and `Operation = Baseline`; its canonical snapshot records the Cave exactly as it existed at the rollout boundary. It does **not** mean the Cave was created at that time or that no earlier changes occurred.
 
-The rollout is a deliberate deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. The coordinated deployment keeps the API stopped until the operation completes and verifies that no live Cave has `CurrentRevisionId = null`; normal web startup contains no deployment/rollout command path.
+The rollout runs as a deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. The coordinated deployment keeps the API stopped until the operation completes and verifies that no live Cave has `CurrentRevisionId = null`; normal web startup contains no deployment/rollout command path.
 
 After rollout, an existing Cave without `CurrentRevisionId` is an integrity/deployment error. Ordinary reads, authoring-context reads, interactive writes, and bulk writes never manufacture a late baseline. A Cave created after rollout instead receives its ordinary `Create` revision atomically with creation.
 
@@ -128,7 +127,7 @@ ConnectionStrings__default="<scoped database connection>" \
 
 The API runtime has no rollout command, readiness check, or deployment-history knowledge. The coordinated deployment owns the safety boundary: it keeps the old API quiesced, requires the Operations command to complete successfully, and only then deploys/starts the new API.
 
-Do not let the old writer remain active during step 3. The rollout intentionally commits bounded batches for resumability rather than holding one database-wide transaction, so quiescing writers is what makes the shared timestamp represent one authoritative rollout state. Concurrent rollout commands themselves are serialized with a PostgreSQL advisory lock.
+Do not let the old writer remain active during step 3. The rollout commits bounded batches for resumability rather than holding one database-wide transaction, so quiescing writers is what makes the shared timestamp represent one authoritative rollout state. Concurrent rollout commands themselves are serialized with a PostgreSQL advisory lock.
 
 ## Snapshot semantics
 
@@ -141,7 +140,7 @@ CavePublishedSnapshotV1 contains the semantic published state needed for history
 - File identity and user-facing metadata;
 - line-plot stable ID, historical name, and deterministic content hash.
 
-It intentionally excludes:
+It excludes:
 
 - raw object-storage partition/key;
 - full line-plot GeoJSON;
@@ -188,9 +187,9 @@ CaveService:
 
 The final revision is a tombstone/history event and does not require the Cave row to remain live.
 
-## Other users of the single-Cave publication engine
+## Other single-Cave workflows
 
-The aggregate editor is the supported normal interactive authoring surface, but `CaveMutationRepository` is intentionally reusable for other one-Cave workflows:
+The aggregate editor is the supported normal interactive authoring surface, but `CaveMutationRepository` is also used by other one-Cave workflows:
 
 - Cave archive/unarchive uses `PublishExistingAsync`;
 - hard delete uses prepare + `PublishPreparedDeleteAsync`;
@@ -199,20 +198,6 @@ The aggregate editor is the supported normal interactive authoring surface, but 
 
 That specialized File-import path is not the same as the Cave/Entrance CSV bulk-import architecture.
 
-## Supported interactive boundary
+## Interactive mutation boundary
 
 The Cave detail page is read-only for Cave-owned Files and line plots. Normal interactive mutation of those assets occurs through the aggregate Cave editor; the detail page continues to provide read/view behavior only.
-
-## Read the code in this order
-
-1. Planarian.Web/src/Modules/Caves/Pages/EditCavePage.tsx
-2. Planarian.Web/src/Modules/Caves/Helpers/CaveFormMapper.ts
-3. Planarian/Planarian/Modules/Caves/Controllers/CaveController.cs
-4. Planarian/Planarian/Modules/Caves/Services/CaveService.cs
-5. Planarian/Planarian/Modules/Caves/Revisions/CaveMutationWorkflow.cs
-6. Planarian/Planarian/Modules/Caves/Revisions/CaveMutationRepository.cs
-7. Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs
-8. Planarian/Planarian.Operations/OperationsCatalog.cs
-9. Planarian/Planarian.Operations/CaveRevisionHistory/InitializeCaveRevisionHistoryOperation.cs
-10. Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutRepository.cs
-11. Planarian/Planarian.Model/Database/Revisions/CavePublishedSnapshotV1.cs

@@ -8,8 +8,7 @@ import { CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 import { CaveVm } from "../Models/CaveVm";
 import { caveToForm, snapshotToForm } from "./CaveFormMapper";
 
-// Compile-time drift guards. These are intentionally explicit: adding a new authoring property must make
-// somebody decide how it is loaded, preserved, cleared, and submitted before the frontend can build.
+// Compile-time drift guard: every authoring property must define how it is loaded, preserved, cleared, and submitted.
 const caveAuthoringFields: Record<keyof AddCaveVm, true> = {
   id: true,
   expectedRevisionId: true,

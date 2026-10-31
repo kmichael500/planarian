@@ -6,7 +6,7 @@ using Planarian.Modules.Caves.Models;
 
 namespace Planarian.Modules.Caves.Revisions;
 
-/// <summary>Database-independent validation and normalization for every Cave mutation authoring path.</summary>
+/// <summary>Shared normalization and validation boundary for direct Cave edits and proposal authoring.</summary>
 public static class CaveMutationValidation
 {
     public static void NormalizeAndValidate(AddCaveVm values)

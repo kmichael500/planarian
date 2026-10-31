@@ -128,11 +128,9 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
     public async Task<IEnumerable<SelectListItem<string>>> GetTags(string key, string? projectId = null)
     {
         return string.IsNullOrWhiteSpace(projectId)
-            // Cave Tags
             ? await DbContext.TagTypes
                 .Where(e => e.Key == key && (e.AccountId == RequestUser.AccountId || e.IsDefault))
                 .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync()
-            // Project Tags
             : await DbContext.TagTypes
                 .Where(e => e.Key == key && e.AccountId == null &&
                             e.ProjectId == projectId)

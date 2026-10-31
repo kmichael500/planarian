@@ -32,7 +32,7 @@ using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Tests.Integration.Infrastructure.Services;
 
-/// <summary>Correctly wired production services used by database integration tests.</summary>
+/// <summary>Production service graph used by database integration tests.</summary>
 internal sealed class IntegrationTestServices
 {
     private readonly PlanarianDbContext _db;

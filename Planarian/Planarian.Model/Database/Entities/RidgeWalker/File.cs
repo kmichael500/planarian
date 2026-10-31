@@ -47,8 +47,7 @@ public class FileConfiguration : BaseEntityTypeConfiguration<File>
                 "\"Extension\" NOT LIKE '%/%' AND \"Extension\" NOT LIKE '%\\\\%' AND \"Extension\" !~ '[[:cntrl:]]'))");
         });
 
-        // This alternate key is the tenant-qualified principal key used by staged
-        // change-request files.
+        // Tenant-qualified principal key for staged change-request Files.
         builder.HasAlternateKey(e => new { e.AccountId, e.Id });
 
         builder.HasOne(e => e.Account)

@@ -109,7 +109,6 @@ const UserManagerComponent: React.FC = () => {
       }
       setInviteModalVisible(false);
       form.resetFields();
-      // Navigate to userId/permissions/View relative to this page
       navigate(`${result.userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {

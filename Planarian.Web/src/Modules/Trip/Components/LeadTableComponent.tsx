@@ -71,7 +71,6 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
     try {
       setLoading(true);
       await LeadService.DeleteLead(leadId);
-      // refresh the leads data
       const response = await TripService.GetLeads(props.tripId as string);
       setLeads(response);
       setLoading(false);

@@ -137,9 +137,7 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     }
 
     /// <summary>
-    /// Called only after an object write/publication failed. A transaction may have rolled
-    /// back after EF accepted its tracked changes; never replay those changes while
-    /// recording independent object-cleanup responsibility.
+    /// Records cleanup after failed object publication without replaying tracked changes from a rolled-back transaction.
     /// </summary>
     public void ForgetFailedObjectWriteTracking() => DbContext.ChangeTracker.Clear();
 
@@ -244,7 +242,7 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                           purposeValues.Contains(row.Purpose) && ids.Contains(row.Id))
             .ExecuteDeleteAsync(cancellationToken);
 
-        // ExecuteDelete intentionally bypasses the change tracker. A persisted target may have
+        // ExecuteDelete bypasses the change tracker. A persisted target may have
         // been loaded/created earlier in this same scoped DbContext, so detach acknowledged
         // persisted rows to prevent later queueing from mistaking stale local state for durable
         // debt. Never detach Added rows: they have not reached the database and therefore

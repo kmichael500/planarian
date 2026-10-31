@@ -17,25 +17,25 @@ export const GAP_STATUS_INFO: Record<
 > = {
   "1": {
     label: "1",
-    color: "#008000", // Dark Green
+    color: "#008000",
     description:
       "Fully protected; managed to maintain natural conditions without human disturbance.",
   },
   "2": {
     label: "2",
-    color: "#32CD32", // Lime Green
+    color: "#32CD32",
     description:
       "Permanently protected; mostly natural conditions with some limited human disturbance allowed.",
   },
   "3": {
     label: "3",
-    color: "#FFD700", // Gold
+    color: "#FFD700",
     description:
       "Protected from significant development; allows sustainable resource use and recreation.",
   },
   "4": {
     label: "4",
-    color: "#FF4500", // Orange Red
+    color: "#FF4500",
     description:
       "Minimal or no formal protection; potential for land conversion and intensive use.",
   },
@@ -73,54 +73,54 @@ export const IUCN_CATEGORY_INFO: Record<
 > = {
   Ia: {
     label: "Strict Nature Reserve",
-    color: "#00441b", // Dark green
+    color: "#00441b",
     description:
       "Highly protected area allowing minimal human use, primarily for research and conservation.",
   },
   Ib: {
     label: "Wilderness Area",
-    color: "#238b45", // Medium green
+    color: "#238b45",
     description:
       "Large, untouched natural areas protected from significant human impact, allowing limited access.",
   },
   II: {
     label: "National Park",
-    color: "#3690c0", // Blue
+    color: "#3690c0",
     description:
       "Large protected area preserving ecosystems while allowing recreation and tourism.",
   },
   III: {
     label: "Natural Monument",
-    color: "#88419d", // Purple
+    color: "#88419d",
     description:
       "Protected area preserving a specific natural landmark or cultural feature.",
   },
   IV: {
     label: "Habitat/Species Management Area",
-    color: "#41b6c4", // Cyan
+    color: "#41b6c4",
     description:
       "Area managed to maintain and protect particular species or habitats through active intervention.",
   },
   V: {
     label: "Protected Landscape/Seascape",
-    color: "#fec44f", // Gold
+    color: "#fec44f",
     description:
       "Areas protecting the interaction of people and nature, allowing sustainable economic activities.",
   },
   VI: {
     label: "Sustainable Use Area",
-    color: "#fe9929", // Orange
+    color: "#fe9929",
     description:
       "Protected area allowing sustainable use of natural resources with minimal environmental impact.",
   },
   "Other Conservation Area": {
     label: "Other Conservation Area",
-    color: "#D3D3D3", // Light gray
+    color: "#D3D3D3",
     description: "Protected area that does not fit standard IUCN categories.",
   },
   Unknown: {
     label: "Unknown",
-    color: "#D3D3D3", // Light gray
+    color: "#D3D3D3",
     description: "Category unknown or not classified.",
   },
 };

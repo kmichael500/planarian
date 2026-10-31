@@ -127,8 +127,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             catch (Exception exception)
             {
                 // The invitation itself is already committed and Mailgun accepted the message.
-                // Do not turn a successful create into a retryable API failure just because
-                // the convenience InvitationSentOn timestamp could not be persisted.
+                // Failure to persist the convenience InvitationSentOn timestamp must not turn
+                // a successful create into a retryable API failure.
                 _logger.LogError(exception,
                     "Unable to persist InvitationSentOn after invitation {UserId} was submitted to the email provider.",
                     user.Id);
@@ -278,16 +278,13 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             var existingPermissions =
                 (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
 
-            // Handle the "all locations" case
             if (vm.HasAllLocations)
             {
-                // Look for an existing "all locations" record (all location scopes null)
                 var allLocationPermission = existingPermissions.FirstOrDefault(p =>
                     string.IsNullOrWhiteSpace(p.StateId) && string.IsNullOrWhiteSpace(p.CountyId) &&
                     string.IsNullOrWhiteSpace(p.CaveId));
                 if (allLocationPermission == null)
                 {
-                    // No record exists, so create one
                     await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, null);
                     allLocationPermission = new CavePermission
                     {
@@ -317,7 +314,6 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             }
             else
             {
-                // Remove any "all locations" if it exists
                 var allLocationPermission = existingPermissions.FirstOrDefault(p =>
                     string.IsNullOrWhiteSpace(p.StateId) && string.IsNullOrWhiteSpace(p.CountyId) &&
                     string.IsNullOrWhiteSpace(p.CaveId));
@@ -330,7 +326,6 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
             }
 
-            // --- Process state-level permissions ---
             var desiredStateIds = vm.StateIds?.Distinct().ToList() ?? new List<string>();
             var existingStatePermissions = existingPermissions
                 .Where(p => !string.IsNullOrWhiteSpace(p.StateId) &&
@@ -363,7 +358,6 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                 Repository.Add(newStatePerm);
             }
 
-            // --- Process county-level permissions ---
             var desiredCountyIds = vm.CountyIds?.Distinct().ToList() ?? new List<string>();
             var existingCountyPermissions = existingPermissions
                 .Where(p => string.IsNullOrWhiteSpace(p.StateId) &&
@@ -372,21 +366,17 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
             var existingCountyIds = existingCountyPermissions.Select(p => p.CountyId).ToList();
 
-            // Identify which county permissions need to be removed and which added
             var countiesToRemove = existingCountyIds.Except(desiredCountyIds).ToList();
             var countiesToAdd = desiredCountyIds.Except(existingCountyIds).ToList();
 
-            // Remove county permissions that are no longer desired
             foreach (var per in existingCountyPermissions.Where(p => countiesToRemove.Contains(p.CountyId)))
             {
                 await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, per.CountyId, per.StateId);
                 Repository.Delete(per);
             }
 
-            // Add new county permissions
             foreach (var countyId in countiesToAdd)
             {
-                // Ensure the current user has the necessary rights for this county
                 await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, countyId, null);
                 var newCountyPerm = new CavePermission
                 {
@@ -400,7 +390,6 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                 Repository.Add(newCountyPerm);
             }
 
-            // --- Process cave-level permissions ---
             var desiredCaveIds = vm.CaveIds.Distinct().ToList() ?? [];
             var existingCavePermissions =
                 existingPermissions
@@ -409,18 +398,15 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                                 string.IsNullOrWhiteSpace(p.CountyId)).ToList();
             var existingCaveIds = existingCavePermissions.Select(p => p.CaveId).ToList();
 
-            // Identify which cave permissions need to be removed and which added
             var cavesToRemove = existingCaveIds.Except(desiredCaveIds).ToList();
             var cavesToAdd = desiredCaveIds.Except(existingCaveIds).ToList();
 
-            // Remove cave permissions that are no longer desired
             foreach (var perm in existingCavePermissions.Where(p => cavesToRemove.Contains(p.CaveId)))
             {
                 await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, perm.CaveId, null, null);
                 Repository.Delete(perm);
             }
 
-            // Add new cave permissions
             foreach (var caveId in cavesToAdd)
             {
                 await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, null, null);

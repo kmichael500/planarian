@@ -1,8 +1,6 @@
-# Deferred email and authentication integration coverage
+# Pending email and authentication integration coverage
 
-The former temporary `Planarian.Tests.EmailDelivery` project has been migrated into the canonical backend test projects. Its pure/model/contract tests now live in `Planarian.Tests.Unit`.
-
-The cases below still require the real PostgreSQL or application-host integration harness. Keep them here until implemented; do not replace PostgreSQL-dependent behavior with EF InMemory tests.
+The cases below require the real PostgreSQL or application-host integration harness. Do not replace PostgreSQL-dependent behavior with EF InMemory tests.
 
 ## PostgreSQL and delivery behavior
 

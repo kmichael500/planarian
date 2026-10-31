@@ -1,5 +1,4 @@
 name: "Planarian: Coordinated deployment"
-# Stable run title records the deployment environment and selected ref.
 run-name: "Planarian ${{ github.event_name == 'push' && 'Development' || inputs.target }} release: ${{ github.ref_name }}"
 
 # main deploys automatically to Development. Manual Development releases may
@@ -24,16 +23,15 @@ on:
         type: boolean
         default: false
       resume_maintenance:
-        description: "Resume a failed maintenance release while the API is intentionally stopped"
+        description: "Resume a failed maintenance release while the API remains stopped"
         type: boolean
         default: false
 
 permissions:
   contents: read
 
-# Serialize the WHOLE release, including last-success detection. Do not cancel a
-# running database migration when a new commit arrives. GitHub may replace
-# a pending run; the next run diffs against the last successful release.
+# Serialize each environment through last-success detection. A new commit must not interrupt a
+# running migration; replaced pending runs are safe because planning diffs from the last successful release.
 concurrency:
   group: planarian-deploy-${{ github.event_name == 'push' && 'Development' || inputs.target }}
   cancel-in-progress: false
@@ -193,7 +191,7 @@ jobs:
       AZURE_API_HEALTH_URL: ${{ vars.AZURE_API_HEALTH_URL }}
       AZURE_WEB_HEALTH_URL: ${{ vars.AZURE_WEB_HEALTH_URL }}
       # Azure Login recommends suppressing default CLI stdout in CI logs.
-      # Commands that intentionally read a value use an explicit --output.
+      # Commands that read a value use an explicit --output.
       AZURE_CORE_OUTPUT: none
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -417,8 +415,7 @@ jobs:
           MAINTENANCE: ${{ needs.plan.outputs.maintenance }}
         run: |
           set -euo pipefail
-          # A maintenance task may intentionally keep the API stopped until the
-          # matching artifact is fully installed.
+          # A maintenance task may keep the API stopped until the matching artifact is fully installed.
           restart=true
           if [[ "$MAINTENANCE" == true ]]; then restart=false; fi
           az webapp deploy \

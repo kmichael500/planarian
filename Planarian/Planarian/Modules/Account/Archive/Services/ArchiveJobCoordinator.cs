@@ -84,7 +84,7 @@ public class ArchiveJobCoordinator
             if (_resettingAccounts.Contains(accountId) || !_jobs.TryAdd(accountId, jobHandle))
             {
                 jobHandle.CancellationTokenSource.Dispose();
-                // Cannot await under the in-process gate; release just below.
+                // Do not await while holding the in-process gate.
                 jobHandle = null!;
             }
         }
@@ -564,9 +564,7 @@ public class ArchiveJobCoordinator
         }
         catch (Exception publicationException)
         {
-            // A commit can succeed even if its response is lost. Reconcile against storage
-            // before deciding whether publication failed. Hashing is deliberately an error-path
-            // operation; the normal publication path never relays archive bytes through the app.
+            // A lost response can hide a successful commit. Reconcile against storage; hashing stays on the error path.
             ArchivePublicationVerification verification;
             try
             {

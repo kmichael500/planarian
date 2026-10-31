@@ -4,7 +4,7 @@ namespace Planarian.Tests;
 
 /// <summary>
 /// Purpose-specific SQL fixture for the exact current-main v32 schema. The current EF model
-/// intentionally differs from v32, so migration-arrangement state must not be created through it.
+/// differs from v32, so migration-arrangement state must not be created through it.
 /// Every durable v32 model table receives at least one row so the preservation census cannot
 /// silently omit an unrelated subsystem.
 /// </summary>

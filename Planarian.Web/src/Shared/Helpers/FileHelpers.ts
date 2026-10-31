@@ -39,14 +39,12 @@ export const downloadCSV = (data: any[], ignoreId: boolean = false): void => {
 };
 
 export const createCsvWithHeaders = (headers: string[]) => {
-  // Create CSV content from headers
   const csvContent = headers.join(",") + "\n";
 
   return csvContent;
 };
 
 export const downloadFile = (filename: string, content: string) => {
-  // Create a downloadable link and trigger download
   const link = document.createElement("a");
   var blob: Blob;
   switch (getFileType(filename)) {

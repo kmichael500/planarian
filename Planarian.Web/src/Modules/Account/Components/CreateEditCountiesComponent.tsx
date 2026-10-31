@@ -136,7 +136,7 @@ const CreateEditCountiesComponent = (
       message.error("Failed to delete some Counties!");
     } finally {
       setIsLoading(false);
-      setSelectedRowKeys([]); // Clear the selection
+      setSelectedRowKeys([]);
     }
   };
 
@@ -226,8 +226,8 @@ const CreateEditCountiesComponent = (
           </PlanarianButton>
           <Button
             onClick={() => {
-              handleReset(clearFilters!); // reset the filter
-              confirm(); // immediately apply the reset
+              handleReset(clearFilters!);
+              confirm();
             }}
             size="small"
             style={{ width: 90 }}
@@ -349,7 +349,6 @@ const CreateEditCountiesComponent = (
       key: "occurrences",
       sorter: (a: TagTypeTableCountyVm, b: TagTypeTableCountyVm) =>
         a.occurrences - b.occurrences,
-      // defaultSortOrder: "descend",
     },
     {
       title: "Action",
@@ -424,7 +423,7 @@ const CreateEditCountiesComponent = (
 
   const sortedAndFilteredCounties = useMemo(() => {
     return localCounties
-      .filter((county) => !selectedRowKeys.includes(county.tagTypeId)) // Exclude selected Counties
+      .filter((county) => !selectedRowKeys.includes(county.tagTypeId))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [localCounties, selectedRowKeys]);
 

@@ -8,7 +8,7 @@ interface PlanarianButtonProps {
   alwaysShowChildren?: boolean;
   neverShowChildren?: boolean;
   collapseOnScreenSize?: "xl" | "lg" | "md" | "sm" | "xs";
-  debounceTime?: number; // Optional debounce time in milliseconds (default: 500ms)
+  debounceTime?: number;
   permissionKey?: PermissionKey;
   tooltip?: React.ReactNode;
 }
@@ -52,7 +52,6 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     }, debounceTime);
   };
 
-  // Define breakpoints order (from smallest to largest)
   const breakpointsOrder: Array<"xs" | "sm" | "md" | "lg" | "xl"> = [
     "xs",
     "sm",

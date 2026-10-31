@@ -135,7 +135,7 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
     {
         var databaseName = $"planarian_failed_template_{Guid.NewGuid():N}";
         NpgsqlConnection? partialConnection = null;
-        var expected = new InvalidOperationException("deliberate template initialization failure");
+        var expected = new InvalidOperationException("template initialization failure");
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             PostgresTestServer.CreateTemplateDatabaseAsync(fixture.ConnectionString, databaseName,

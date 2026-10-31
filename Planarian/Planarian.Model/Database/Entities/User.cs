@@ -63,7 +63,8 @@ public class User : EntityBase
     public DateTime? EmailConfirmedOn { get; set; }
     public int SessionVersion { get; set; }
 
-    public bool IsTemporary { get; set; } = false; // Used to invite users to Planarian. The entire user record will be deleted once the user accepts the invitation.
+    // Invitation placeholder deleted when the invitation is accepted or declined.
+    public bool IsTemporary { get; set; } = false;
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
@@ -78,12 +79,9 @@ public class User : EntityBase
 
     public DateTime? LastActiveOn { get; set; }
 
-    #region Helper Functions
-
     [NotMapped] public bool IsProjectMember => Members.Any(e => !string.IsNullOrWhiteSpace(e.ProjectId));
     [NotMapped] public bool IsTripMember => Members.Any(e => !string.IsNullOrWhiteSpace(e.TripId));
 
-    #endregion
 }
 
 public class UserConfiguration : BaseEntityTypeConfiguration<User>

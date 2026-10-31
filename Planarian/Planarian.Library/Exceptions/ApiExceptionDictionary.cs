@@ -82,8 +82,6 @@ public static class ApiExceptionDictionary
 
     #endregion
 
-    #region User 100-199
-
     public static ApiException EmailAlreadyExists => new((int)HttpStatusCode.BadRequest, ApiExceptionType.EmailAlreadyExists, "Email already exists");
 
     public static ApiException InvalidPasswordComplexity => new((int)HttpStatusCode.BadRequest, ApiExceptionType.InvalidPasswordComplexity,
@@ -97,10 +95,6 @@ public static class ApiExceptionDictionary
 
     public static ApiException EmailNotConfirmed => new((int)HttpStatusCode.BadRequest, ApiExceptionType.EmailNotConfirmed,
         "Please confirm your email address before logging in.");
-
-    #endregion
-
-    #region Authentication 200-299
 
     public static ApiException EmailDoesNotExist =>
         new((int)HttpStatusCode.Unauthorized, ApiExceptionType.EmailDoesNotExist, "Email does not exist");
@@ -117,17 +111,11 @@ public static class ApiExceptionDictionary
     public static ApiException UserAlreadyInAccount =>
         new((int)HttpStatusCode.BadRequest, ApiExceptionType.UserAlreadyInAccount, "You are already have access to this account");
 
-    #endregion
-
-    #region Email Issues 300-399
-
     public static ApiException MessageTypeNotFound =>
         new((int)HttpStatusCode.InternalServerError, ApiExceptionType.MessageTypeNotFound, "There was an issue");
 
     public static ApiException EmailFailedToSend =>
         new((int)HttpStatusCode.InternalServerError, ApiExceptionType.EmailFailedToSend, "The email failed to send");
-
-    #endregion
 
     public static ApiException NoAccount =>
         new((int)HttpStatusCode.InternalServerError, ApiExceptionType.NoAccount, "No account was found");
@@ -162,13 +150,10 @@ public static class ApiExceptionDictionary
 
     #endregion
 
-    #region Query 500-599
-
     public static Exception QueryInvalidValue(string field, string value)
     {
         return new ApiException((int)HttpStatusCode.BadRequest, ApiExceptionType.QueryInvalidValue,
             $"Invalid value '{value}' for field '{field}'");
     }
 
-    #endregion
 }

@@ -43,9 +43,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (user == null)
         {
-            // SECURITY/PRODUCT DECISION: Planarian intentionally distinguishes an unknown email
-            // for usability. Do not replace this with a generic login error without explicit product approval.
-            // Login throttling still limits automated discovery.
+            // Product choice: expose unknown-email feedback for usability; login throttling limits automated discovery.
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         

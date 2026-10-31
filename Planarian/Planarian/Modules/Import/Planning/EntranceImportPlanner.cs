@@ -76,8 +76,8 @@ public sealed class EntranceImportPlanner
                 var normalized = new NormalizedEntranceRow(
                     IdGenerator.Generate(), index, record,
                     record.CountyCode, countyCaveNumber,
-                    // Sync replaces an existing authored Entrance, so blank optional text follows the same null
-                    // canonicalization as normal authoring. Keep append/import-creation behavior characterized from main.
+                    // Sync replaces an authored Entrance, so blank optional text canonicalizes to null like normal
+                    // authoring; append creation preserves the trimmed import value.
                     syncExisting ? NormalizeOptionalText(record.EntranceName) : record.EntranceName?.Trim(),
                     record.IsPrimaryEntrance ?? false,
                     syncExisting ? NormalizeOptionalText(record.EntranceDescription) : record.EntranceDescription?.Trim(),

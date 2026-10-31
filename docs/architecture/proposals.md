@@ -1,8 +1,7 @@
 # Proposal and review architecture
 
-This page explains how suggested Cave changes remain separate from published state until approval.
 
-## Core idea
+## Model
 
 A proposal is not a mutable alternate Cave. “Immutable” here is an application/persistence invariant rather than a database trigger that would reject arbitrary SQL updates.
 
@@ -50,7 +49,7 @@ stateDiagram-v2
 
 The state policy is centralized in CaveChangeRequestStatePolicy.
 
-Important consequences:
+State semantics:
 
 - Pending is the reviewer-facing publishable state.
 - ChangesRequested is the author-facing revision state.
@@ -70,9 +69,8 @@ CaveChangeRequestService provides:
 
 The authoring path builds CaveProposalSnapshotV1, which captures exact intent rather than only a sparse patch.
 
-### Why complete intent matters
+### Complete proposal intent
 
-Files are a good example.
 
 A proposal version explicitly records each relevant File as:
 
@@ -97,7 +95,7 @@ CaveProposalSnapshotV1 contains:
 - File intents;
 - full normalized proposed line-plot GeoJSON.
 
-This differs intentionally from CavePublishedSnapshotV1, whose line-plot history stores only ID/name/content hash.
+`CavePublishedSnapshotV1` stores only line-plot ID, name, and content hash.
 
 ## Approval sequence
 
@@ -182,15 +180,3 @@ Request ownership does not become a permanent bypass if the submitter later lose
 the submitter receives explicit Cave View only if they are still an Account member.
 
 See [Authorization](../authorization.md) for the durable permission model.
-
-## Read the code in this order
-
-1. Planarian.Web/src/Modules/Caves/Pages/SuggestCaveChangesPage.tsx
-2. Planarian.Web/src/Modules/Caves/Pages/ReviseCaveChangeRequestPage.tsx
-3. Planarian.Web/src/Modules/Caves/Pages/CaveChangeRequestPage.tsx
-4. Planarian/Planarian/Modules/Caves/Controllers/CaveChangeRequestController.cs
-5. Planarian/Planarian/Modules/Caves/Services/CaveChangeRequestService.cs
-6. Planarian/Planarian/Modules/Caves/Revisions/CaveChangeRequestRepository.cs
-7. Planarian/Planarian.Model/Database/Entities/RidgeWalker/CaveChangeRequest.cs
-8. Planarian/Planarian.Model/Database/Revisions/CaveProposalSnapshotV1.cs
-9. Planarian/Planarian/Modules/Caves/Services/CaveService.cs for final publication

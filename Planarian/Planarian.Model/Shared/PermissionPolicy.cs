@@ -13,10 +13,6 @@ public static class PermissionPolicy
     private static readonly string[] AccountRoleCapabilities =
         [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin];
 
-    /// <summary>
-    /// Returns supported persisted roles scoped to an Account for the requested permission domain.
-    /// Global platform administration is intentionally outside this vocabulary.
-    /// </summary>
     public static string[] GetAccountScopedPersistedRoleKeys(string permissionType) => permissionType switch
     {
         PermissionType.User => [PermissionKey.Admin],
@@ -27,10 +23,6 @@ public static class PermissionPolicy
     public static bool IsAccountManagementPermission(string permissionType, string permissionKey) =>
         GetAccountScopedPersistedRoleKeys(permissionType).Contains(permissionKey, StringComparer.Ordinal);
 
-    /// <summary>
-    /// Returns account-scoped UserPermission keys that satisfy the requested semantic capability.
-    /// Global PlanarianAdmin checks are resolved separately before this mapping is used.
-    /// </summary>
     public static string[] GetSatisfyingUserPermissionKeys(string permissionKey) => permissionKey switch
     {
         // Account Admin is the only persisted account-scoped UserPermission that broadens into Cave authority.
@@ -41,9 +33,6 @@ public static class PermissionPolicy
         _ => []
     };
 
-    /// <summary>
-    /// Returns persisted CavePermission keys that satisfy the requested Cave capability.
-    /// </summary>
     public static string[] GetSatisfyingCavePermissionKeys(string permissionKey) => permissionKey switch
     {
         PermissionPolicyKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager],
@@ -51,10 +40,6 @@ public static class PermissionPolicy
         _ => []
     };
 
-    /// <summary>
-    /// Expands persisted account/Cave role keys into the effective coarse role capabilities returned to clients.
-    /// Synthetic capabilities and account settings remain the caller's responsibility.
-    /// </summary>
     public static string[] GetEffectiveAccountRoleCapabilities(
         IEnumerable<string> userPermissionKeys,
         IEnumerable<string> cavePermissionKeys)
@@ -69,9 +54,6 @@ public static class PermissionPolicy
             .ToArray();
     }
 
-    /// <summary>
-    /// Identifies platform/synthetic capabilities that must use their coarse resolver even when a resource is supplied.
-    /// </summary>
     public static bool BypassesResourceScopeResolution(string permissionKey) =>
         permissionKey is PermissionPolicyKey.PlanarianAdmin
             or PermissionPolicyKey.AdminManager

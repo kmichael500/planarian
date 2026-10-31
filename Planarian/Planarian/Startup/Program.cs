@@ -101,13 +101,10 @@ else
 
 #if DEBUG
 builder.Configuration.AddJsonFile("appsettings.Development.json", false);
-// Re-apply the standard high-priority providers after the explicit development JSON
-// override: environment variables first, then command-line arguments last.
+// Preserve standard precedence after the development JSON override: environment, then command line.
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddCommandLine(args);
-// Host filtering is configured when the web host is created, before Azure App
-// Configuration and the development override are added. Apply the final local
-// value explicitly so local proxy requests reach the CORS middleware.
+// Host filtering is initialized before later providers; apply the final local value explicitly.
 builder.WebHost.UseSetting("AllowedHosts",
     builder.Configuration["AllowedHosts"] ?? "localhost");
 #endif
@@ -119,9 +116,8 @@ builder.Services.AddControllers(options =>
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        // Configure JSON options for large GeoJSON files
-        options.JsonSerializerOptions.MaxDepth = 64; // Increase max depth for complex GeoJSON
-        options.JsonSerializerOptions.DefaultBufferSize = 16 * 1024; // 16KB buffer
+        options.JsonSerializerOptions.MaxDepth = 64;
+        options.JsonSerializerOptions.DefaultBufferSize = 16 * 1024;
     });
 
 builder.Services.Configure<RouteOptions>(options =>
@@ -138,7 +134,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.ValueLengthLimit = 500 * 1024 * 1024; // 500MB
     options.MemoryBufferThreshold = Int32.MaxValue;
 });
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -314,15 +309,11 @@ builder.Services.AddScoped<EntranceImportPlanningRepository>();
 
 #endregion
 
-#region Http Clients
-
 builder.Services.AddHttpClient<GeologicMapHttpClient>();
 builder.Services.AddHttpClient<IHydrologyProvider, Usgs3DhpHydrologyProvider>(client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient<UsgsWaterDataClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30));
-
-#endregion
 
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpContextAccessor();
@@ -408,13 +399,9 @@ builder.Services.AddSession();
 
 #endregion
 
-#region Authorization
-
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
 builder.Services.AddAuthorization(PermissionPolicyConfiguration.Configure);
-
-#endregion
 
 #region Rate Limiting
 
@@ -459,9 +446,9 @@ builder.Services.AddResponseCompression(options =>
     options.EnableForHttps = true;
     options.MimeTypes = new[]
     {
-        "application/json",      // all your normal JSON
-        "application/geo+json",  // GeoJSON
-        "application/gpx+xml"    // GPX files
+        "application/json",
+        "application/geo+json",
+        "application/gpx+xml"
     };
     options.Providers.Add<BrotliCompressionProvider>();
     options.Providers.Add<GzipCompressionProvider>();
@@ -490,7 +477,6 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-// correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
 
 app.UseCors(x =>

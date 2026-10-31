@@ -10,5 +10,5 @@ public static class FullTextSearchExtensions
         string document,
         string query,
         string options)           
-        => throw new NotSupportedException(); // this isn't actually executed
+        => throw new NotSupportedException(); // Translated by EF; never executed client-side.
 }

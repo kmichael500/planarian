@@ -1,12 +1,8 @@
-# Important data model relationships
+# Cave revision data model
 
-This is a conceptual map of the revision/proposal/File model introduced or substantially changed by the Cave-revisions completion work.
+`CaveRevision.CaveId`, `CaveChangeRequest.CaveId`, and `StorageCleanupTarget.AccountId` are logical ownership links, not live-domain foreign keys. History and cleanup debt therefore survive removal of current Cave/File relationships without keeping those live relationships artificially alive.
 
-It is not a complete ERD of Planarian.
-
-The diagram is conceptual, but relationship labels explicitly mark the important **logical-only** links. In particular, `CaveRevision.CaveId`, `CaveChangeRequest.CaveId`, and `StorageCleanupTarget.AccountId` are not live-domain foreign keys. History and cleanup debt therefore survive removal of current Cave/File relationships without keeping those live relationships artificially alive.
-
-## Core relationships
+## Relationships
 
 ~~~mermaid
 erDiagram
@@ -32,13 +28,13 @@ erDiagram
     CAVE_REVISION }o--o| CAVE_IMPORT_BATCH : import_source
 ~~~
 
-All other relationship lines in the diagram correspond to configured EF relationships, many using tenant-qualified composite keys rather than a single ID. The logical-only labels above are intentionally different.
+Configured EF relationships use tenant-qualified composite keys where required; the labeled logical ownership links are the exceptions without foreign keys.
 
 ## Cave
 
 Cave is the **current relational state**.
 
-Important fields for the revision architecture:
+Revision-related fields:
 
 - AccountId;
 - CurrentRevisionId;
@@ -52,7 +48,7 @@ Cave also owns current relationships to Entrances, Files, tag joins, and CaveGeo
 
 CaveRevision is published history that application persistence treats as append-only after creation.
 
-Important fields:
+Fields:
 
 - AccountId;
 - CaveId;
@@ -83,7 +79,7 @@ Operations include:
 
 PreviousRevisionId forms the history chain.
 
-There is deliberately no CaveRevision → live Cave foreign key. Cave.CurrentRevisionId points to its current revision while the Cave is live, but revision rows can remain after the Cave row is gone.
+There is no CaveRevision → live Cave foreign key. Cave.CurrentRevisionId points to its current revision while the Cave is live, but revision rows can remain after the Cave row is gone.
 
 ## CavePublishedSnapshotV1
 
@@ -98,15 +94,15 @@ The V1 persisted schema contains:
 - File identity/user-facing metadata;
 - line-plot identity/name/content hash.
 
-V1 deliberately excludes storage locators and full line-plot GeoJSON.
+V1 excludes storage locators and full line-plot GeoJSON.
 
-Once this pre-release feature lands, changing persisted semantics requires a new schema version rather than silently redefining V1.
+Changing persisted V1 semantics requires a new schema version rather than silently redefining V1.
 
 ## CaveChangeRequest
 
 The request is the mutable workflow envelope.
 
-Important fields:
+Fields:
 
 - AccountId;
 - CaveId;
@@ -123,7 +119,7 @@ Its mutable pointer/status tell the workflow which immutable proposal version is
 
 CaveProposalVersion is proposed state that application persistence treats as append-only after creation.
 
-Important fields:
+Fields:
 
 - AccountId;
 - ChangeRequestId;
@@ -177,7 +173,7 @@ Review actions include:
 
 File represents a **current or staged live File**, not immutable history.
 
-Important fields:
+Fields:
 
 - AccountId;
 - optional CaveId;
@@ -203,7 +199,7 @@ Proposal versions still carry the exact File semantic intent; this table is work
 
 ## StorageCleanupTarget
 
-This internal table is durable **external-cleanup debt**, not historical File storage. It is intentionally independent of live File/Cave foreign keys so a relational deletion can commit before object-storage cleanup is attempted.
+This internal table is durable **external-cleanup debt**, not historical File storage. It is independent of live File/Cave foreign keys so relational deletion can commit before object-storage cleanup is attempted.
 
 Fields:
 
@@ -241,19 +237,3 @@ An import batch records import provenance and counts.
 Import-created CaveRevisions may identify the batch through ImportBatchId.
 
 This ties accepted history to one bulk import without turning every Cave mutation into an interactive service call.
-
-## Current state versus history versus proposal
-
-A useful distinction:
-
-| Concern | Authoritative representation |
-| --- | --- |
-| Current Cave | Cave + relational children |
-| Current line-plot body | CaveGeoJson |
-| Current File metadata | File |
-| Published history | CaveRevision + CavePublishedSnapshotV1 |
-| Proposed future state | CaveProposalVersion + CaveProposalSnapshotV1 |
-| Proposal workflow status | CaveChangeRequest |
-| Review audit | CaveChangeRequestReviewEvent |
-| Post-commit external cleanup debt | StorageCleanupTarget |
-| Import provenance | CaveImportBatch |

@@ -45,7 +45,7 @@ export interface UploadParams {
   file: any;
   uid: string;
   onProgress: (event: AxiosProgressEvent) => void;
-  [key: string]: any; // This allows you to pass in any other parameters your upload function might need
+  [key: string]: any;
 }
 
 const UploadComponent = ({
@@ -60,7 +60,7 @@ const UploadComponent = ({
   allowedFileTypes,
 }: UploadComponentProps) => {
   const [form] = Form.useForm<AddCaveFilesForm>();
-  const [formChanged, setFormChanged] = useState(false); // Track form changes
+  const [formChanged, setFormChanged] = useState(false);
 
   const [singleFileUploadPercent, setSingleFileUploadPercent] =
     useState<number>(0);
@@ -76,12 +76,10 @@ const UploadComponent = ({
   >({});
 
   useEffect(() => {
-    // Check if all uploads are completed
     if (
       completedNumberOfUploads === numberOfFilesToUpload &&
       completedNumberOfUploads !== 0
     ) {
-      // Display a success message
       message.success("All files have been uploaded successfully!");
     }
   }, [completedNumberOfUploads, numberOfFilesToUpload]);
@@ -123,17 +121,17 @@ const UploadComponent = ({
         )}.`
       );
       console.error(file);
-      return false; // Prevent file from being uploaded
+      return false;
     }
     const fileSizeInMB = file.size / 1024 / 1024;
     const maxSizeInMB = 50;
 
     if (fileSizeInMB > maxSizeInMB) {
       message.error(`File size should not exceed ${maxSizeInMB} MB.`);
-      return false; // Prevent file from being uploaded
+      return false;
     }
 
-    return true; // Allow file upload
+    return true;
   };
 
   useEffect(() => {
@@ -231,7 +229,6 @@ const UploadComponent = ({
                   <div key={key} style={{ marginBottom: "10px" }}>
                     <Progress
                       percent={value.progress}
-                      // format={(percent) => `${percent?.toFixed(2)}%`}
                     />
                     <div>
                       {value.name} - {value.progress?.toFixed(2)}%

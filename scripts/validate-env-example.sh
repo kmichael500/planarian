@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# This is the exact non-evaluating dotenv loader used by deploy-dev.sh.
+# Use the same non-evaluating dotenv loader as deploy-dev.sh.
 # shellcheck source=load-dotenv.sh
 source "${ROOT_DIR}/scripts/load-dotenv.sh"
 load_dotenv "${ROOT_DIR}/Planarian.Web/.env.example"

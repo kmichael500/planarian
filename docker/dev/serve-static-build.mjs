@@ -36,9 +36,7 @@ const resolveFile = async (requestPath) => {
   try {
     const info = await stat(candidate);
     if (info.isFile()) return candidate;
-  } catch {
-    // SPA fallback below.
-  }
+  } catch {}
 
   if (!path.extname(normalized)) return path.join(root, "index.html");
   return null;

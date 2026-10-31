@@ -1,6 +1,6 @@
-# ADR 0006 — Use pure import planning and set-oriented bulk revision publication
+# ADR 0005 — Use pure import planning and set-oriented bulk revision publication
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Accepted
 **Scope:** Cave and Entrance CSV import
 
 ## Context
@@ -59,7 +59,7 @@ bulk publication fails closed if an existing target lacks that current revision 
 
 ### Costs
 
-- There are intentionally separate interactive and bulk publication implementations.
+- Interactive and bulk publication use separate implementations for their different concurrency and scale requirements.
 - Planner/executor contracts are more explicit than a simple CRUD import loop.
 - Changes to the semantic snapshot shape must be considered by both publication paths.
 - Lock ordering is part of the architecture and must remain consistent with admin/direct workflows.

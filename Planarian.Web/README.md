@@ -26,4 +26,4 @@ npm run build
 
 The npm lifecycle hooks automatically regenerate/check the shared client-route projections and prepare the local PDF.js assets where required. The route manifest and generation contract are documented in [`../Contracts/README.md`](../Contracts/README.md); do not hand-edit generated route projections.
 
-The complete cross-stack pull-request sequence is owned by [`../.github/workflows/pr-validation.yml`](../.github/workflows/pr-validation.yml). Keep this README focused on frontend-local commands rather than duplicating the entire CI workflow.
+The complete cross-stack pull-request sequence is owned by [`../.github/workflows/pr-validation.yml`](../.github/workflows/pr-validation.yml); this README covers frontend-local commands only.

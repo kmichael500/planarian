@@ -44,7 +44,6 @@ const AccountService = {
     return response.data;
   },
 
-  //#region Settings
 
   async GetSettings() {
     const response = await HttpClient.get<MiscAccountSettingsVm>(
@@ -92,7 +91,6 @@ const AccountService = {
     await HttpClient.delete(`${baseUrl}/archive?blobKey=${encodeURIComponent(blobKey)}`);
   },
 
-  //#region Import
   async ImportCavesFile(
     file: string | Blob | RcFile,
     uuid: string,
@@ -105,7 +103,7 @@ const AccountService = {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      onUploadProgress: onProgress, // Set the onUploadProgress callback
+      onUploadProgress: onProgress,
     };
 
     const response = await HttpClient.post<FileVm>(
@@ -137,7 +135,7 @@ const AccountService = {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      onUploadProgress: onProgress, // Set the onUploadProgress callback
+      onUploadProgress: onProgress,
     };
 
     const response = await HttpClient.post<FileVm>(
@@ -207,7 +205,6 @@ const AccountService = {
   async CancelActiveImportFileUploadSessions(): Promise<void> {
     await HttpClient.delete(`${baseUrl}/import/file/session`);
   },
-  //#endregion
 
   async GetFeatureSettings(
     resetCache: boolean = false,
@@ -253,7 +250,6 @@ const AccountService = {
     return response.data;
   },
 
-  //#region Tags
   async GetAllStates(): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
       `${baseUrl}/states`
@@ -353,6 +349,5 @@ const AccountService = {
     return response.data;
   },
 
-  //#endregion
 };
 export { AccountService };

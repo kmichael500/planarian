@@ -119,9 +119,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(null);
 
-        // Create a real actor through the ordinary test context, then populate every major
-        // completion-owned relational area with valid rows. Migration rollback should not
-        // depend on those new tables being empty.
+        // Populate revision/proposal/cleanup tables with valid rows; downgrade must not depend on them being empty.
         using (database.CreateDbContext("reviewusr1", "mainacct01")) { }
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
@@ -251,8 +249,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     {
         await using var database = await CreateCurrentMainV32DatabaseAsync(
             fixture, nameof(PermissionDomainMigrationRemovesMalformedAdminExpansionWithoutBreakingRealAdmin));
-        // Seed malformed and valid permissions in the existing v32 schema,
-        // then verify the Cave revisions upgrade tightens the projection.
+        // Seed malformed and valid v32 permissions; the upgrade must tighten the projection.
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
@@ -344,8 +341,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     {
         await using var database = await CreateCurrentMainV32DatabaseAsync(
             fixture, nameof(PermissionDomainIdentityMigrationFailsClosedOnLegacySameDomainDuplicates));
-        // Duplicates exist before upgrading v32; one atomic feature migration
-        // must refuse the entire upgrade without leaving any partial schema objects.
+        // v32 duplicates must make the migration fail atomically without partial schema changes.
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
@@ -443,7 +439,6 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     [Fact]
     public async Task V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData()
     {
-        // Arrange the frozen historical v29 schema and representative data.
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
             nameof(V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData));
         var migrations = database.GetMigrationNames().ToList();
@@ -459,10 +454,8 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         await database.MigrateAsync(migrations[baseline]);
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
 
-        // Act
         await database.MigrateAsync(null);
 
-        // Assert historical rows and spatial values survived unchanged.
         await using (var verify = database.CreateDbContext("main", "mainacct01"))
         {
             var cave = await verify.Caves.IgnoreQueryFilters().SingleAsync(candidate => candidate.Id == "maincave01");
@@ -501,7 +494,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             Assert.False(entranceOtherSetting.IsDefault);
         }
 
-        // The newly-added xmin concurrency token must also work after upgrade.
+        // Verify xmin concurrency after upgrade.
         await using var currentDb = database.CreateDbContext("current", "mainacct01");
         await using var staleDb = database.CreateDbContext("stale", "mainacct01");
         var current = await currentDb.Caves.IgnoreQueryFilters().SingleAsync(cave => cave.Id == "maincave01");

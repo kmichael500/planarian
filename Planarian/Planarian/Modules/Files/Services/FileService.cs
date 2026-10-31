@@ -789,20 +789,17 @@ public class FileService : ServiceBase<FileRepository>
     {
         var normalizedContainerName = containerName.ToLowerInvariant();
 
-        // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
             _fileOptions.ConnectionString,
             normalizedContainerName);
 
         try
         {
-            // Attempt to delete the entire container
             await containerClient.DeleteIfExistsAsync();
         }
         finally
         {
-            // A successful initialization is cached to avoid repeated container-existence checks.
-            // Invalidate it even when deletion fails so a later upload can re-establish the container safely.
+            // Force later uploads to revalidate the container even when deletion fails.
             ContainerInitializationTasks.TryRemove(GetContainerInitializationKey(containerClient), out _);
             _objectStorage.InvalidateContainer(containerClient.Name);
         }

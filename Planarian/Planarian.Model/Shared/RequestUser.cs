@@ -57,8 +57,7 @@ public class RequestUser
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId) && throwOnInvalidAccountId)
         {
-            // Intentionally return 401 here so the client clears stale account selection state
-            // and forces a fresh login/session bootstrap instead of continuing with a bad account.
+            // Return 401 so the client clears stale account selection and bootstraps a fresh session.
             throw RequestPolicyErrors.Unauthorized("the accountId doesn't exist or is invalid for this user");
         }
 
@@ -93,13 +92,8 @@ public class RequestUser
 
     /// <summary>
     /// Determines whether the user has the effective capability anywhere in the current Account.
-    /// This is appropriate for named policy/account-level capability checks; it does not authorize
-    /// a particular Cave, County, or State. Use the scoped overload for resource authorization.
+    /// Suitable for named policy/account-level checks; resource authorization uses the scoped overload.
     /// </summary>
-    /// <param name="permissionKey">The semantic permission/capability to evaluate.</param>
-    /// <param name="throw">Whether to throw Forbidden when the capability is absent.</param>
-    /// <returns>True when the user has the effective capability in the current Account.</returns>
-    /// <exception cref="ApiException">Thrown for a denied capability when <paramref name="throw"/> is true.</exception>
     public async Task<bool> HasCavePermission(string permissionKey, bool @throw = true)
     {
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
@@ -168,10 +162,7 @@ public class RequestUser
         if (hasUserPermission)
             return true;
 
-        // This overload answers whether the user has the capability anywhere in
-        // the current Account, not whether a particular resource currently exists inside
-        // the granted scope. Use the grant rows directly so an all-location or State grant
-        // remains effective even when that scope contains no Counties or Caves yet.
+        // Query grant rows directly so State/all-location capabilities survive empty scopes.
         var hasCavePermission = await _dbContext.CavePermissions
             .AnyAsync(e =>
                 e.AccountId == AccountId
@@ -249,7 +240,6 @@ public class RequestUser
         {
             // StateId is descriptive metadata on Cave/County view rows, so querying the
             // view by StateId alone would incorrectly promote narrower Cave/County grants.
-            // Check the owning permission rows directly for State or all-location scope.
             hasPermission = await _dbContext.CavePermissions.AnyAsync(e =>
                 e.UserId == Id
                 && e.AccountId == AccountId

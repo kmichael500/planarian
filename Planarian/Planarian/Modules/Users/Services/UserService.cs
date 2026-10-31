@@ -247,9 +247,7 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByEmail(email);
         if (user == null)
         {
-            // SECURITY/PRODUCT DECISION: Planarian intentionally returns account-existence feedback here
-            // for usability. Do not replace this with a generic response without explicit product approval.
-            // Request throttling still limits automated discovery.
+            // Product choice: expose account-existence feedback for usability; throttling limits automated discovery.
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
 

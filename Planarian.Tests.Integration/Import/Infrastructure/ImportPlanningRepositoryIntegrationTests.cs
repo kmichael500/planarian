@@ -14,7 +14,6 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
     [Fact]
     public async Task CaveProjectionIsAccountSafeCompleteAndUntracked()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveProjectionIsAccountSafeCompleteAndUntracked));
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
@@ -38,11 +37,9 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
         await using var db = database.CreateDbContext("repository", accountA.AccountId);
         var records = new[] { CaveRecord(accountA) };
 
-        // Act
         var state = await new CaveImportPlanningRepository(db, db.RequestUser)
             .LoadAsync(records, syncExisting: true);
 
-        // Assert
         var cave = Assert.Single(state.ExistingCaves);
         Assert.Equal(accountA.CaveId, cave.Id);
         Assert.Equal(accountA.RevisionId, cave.CurrentRevisionId);
@@ -59,7 +56,6 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
     [Fact]
     public async Task EntranceProjectionIsAccountSafeAndLargeTargetLoadIsSetOriented()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceProjectionIsAccountSafeAndLargeTargetLoadIsSetOriented));
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -95,10 +91,8 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
         }).ToList();
         counter.Reset();
 
-        // Act
         var state = await new EntranceImportPlanningRepository(db, db.RequestUser).LoadAsync(records);
 
-        // Assert
         Assert.Equal(targetCount, state.Caves.Count);
         Assert.DoesNotContain(state.Caves, cave => cave.Id == accountB.CaveId);
         Assert.Contains(state.EligibleTags, tag => tag.Id == quality.Id);

@@ -83,7 +83,6 @@ export interface CaveComponentProps {
   hasEditPermission?: boolean;
 }
 
-// Common function to generate tags
 const generateTags = (tagIds: string[] | undefined) => {
   if (!tagIds || tagIds.length === 0) {
     return defaultIfEmpty(null);
@@ -107,11 +106,10 @@ const hasCoordinates = (entrance: EntranceVm) =>
 const CaveComponent = ({
   cave,
   isLoading,
-  options = {}, // Default to empty object
+  options = {},
   hasEditPermission,
 }: CaveComponentProps) => {
-  // Set default for inCardContainer within options
-  const inCardContainer = options.inCardContainer !== false; // Default to true unless explicitly set to false
+  const inCardContainer = options.inCardContainer !== false;
 
   const { isFeatureEnabled } = useFeatureEnabled();
 

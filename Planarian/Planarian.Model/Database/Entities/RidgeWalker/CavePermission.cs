@@ -71,7 +71,7 @@ public class CavePermissionConfiguration : BaseEntityTypeConfiguration<CavePermi
             .HasForeignKey(e => e.PermissionId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        // Enforce that at most one location scope is provided.
+        // A permission may target at most one location scope: State, County, or Cave.
         builder.ToTable(nameof(CavePermission), tb =>
         {
             tb.HasCheckConstraint("CK_CavePermission_OneLocation",

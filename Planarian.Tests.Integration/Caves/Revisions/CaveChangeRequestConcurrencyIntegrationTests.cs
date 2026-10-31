@@ -416,8 +416,8 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
             PublishableValues(tenant, locationTag.Id, "Loses to delete"), tenant.RevisionId, default);
         await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, contributorPid, createTask);
 
-        // This test isolates lock ordering. Once the hard-delete lock wins, remove the minimal
-        // relational rows directly inside that transaction so no service API needs to accept a DB transaction.
+        // Once the hard-delete lock wins, remove only the rows needed to release the blocked writer
+        // without adding transaction-bearing service APIs.
         await manager.CavePermissions.IgnoreQueryFilters()
             .Where(permission => permission.AccountId == tenant.AccountId && permission.CaveId == tenant.CaveId)
             .ExecuteDeleteAsync();
@@ -455,8 +455,7 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         {
             await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
             var approvalValues = PublishableValues(tenant, locationTag.Id, "Approval loses race");
-            // This test isolates the Cave revision race. A manual county number intentionally takes the
-            // county allocator lock, which would make the competing publication wait on a separate resource.
+            // Avoid the county allocator lock so the competing publication exercises only the Cave revision race.
             approvalValues.IsCountyNumberManuallySet = false;
             requestId = await IntegrationTestServices.For(contributor).CaveChangeRequests.CreateAsync(tenant.CaveId,
                 approvalValues, tenant.RevisionId, default);

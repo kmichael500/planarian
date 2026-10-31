@@ -9,7 +9,7 @@ using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Shared.Base;
 
-// ReSharper disable once CheckNamespace ( for partial class compatability )
+// ReSharper disable once CheckNamespace -- partial class spans feature folders.
 namespace Planarian.Modules.Account.Controller;
 
 [Route(Route)]
@@ -27,7 +27,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         _importService = importService;
     }
 
-    // dangerous
     [HttpDelete("reset")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<AccountResetResult>> RestAccount(CancellationToken cancellationToken)
@@ -46,8 +45,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
     public async Task<ActionResult<AccountResetResult>> RetryResetCleanup(CancellationToken cancellationToken)
         => Ok(await Service.RetryResetCleanupAsync(cancellationToken));
 
-    #region Misc Settings
-
     [HttpGet("settings")]
     public async Task<ActionResult<MiscAccountSettingsVm?>> GetSettings(CancellationToken cancellationToken)
     {
@@ -63,8 +60,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.UpdateMiscAccountSettingsVm(settings, cancellationToken);
         return Ok(result);
     }
-
-    #endregion
 
     #region Tags
 

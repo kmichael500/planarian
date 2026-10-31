@@ -442,9 +442,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             });
           }
 
-          // Queue entries survive refresh, but upload sessions do not.
-          // We intentionally clear transient server/session progress here so any
-          // interrupted upload restarts cleanly from byte 0 when resumed.
+          // Queue state survives refresh; upload sessions do not, so resumed uploads restart at byte 0.
           return normalizeQueueItem<TResult>({
             ...item,
             queueOrder:

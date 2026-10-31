@@ -33,7 +33,7 @@ public class AppService : ServiceBase<AppRepository>
             _serverOptions.SupportName,
             _serverOptions.SupportEmail);
 
-        if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result; // if not authenticated
+        if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result;
 
         var accountIds = await Repository.GetAccountIds();
 

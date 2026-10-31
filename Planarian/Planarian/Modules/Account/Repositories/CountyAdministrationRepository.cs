@@ -14,10 +14,7 @@ namespace Planarian.Modules.Account.Repositories;
 
 public sealed record CountyMutationResult(string Id, string Name, string DisplayId);
 
-/// <summary>
-/// Owns County create/update persistence, validation, locking, and transaction details.
-/// Application services provide validated user intent and map the result for presentation.
-/// </summary>
+/// <summary>Owns County mutation persistence, locking, and transaction details.</summary>
 public sealed class CountyAdministrationRepository : RepositoryBase
 {
     private const int BatchSize = 500;

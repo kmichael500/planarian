@@ -29,7 +29,7 @@ A typical workflow looks like this:
 
 Published Cave changes are recorded as immutable revisions, while pending proposals remain separate from published
 state and pass through a controlled review and publication boundary. See
-[`docs/cave-revisions.md`](docs/cave-revisions.md) for the durable architecture contract.
+[`docs/cave-revisions.md`](docs/cave-revisions.md) for the durable revision/proposal invariants.
 
 The deployment process is documented in [docs/deployment.md](docs/deployment.md), including the
 coordinated API/web/EF migration release workflow and the one-time Cave revision history rollout.
@@ -135,16 +135,13 @@ Users can be invited by managers or admins through the app, accept or decline pe
 
 Use the focused document that owns the fact instead of copying volatile rules between guides:
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — start here for the system map, workflow diagrams, component catalog, and guided code tours.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system architecture, major workflows, component boundaries, and architecture decisions.
 - [`docs/authorization.md`](docs/authorization.md) — platform, account, and Cave authorization boundaries.
 - [`docs/data-access-architecture.md`](docs/data-access-architecture.md) — durable backend dependency and persistence rules.
-- [`docs/cave-revisions.md`](docs/cave-revisions.md) — durable Cave revision/proposal architecture contract.
+- [`docs/cave-revisions.md`](docs/cave-revisions.md) — durable Cave revision/proposal invariants.
 - [`docs/import-compatibility.md`](docs/import-compatibility.md) — import compatibility invariants and approved differences.
 - [`docs/testing.md`](docs/testing.md) — backend test architecture and validation commands.
 - [`Contracts/README.md`](Contracts/README.md) — shared browser-route contract and generation workflow.
-- [`AGENTS.md`](AGENTS.md) — concise routing for coding agents; specialized command-like workflows are registered in [`PROJECT_PROTOCOLS.md`](PROJECT_PROTOCOLS.md).
-
-The Cave-revisions completion material under `docs/plans/` is an active target-state implementation plan, not the canonical source for unrelated repository behavior.
 
 - Frontend: React + TypeScript
 - Backend: C#
@@ -155,7 +152,7 @@ The core application architecture is not tied to Azure hosting, but the current 
 
 ### Docker development
 
-The repository includes a Compose-based development environment for the backend, frontend, PostgreSQL/PostGIS, Azurite, Caddy, a shared Playwright/Chromium browser, and an optional Desktop Commander agent. Docker Compose v2 and Docker Buildx are expected; Docker Desktop includes them, while Homebrew/Colima users can install the corresponding Docker CLI plugins separately.
+The repository includes a Compose-based development environment for the backend, frontend, PostgreSQL/PostGIS, Azurite, Caddy, and a shared Playwright/Chromium browser. Docker Compose v2 and Docker Buildx are expected; Docker Desktop includes them, while Homebrew/Colima users can install the corresponding Docker CLI plugins separately.
 
 ```bash
 npm run dev:setup             # first-time build + generic dataset
@@ -171,13 +168,13 @@ npm run dev:db
 
 The root `package.json` is only a convenience layer; `./dev` remains the canonical implementation for Docker orchestration. Run `npm run` to list the available aliases. Arguments can be passed through after `--`, for example `npm run dev:logs -- backend` or `npm run dev:restart -- backend`.
 
-The app is available to devices on the same LAN at `https://planarian.local` with no port number. The shared agent browser is available to devices on the same LAN at `https://viewer.planarian.local` with no port number; run `npm run dev:viewer` to see its generated username/password. The raw browser viewer and CDP endpoint remain Docker-internal/loopback-only.
+The app is available to devices on the same LAN at `https://planarian.local` with no port number. The shared browser viewer is available at `https://viewer.planarian.local`; run `npm run dev:viewer` to see its generated username/password. The raw viewer and CDP endpoint remain Docker-internal/loopback-only.
 
 `npm run dev:repo` starts an optional code-server editor at `https://repo.planarian.local`; it is off by default. Run `npm run dev:repo:credentials` to see its generated password. The editor uses the same read/write checkout, persists its editor data/extensions in a Docker volume, includes the repository's .NET 8 and Node 22 development toolchains, and does not receive the Docker socket. Known ignored Planarian appsettings and frontend environment paths are overlaid with the tracked safe local-development files rather than exposing those host files through the editor.
 
 Caddy uses one local development CA for `planarian.local`, `viewer.planarian.local`, and `repo.planarian.local`. Run `npm run dev:cert` once on macOS. On another LAN device, open `http://cert.planarian.local` to download that same root CA and install/trust it once; trusting that root covers certificates for all three HTTPS hostnames. The seeded Planarian users are `admin@planarian.local`, `manager@planarian.local`, and `viewer@planarian.local`, all with password `planarian`.
 
-The generic and E2E datasets are separate databases in the same local PostgreSQL container. `reset` is intentionally destructive for the selected local dataset: it recreates that database and removes its account-owned Azurite containers before reseeding the baseline. It does not reset the other dataset.
+The generic and E2E datasets are separate databases in the same local PostgreSQL container. `reset` is destructive for the selected local dataset: it recreates that database and removes its account-owned Azurite containers before reseeding the baseline. It does not reset the other dataset.
 
 On a fresh local dataset, `Planarian.Dev` bootstraps the local users and creates the fixture account through `PlanarianSettingsService.CreateAccount`, so the account, selected state, feature settings, creator membership, and Admin permission follow the normal Planarian account-creation path. The generated account and the dev-owned county marker are committed in one transaction, so a failed bootstrap cannot leave an unmarked fixture account behind. Subsequent startup resolves the account by that marker; if the marker was deleted, it can recover one unambiguous account matching the local account name and seeded admin. Unrelated local accounts can coexist, and ambiguous recovery fails instead of choosing an account implicitly.
 
@@ -195,7 +192,7 @@ This defaults to `Planarian/Planarian/appsettings.Development.json`. To use a di
 npm run dev:settings -- /absolute/path/to/appsettings.Development.json
 ```
 
-The backend receives the selected file read-only. The Desktop Commander agent continues to receive the safe generic local settings and local PostgreSQL configuration, so mounting Azure-backed application settings does not automatically expose them to the agent. Use `npm run dev:agent` for the one-time Desktop Commander device authorization; its session persists in a Docker volume.
+The backend receives the selected file read-only.
 
 Rider can continue to open the host checkout directly. The same checkout is bind-mounted into the containers, and `.devcontainer/devcontainer.json` is available for Rider's Dev Container workflow when desired. Rider's Docker-attach debugger tools are stored in the named `planarian-compose-rider-debugger` volume at `~/.RiderDebuggerTools`, so the one-time **Install tools to the container** step survives backend-container recreation. After a Rider upgrade, Rider may refresh the tools in that same persistent volume; normal `npm run dev:stop` does not remove it.
 
@@ -212,17 +209,17 @@ If you prefer to run Planarian natively:
 
 The frontend build requires the public, non-secret `REACT_APP_API_ORIGIN_MAPPINGS` environment variable for hosted deployments. It is a JSON object mapping each frontend hostname to its API origin, for example `{"portal.example.com":"https://services.example.com"}`. Mapping keys are compared with `window.location.hostname`, so they are hostnames without ports.
 
-For local deployment-script use, place the variable in the ignored `Planarian.Web/.env` file, for example `REACT_APP_API_ORIGIN_MAPPINGS='{"portal.example.org":"https://backend.example.org"}'`. The outer quotes are required when the value contains JSON quotes. `scripts/deploy-dev.sh` uses a deliberately small dotenv loader rather than sourcing this uncommitted file as Bash; it accepts `KEY=VALUE`, optional `export`, and matching outer single/double quotes, and treats shell syntax as literal text. Set `PLANARIAN_DEPLOY_ENV_FILE` to use another uncommitted environment file when needed. Run `scripts/validate-env-example.sh` to verify that the documented example reaches the frontend as valid JSON.
+For local deployment-script use, place the variable in the ignored `Planarian.Web/.env` file, for example `REACT_APP_API_ORIGIN_MAPPINGS='{"portal.example.org":"https://backend.example.org"}'`. The outer quotes are required when the value contains JSON quotes. `scripts/deploy-dev.sh` uses a minimal dotenv loader rather than sourcing this uncommitted file as Bash; it accepts `KEY=VALUE`, optional `export`, and matching outer single/double quotes, and treats shell syntax as literal text. Set `PLANARIAN_DEPLOY_ENV_FILE` to use another uncommitted environment file when needed. Run `scripts/validate-env-example.sh` to verify that the documented example reaches the frontend as valid JSON.
 
-The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. For example, an API host `services.example.com` can map to `https://portal.example.com`, while `backend.example.org` can map to `https://portal.example.org`. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit semicolon-delimited API hostnames without ports. These mappings intentionally do not infer hostnames from naming conventions.
+The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. For example, an API host `services.example.com` can map to `https://portal.example.com`, while `backend.example.org` can map to `https://portal.example.org`. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit semicolon-delimited API hostnames without ports. These mappings do not infer hostnames from naming conventions.
 
 Hosted browser frontend/API mappings must use HTTPS and be schemeful same-site. HTTPS is validated for every hosted/production deployment (not merely Azure); development permits HTTP only for explicit localhost/loopback mappings. Hosted deployments also require explicit, non-wildcard `AllowedHosts`, at least one `Server:ClientOriginMappings` entry, and a mapping/CORS/allowed-host match. Same-site relationships remain an explicit deployment responsibility because correctly evaluating public suffixes requires public-suffix data that Planarian does not embed. Planarian authentication uses host-only, `Secure`, `SameSite=Lax` cookies, so arbitrary unrelated registrable domains cannot provide browser cookie authentication. This does not impose an `app` → `api` naming convention: subdomain names are arbitrary, and no deployment domain is hard-coded in source.
 
 ### Azure App Service API deployments
 
-Azure/Linux App Service terminates TLS before Kestrel. Local `scripts/deploy-dev.sh` can configure `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`; for hosted releases, configure that App Service setting once before enabling the coordinated GitHub deployment workflow. The workflow verifies the setting before API deployment rather than rewriting App Service configuration on every release. Configure the GitHub Environment with the non-secret `AZURE_RESOURCE_GROUP` variable and an `AZURE_CREDENTIALS` secret usable by `azure/login`; the coordinated workflow no longer uses the old publish-profile deployment path.
+Azure/Linux App Service terminates TLS before Kestrel. Local `scripts/deploy-dev.sh` can configure `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`; for hosted releases, configure that App Service setting once before enabling the coordinated GitHub deployment workflow. The workflow verifies the setting before API deployment rather than rewriting App Service configuration on every release. Configure the GitHub Environment with the non-secret `AZURE_RESOURCE_GROUP` variable and an `AZURE_CREDENTIALS` secret usable by `azure/login`; the coordinated workflow uses Azure login rather than a publish profile.
 
-This is required so forwarded `X-Forwarded-Proto` restores the public HTTPS scheme before HTTPS redirection and before Planarian constructs `ApiBaseUrl`, SignalR URLs, photo URLs, profile URLs, and other request-generated URLs. The API intentionally fails fast in Azure when the setting is absent.
+This is required so forwarded `X-Forwarded-Proto` restores the public HTTPS scheme before HTTPS redirection and before Planarian constructs `ApiBaseUrl`, SignalR URLs, photo URLs, profile URLs, and other request-generated URLs. The API fails fast in Azure when the setting is absent.
 
 Microsoft documents that this environment setting is useful for cloud proxies whose addresses can change, but it clears the normal `KnownProxies`/`KnownNetworks` restriction. Azure App Service does not provide a stable App-Service proxy address range suitable for this application-level allow-list, so this deployment uses the supported environment setting and continues to validate request hosts against configured mappings rather than trusting `X-Forwarded-Host` for public-origin generation. Revisit this choice if the deployment is placed behind a stable, explicitly trusted proxy such as an application gateway; then configure `ForwardedHeadersOptions` with its known proxy/network instead. See [Microsoft's forwarded-header guidance](https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer) and [host-name preservation guidance](https://learn.microsoft.com/azure/architecture/best-practices/host-name-preservation).
 

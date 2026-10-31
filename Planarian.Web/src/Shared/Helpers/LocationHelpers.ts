@@ -1,7 +1,7 @@
 import type { MessageInstance } from "antd/es/message/interface";
 import { formatCoordinateNumber } from "./StringHelpers";
 
-// Singleton to ensure only one location request happens at a time
+// Coalesce concurrent geolocation requests.
 let locationRequestPromise: Promise<{ latitude: number; longitude: number; } | null> | null = null;
 
 export const LocationHelpers = {

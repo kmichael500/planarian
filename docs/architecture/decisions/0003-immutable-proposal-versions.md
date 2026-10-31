@@ -1,6 +1,6 @@
 # ADR 0003 — Store change proposals as immutable versions
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Accepted
 **Scope:** Cave suggestion and review workflow
 
 ## Context

@@ -78,12 +78,6 @@ interface ExpandableTextProps {
   maxChars?: number;
 }
 
-/**
- * ExpandableText splits the text into paragraphs (by newline).
- * If the total character count exceeds maxChars, it shows a truncated
- * version along with a "Show more" control. When expanded, it shows all paragraphs
- * with a "Show less" control.
- */
 const ExpandableText: React.FC<ExpandableTextProps> = ({
   text,
   maxChars = 1000,
@@ -178,14 +172,14 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   const [geologicMapsError, setGeologicMapsError] = useState<string | null>(
     null
   );
-  const [selectedScales, setSelectedScales] = useState<(number | string)[]>([]); // Changed type
+  const [selectedScales, setSelectedScales] = useState<(number | string)[]>([]);
 
   const isColorLight = (color: string): boolean => {
     if (!color || color[0] !== "#") return false;
     const r = parseInt(color.substr(1, 2), 16);
     const g = parseInt(color.substr(3, 2), 16);
     const b = parseInt(color.substr(5, 2), 16);
-    // Calculate brightness per ITU-R BT.601
+    // ITU-R BT.601 luma approximation.
     const brightness = (r * 299 + g * 587 + b * 114) / 1000;
     return brightness > 200;
   };
@@ -217,24 +211,18 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       try {
         let maps = await MapService.getGeologicMaps(lat, lng);
 
-        // Sort maps:
-        // 1. Primary sort by scale: ascending for positive scales, -1 (unscaled) goes to the end.
-        // 2. Secondary sort by year: descending (newer first).
+        // Prefer finer mapped scales, place unscaled results last, and use newest year as the tie-breaker.
         maps.sort((a, b) => {
           const aIsUnscaled = a.scale === -1;
           const bIsUnscaled = b.scale === -1;
 
-          // Rule 1: Unscaled items go to the end
-          if (aIsUnscaled && !bIsUnscaled) return 1; // a (-1) comes after b (positive)
-          if (!aIsUnscaled && bIsUnscaled) return -1; // a (positive) comes before b (-1)
+          if (aIsUnscaled && !bIsUnscaled) return 1;
+          if (!aIsUnscaled && bIsUnscaled) return -1;
 
-          // Rule 2: If scales are different (applies only if both are positive and different)
-          // If both are unscaled, their scales are "equal" for this check (both -1)
           if (a.scale !== b.scale && !aIsUnscaled && !bIsUnscaled) {
-            return a.scale - b.scale; // Sort positive scales numerically ascending
+            return a.scale - b.scale;
           }
 
-          // Rule 3: If scales are effectively the same (both -1, or same positive value), sort by year descending
           return b.year - a.year;
         });
 
@@ -273,7 +261,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
 
   const xddSnippets = xddData?.success.data || [];
 
-  // Get unique scales for the filter dropdown, maintaining the sort order (finest first, -1 last)
   const uniqueScales = useMemo(() => {
     const scales: number[] = [];
     if (geologicMapsData.length > 0) {
@@ -292,10 +279,8 @@ const Macrostrat: React.FC<MacrostratProps> = ({
     if (uniqueScales.length > 0) {
       const finestScale = uniqueScales[0];
       if (uniqueScales.length === 1) {
-        // If only one unique scale, select it and "All"
         setSelectedScales([finestScale, allOptionValue]);
       } else {
-        // Otherwise, select only the finest scale
         setSelectedScales([finestScale]);
       }
     } else {
@@ -312,7 +297,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
     let newSelectedValues: (number | string)[];
 
     if (allIsCurrentlyInCheckedList && !allWasPreviouslyInSelectedScales) {
-      // "All" was just explicitly checked by the user
       newSelectedValues = allUniqueScalesAvailable
         ? [...uniqueScales, allOptionValue]
         : [allOptionValue];
@@ -320,12 +304,8 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       !allIsCurrentlyInCheckedList &&
       allWasPreviouslyInSelectedScales
     ) {
-      // "All" was just explicitly unchecked by the user
-      // Revert to selecting only the highest resolution scale (or none if no scales)
       newSelectedValues = allUniqueScalesAvailable ? [uniqueScales[0]] : [];
     } else {
-      // "All" was not the item directly clicked, or its state in checkedList matches its previous state.
-      // This means an individual scale was checked/unchecked.
       const currentlySelectedNumeric = checkedList.filter(
         (v) => typeof v === "number"
       ) as number[];
@@ -335,7 +315,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
         allUniqueScalesAvailable &&
         currentlySelectedNumeric.length === uniqueScales.length
       ) {
-        // All individual scales are now checked, so add "all" to the selection
         if (!newSelectedValues.includes(allOptionValue)) {
           newSelectedValues.push(allOptionValue);
         }
@@ -392,7 +371,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   }
 
   if (!macroData) {
-    return null; // Or a <Text>No data available</Text> component
+    return null;
   }
 
   const { mapData = [], regions = [] } = macroData.success.data;
@@ -406,13 +385,12 @@ const Macrostrat: React.FC<MacrostratProps> = ({
     descrip,
     comments,
     liths: mainLiths = [],
-    color, // main color for the map object
+    color,
     b_int,
     t_int,
-    ref, // source for the geologic map
+    ref,
   } = firstMap;
 
-  // Macrostrat-specific fields
   const {
     strat_names = [],
     max_thick,
@@ -426,7 +404,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   const descriptionText = descrip ? descrip.trim() : "";
   const commentsText = comments ? comments.trim() : "";
 
-  // Compute ranges for macrostrat age and thickness (if available)
   const macroAgeRange = b_age && t_age ? `${b_age}–${t_age} Ma` : "N/A";
   const thicknessRange =
     typeof min_min_thick === "number" && typeof max_thick === "number"
@@ -740,7 +717,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
               </Typography>
             </Panel>
 
-            {/* Macrostrat-linked data panel */}
             <Panel header="Macrostrat-linked data" key="2">
               <PlanarianDescription
                 copyable={false}
@@ -751,7 +727,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
               />
             </Panel>
 
-            {/* Primary Literature panel */}
             <Panel header="Primary Literature" key="3">
               {xddSnippets.length === 0 ? (
                 <Text>No references found for "{strat_name}"</Text>
@@ -780,7 +755,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
               )}
             </Panel>
 
-            {/* Regions panel */}
             {regions.length > 0 && (
               <Panel header="Physiography / Regions" key="4">
                 <Collapse>

@@ -21,8 +21,6 @@ public class TripController : PlanarianControllerBase<TripService>
     {
     }
 
-    #region Invitations
-
     [HttpPost("{tripId:length(10)}/members/invite")]
     public async Task<ActionResult> InviteTripMember(string tripId,
         [FromBody] InviteMember invitation)
@@ -31,8 +29,6 @@ public class TripController : PlanarianControllerBase<TripService>
 
         return new OkResult();
     }
-
-    #endregion
 
     #region Trip
 
@@ -168,8 +164,6 @@ public class TripController : PlanarianControllerBase<TripService>
 
     #endregion
 
-    #region Leads
-
     [HttpGet("{tripId:length(10)}/leads")]
     public async Task<ActionResult<IEnumerable<LeadVm>>> GetTripLeads(string tripId)
     {
@@ -184,5 +178,4 @@ public class TripController : PlanarianControllerBase<TripService>
         return new OkResult();
     }
 
-    #endregion
 }

@@ -204,7 +204,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
                               e.CartographerNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.EntranceReportedByNameTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
                               e.FileTypeTags.Count(ee =>
-                                  ee.ExpiresOn == null && ee.Cave.AccountId == RequestUser.AccountId) + // temp files don't count
+                                  ee.ExpiresOn == null && ee.Cave.AccountId == RequestUser.AccountId) + // Exclude temporary Files.
                               e.MapStatusTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.GeologicAgeTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.PhysiographicProvinceTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +

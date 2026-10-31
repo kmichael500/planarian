@@ -5,10 +5,7 @@ using Xunit;
 
 namespace Planarian.Tests.Unit.Import;
 
-/// <summary>
-/// Drift guard for the CSV import contracts. Persistence semantics are exercised by the real-PostgreSQL
-/// parity/lifecycle tests; these declarations make a newly added import field an explicit test decision.
-/// </summary>
+/// <summary>Drift guard requiring every CSV import field to be classified by the tests.</summary>
 public sealed class ImportFieldCoverageTests
 {
     [Fact]

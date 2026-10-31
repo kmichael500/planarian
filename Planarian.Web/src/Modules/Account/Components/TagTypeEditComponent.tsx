@@ -44,7 +44,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15); // Assuming default page size is 10
+  const [pageSize, setPageSize] = useState(15);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -130,7 +130,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       message.error("Failed to delete some Tag Types!");
     } finally {
       setIsLoading(false);
-      setSelectedRowKeys([]); // Clear the selection
+      setSelectedRowKeys([]);
     }
   };
 
@@ -197,8 +197,8 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
           </PlanarianButton>
           <Button
             onClick={() => {
-              handleReset(clearFilters!); // reset the filter
-              confirm(); // immediately apply the reset
+              handleReset(clearFilters!);
+              confirm();
             }}
             size="small"
             style={{ width: 90 }}
@@ -256,9 +256,9 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       title: "Name",
       dataIndex: "name",
       key: "name",
-      ...getColumnSearchProps("name"), // Apply the search props to this column
+      ...getColumnSearchProps("name"),
       sorter: (a: TagTypeTableVm, b: TagTypeTableVm) =>
-        a.name.localeCompare(b.name), // Enable sorting
+        a.name.localeCompare(b.name),
 
       render: (text: string, record: TagTypeTableVm) => {
         if (editedTagType && editedTagType.tagTypeId === record.tagTypeId) {
@@ -284,7 +284,6 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       key: "occurrences",
       sorter: (a: TagTypeTableVm, b: TagTypeTableVm) =>
         a.occurrences - b.occurrences,
-      // defaultSortOrder: "descend",
     },
     {
       title: "Action",
@@ -359,31 +358,27 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       mergeForm.resetFields();
       setIsLoading(true);
 
-      // Perform the merge operation on the server
       await AccountService.MergeTagTypes(
         sourceTagTypeIds,
         destinationTagTypeId
       );
 
-      // Manually calculate the new occurrences for the merged tag type and adjust the local state
       setLocalTagTypes((prev) => {
         let newOccurrence = 0;
 
-        // First map to adjust sourceTagType occurrences and calculate newOccurrence
         const intermediateTagTypes = prev.map((t) => {
           if (sourceTagTypeIds.includes(t.tagTypeId)) {
             newOccurrence += t.occurrences;
-            return { ...t, occurrences: 0 }; // Return a new object with occurrences set to 0
+            return { ...t, occurrences: 0 };
           }
-          return t; // Return the original object if no change is needed
+          return t;
         });
 
-        // Second map to adjust the destinationTagType occurrences
         const updatedTagTypes = intermediateTagTypes.map((t) => {
           if (t.tagTypeId === destinationTagTypeId) {
-            return { ...t, occurrences: t.occurrences + newOccurrence }; // Return a new object with updated occurrences
+            return { ...t, occurrences: t.occurrences + newOccurrence };
           }
-          return t; // Return the original object if no change is needed
+          return t;
         });
 
         return updatedTagTypes;
@@ -394,15 +389,15 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       message.error("Failed to merge Tag Types!");
     } finally {
       setIsLoading(false);
-      setSelectedRowKeys([]); // Clear the selection
-      setSingleMergeTagTypeId(null); // Clear the single merge tag type id
+      setSelectedRowKeys([]);
+      setSingleMergeTagTypeId(null);
     }
   };
 
   const sortedAndFilteredTagTypes = useMemo(() => {
     return localTagTypes
-      .filter((tagType) => !selectedRowKeys.includes(tagType.tagTypeId)) // Exclude selected items
-      .filter((tagType) => tagType.tagTypeId !== singleMergeTagTypeId) // Exclude the single merge tag type
+      .filter((tagType) => !selectedRowKeys.includes(tagType.tagTypeId))
+      .filter((tagType) => tagType.tagTypeId !== singleMergeTagTypeId)
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [localTagTypes, selectedRowKeys, singleMergeTagTypeId]);
 
@@ -490,7 +485,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
         onCancel={
           () => {
             setIsMergeModalOpen(false);
-          } // Clear the single merge tag type id
+          }
         }
       >
         <Form form={mergeForm}>

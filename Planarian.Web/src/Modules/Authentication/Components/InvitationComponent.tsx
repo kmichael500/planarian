@@ -7,7 +7,7 @@ import {
   EnvironmentOutlined,
 } from "@ant-design/icons";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
-import { useNavigate } from "react-router-dom"; // Add this import for navigation
+import { useNavigate } from "react-router-dom";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserService } from "../../User/UserService";

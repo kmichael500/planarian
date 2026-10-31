@@ -29,21 +29,17 @@ const CSVDisplay: React.FC<CSVDisplayProps> = ({ data }) => {
   const [columnKeys, setColumnKeys] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Set filter settings (using Excel type for enhanced filtering UI)
   const filterSettings: FilterSettingsModel = { type: "Excel" };
 
   useEffect(() => {
-    // Parse CSV data after component mount
     if (data) {
       const result = Papa.parse<TableRow>(data, { header: true });
       const parsed = result.data;
       setParsedData(parsed);
 
-      // Extract column keys from the first row
       const keys = parsed && parsed.length > 0 ? Object.keys(parsed[0]) : [];
       setColumnKeys(keys);
 
-      // Set component as loaded
       setIsLoaded(true);
     }
   }, [data]);

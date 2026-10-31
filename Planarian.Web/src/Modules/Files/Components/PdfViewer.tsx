@@ -17,7 +17,7 @@ const pdfAssetUrl = (path: string) =>
 
 const PDF_VIEWER_ELEMENT_TAG = "pdfjs-viewer-element";
 const PDF_VIEWER_READ_ONLY_OPTIONS = {
-  // Render annotations, but keep interactive form controls non-editable.
+  // Annotation rendering without editable form controls.
   annotationMode: 1,
   annotationEditorMode: -1,
   disableHistory: true,

@@ -35,7 +35,6 @@ public class CaveSearchParamsVm
 
     #endregion
 
-    #region Entrance
     
     public string EntranceStatusTagIds { get; set; }
     public string EntranceDescription { get; set; }
@@ -49,13 +48,8 @@ public class CaveSearchParamsVm
     public string EntranceReportedByPeopleTagIds { get; set; }
     public DateTime EntranceReportedOnDate { get; set; }
 
-    #endregion
-
-    #region Files
-
     public string FileTypeTagIds { get; set; }
     public string FileName { get; set; }
     public string FileExtension { get; set; }
 
-    #endregion
 }

@@ -166,7 +166,7 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
         var before = await CaveDurableStateFingerprint.CaptureAsync(verify);
         await using (var mutate = database.CreateDbContext("same-value-rewrite", cave.AccountId))
         {
-            // Intentionally change the PostgreSQL row version without changing any domain field values.
+            // Change only the PostgreSQL row version; domain values remain identical.
             Assert.Equal(1, await mutate.Caves.IgnoreQueryFilters()
                 .Where(row => row.AccountId == cave.AccountId && row.Id == cave.CaveId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Name, row => row.Name)));

@@ -138,8 +138,8 @@ public sealed class SaveChangesOwnershipCommandCountTests(PostgresTestServer fix
     private static PlanarianDbContext CreateContext(PostgresTestDatabase database, string accountId, DbCommandCounter counter)
     {
         // Account-scoped writes are audit-stamped by SaveChangesInterceptor, so
-        // the command-count context must use a persisted User just like a real
-        // request. CreateDbContext performs that idempotent fixture setup.
+        // the command-count context must use a persisted User. CreateDbContext performs
+        // that idempotent fixture setup.
         using (database.CreateDbContext("counter", accountId)) { }
 
         var options = new DbContextOptionsBuilder<PlanarianDbContext>().UseNpgsql(database.ConnectionString, o => { o.MigrationsAssembly("Planarian.Migrations"); o.UseNetTopologySuite(); }).AddInterceptors(counter).Options;

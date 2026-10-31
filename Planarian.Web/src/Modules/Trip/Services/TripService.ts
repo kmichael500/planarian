@@ -11,7 +11,6 @@ import { PhotoVm } from "../../Photo/Models/PhotoVm";
 
 const baseUrl = "api/trips";
 const TripService = {
-  //#region Trips
   async GetTrip(id: string): Promise<TripVm> {
     const response = await HttpClient.get<TripVm>(`${baseUrl}/${id}`);
     return response.data;
@@ -64,9 +63,7 @@ const TripService = {
       headers: { "Content-Type": "application/json" },
     });
   },
-  //#endregion
 
-  //#region Photos
   async UploadPhotos(values: TripPhotoUpload[], tripId: string): Promise<void> {
     const formData = new FormData();
 
@@ -100,9 +97,7 @@ const TripService = {
     return response.data;
   },
 
-  //#endregion
 
-  //#region Trip Members
   async GetTripMembers(tripId: string): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
       `${baseUrl}/${tripId}/members`
@@ -130,9 +125,7 @@ const TripService = {
     );
     return response.data;
   },
-  //#endregion
 
-  //#region Leads
   async GetLeads(tripId: string): Promise<LeadVm[]> {
     const response = await HttpClient.get<LeadVm[]>(
       `${baseUrl}/${tripId}/leads`
@@ -144,9 +137,7 @@ const TripService = {
     await HttpClient.post<void>(`${baseUrl}/${tripId}/leads`, leads);
   },
 
-  //#endregion
 
-  //#region
 
   async InviteTripMembers(values: InviteMember, tripId: string): Promise<void> {
     const response = await HttpClient.post<void>(
@@ -155,7 +146,6 @@ const TripService = {
     );
     return response.data;
   },
-  //#endregion
 };
 
 export { TripService };

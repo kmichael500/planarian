@@ -10,21 +10,11 @@ import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 
 const baseUrl = "api/projects";
 const ProjectService = {
-  //#region Project
-  /**
-   *
-   * @param project
-   * @returns Id of the project.
-   */
   async CreateProject(project: CreateOrEditProject): Promise<ProjectVm> {
     const response = await HttpClient.post<ProjectVm>(`${baseUrl}/`, project);
     return response.data;
   },
 
-  /**
-   *
-   * @returns List of projects that user has access to.
-   */
   async GetProjects(
     queryBuilder: QueryBuilder<ProjectVm>
   ): Promise<PagedResult<ProjectVm>> {
@@ -34,19 +24,12 @@ const ProjectService = {
     return response.data;
   },
 
-  /**
-   *
-   * @param projectId
-   * @returns a project
-   */
   async GetProject(projectId: string): Promise<ProjectVm> {
     const response = await HttpClient.get<ProjectVm>(`${baseUrl}/${projectId}`);
     return response.data;
   },
 
-  //#endregion
 
-  //#region Trip
 
   async AddTrip(values: CreateOrEditTripVm): Promise<TripVm> {
     const response = await HttpClient.post<TripVm>(
@@ -66,9 +49,7 @@ const ProjectService = {
     return response.data;
   },
 
-  //#endregion
 
-  //#region Project Members
   async GetProjectMembers(
     projectId: string
   ): Promise<SelectListItem<string>[]> {
@@ -98,9 +79,7 @@ const ProjectService = {
     return response.data;
   },
 
-  //#endregion
 
-  //#region
 
   async InviteProjectMembers(
     values: InviteMember,
@@ -112,7 +91,6 @@ const ProjectService = {
     );
     return response.data;
   },
-  //#endregion
 };
 
 export { ProjectService };

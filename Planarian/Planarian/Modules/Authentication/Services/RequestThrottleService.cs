@@ -314,8 +314,6 @@ public class RequestThrottleService
 
     #endregion
 
-    #region Counter State
-
     private CounterState GetState(string key, TimeSpan window)
     {
         return _cache.GetOrCreate(key, entry =>
@@ -325,8 +323,6 @@ public class RequestThrottleService
             return new CounterState(expiresOn);
         })!;
     }
-
-    #endregion
 
     #region Helpers
 

@@ -16,8 +16,6 @@ public class PhotoController : PlanarianControllerBase<PhotoService>
     {
     }
 
-    #region Trip Photos
-
     [HttpDelete("{photoId:length(10)}")]
     public async Task<ActionResult> DeletePhoto(string photoId)
     {
@@ -33,5 +31,4 @@ public class PhotoController : PlanarianControllerBase<PhotoService>
         return await CreateFileResult(result);
     }
 
-    #endregion
 }

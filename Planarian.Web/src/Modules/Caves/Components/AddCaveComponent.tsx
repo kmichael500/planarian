@@ -98,7 +98,6 @@ const AddCaveComponent = ({
   };
 
   useEffect(() => {
-    // if stateId has a value in the form, set the selectedStateId to that value
     const initialStateValue = form.getFieldValue("stateId");
     if (!isNullOrWhiteSpace(initialStateValue)) {
       setSelectedStateId(initialStateValue);
@@ -218,9 +217,7 @@ const AddCaveComponent = ({
     }
 
     if (hideCountyNumberControls) {
-      // Hidden Manager-only state is intentionally preserved in the form so a transient
-      // permission lookup cannot erase an authorized Manager's saved proposal intent.
-      // The owning page re-checks destination authority and sanitizes before preview/save.
+      // Preserve hidden Manager values across permission loading; the owning page revalidates before submission.
       setIsCountyNumberLoading(false);
       return;
     }
@@ -274,7 +271,6 @@ const AddCaveComponent = ({
     cave?.countyNumber,
   ]);
 
-  //#region  Column Props
   const fourColProps = {
     xxl: 6,
     xl: 6,
@@ -310,7 +306,6 @@ const AddCaveComponent = ({
     sm: 24,
     xs: 24,
   } as ColProps;
-  //#endregion
 
   const countyNumberPrefix = countyDisplayId
     ? `${countyDisplayId}${countyIdDelimiter ?? ""}`

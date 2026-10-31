@@ -1,17 +1,12 @@
 namespace Planarian.Model.Database.Revisions;
 
-/// <summary>
-/// A descriptive value changing while its stable reference ID remains the same.
-/// It is an effective historical change, not an association change and not an
-/// assertion that the actor who published this Cave revision renamed the shared
-/// reference entity.
-/// </summary>
+/// <summary>A historical label change for an unchanged stable reference; not an association change or actor rename.</summary>
 public sealed record ReferenceMetadataChange(string Path, string StableId, string Property,
     string? PreviousValue, string? CurrentValue);
 
 /// <summary>
 /// Stable serialized identifiers consumed by the Cave revision-diff API and frontend presentation.
-/// These values are a wire contract and must not change merely because a CLR snapshot member is renamed.
+/// Values are a wire contract and do not follow CLR member renames.
 /// </summary>
 public static class CaveRevisionDiffWireContract
 {

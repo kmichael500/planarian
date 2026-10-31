@@ -11,8 +11,8 @@ public sealed record StoredObjectReadResult(
 public interface IObjectStorage
 {
     /// <summary>
-    /// Creates content at an application-allocated immutable address. Implementations must fail
-    /// if that address already exists; they must never overwrite existing content.
+    /// Writes to an application-allocated immutable address. Implementations must fail
+    /// when the address already exists; existing content is never overwritten.
     /// </summary>
     Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken);

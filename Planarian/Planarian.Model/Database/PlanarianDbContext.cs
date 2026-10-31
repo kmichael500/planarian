@@ -21,44 +21,19 @@ public partial class PlanarianDbContextBase : DbContext
     {
     }
 
-    #region Photo
-
     public DbSet<Photo> Photos { get; set; } = null!;
 
-    #endregion
-
-    #region Tag
-
     public DbSet<TagType> TagTypes { get; set; } = null!;
-
-    #endregion
-
-    #region User
 
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<UserPermission> UserPermissions { get; set; } = null!;
 
-    #endregion
-
-    #region Member
-
     public DbSet<Member> Members { get; set; } = null!;
-
-    #endregion
-
-    #region Project
 
     public DbSet<Project> Projects { get; set; } = null!;
 
-    #endregion
-
-    #region Cave
-
-    #region Views
-
     public DbSet<UserCavePermissionsView> UserCavePermissionView { get; set; } = null!;
 
-    #endregion
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<AccountState> AccountStates { get; set; } = null!;
     public DbSet<AccountUser> AccountUsers { get; set; } = null!;
@@ -96,8 +71,6 @@ public partial class PlanarianDbContextBase : DbContext
     public DbSet<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
 
-    #endregion
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("postgis");
@@ -121,33 +94,18 @@ public partial class PlanarianDbContextBase : DbContext
         optionsBuilder.AddInterceptors(ChangesInterceptor);
     }
 
-    #region Trip
-
     public DbSet<Trip> Trips { get; set; } = null!;
     public DbSet<TripTag> TripTags { get; set; } = null!;
 
-    #endregion
-
-    #region Lead
-
     public DbSet<Lead> Leads { get; set; } = null!;
     public DbSet<LeadTag> LeadTags { get; set; } = null!;
-
-    #endregion
-
-    #region Message
 
     public DbSet<MessageType> MessageTypes { get; set; } = null!;
     public DbSet<MessageLog> MessageLogs { get; set; } = null!;
     public DbSet<MessageLogEvent> MessageLogEvents { get; set; } = null!;
 
-    #endregion
-
-    #region Throttling
-
     public DbSet<ThrottleEventLog> ThrottleEventLogs { get; set; } = null!;
 
-    #endregion
 }
 
 public class PlanarianDbContext : PlanarianDbContextBase
@@ -156,9 +114,7 @@ public class PlanarianDbContext : PlanarianDbContextBase
     {
     }
 
-    // Query filters intentionally use scalar context properties. EF parameterizes
-    // DbContext members per context instance, so account changes do not get captured
-    // into the cached model. A missing account fails closed for all tenant-owned data.
+    // Scalar context properties keep tenant/user filters parameterized per DbContext; missing scope fails closed.
     private string? CurrentAccountId => RequestUser?.AccountId;
     private string? CurrentUserId => RequestUser?.Id;
 

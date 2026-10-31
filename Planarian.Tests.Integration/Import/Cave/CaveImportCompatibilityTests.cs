@@ -15,7 +15,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task ExistingAccountTagIsReusedCaseInsensitivelyAndPersistedWithCanonicalName()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ExistingAccountTagIsReusedCaseInsensitivelyAndPersistedWithCanonicalName));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -25,12 +24,10 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         var import = new CaveImportTestHarness(db, db.RequestUser);
         var csv = CaveCsv("Case,County A,A01,20,AA,,,,,,,1,  foo  ,,,,,,,false,,");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         await import.ExecuteAsync(plan, "case.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Empty(plan.TagCreations);
         var planned = Assert.Single(plan.Caves);
         Assert.Equal(["Foo"], planned.Geology);
@@ -45,7 +42,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task CaseVariantsCreateAndPersistOneTagUsingFirstSpelling()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaseVariantsCreateAndPersistOneTagUsingFirstSpelling));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -54,11 +50,9 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
             "First,County A,A01,20,AA,,,,,,,1,\"Limestone, limestone\",,,,,,,false,,",
             "Second,County A,A01,21,AA,,,,,,,1,LIMESTONE,,,,,,,false,,");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         await import.ExecuteAsync(plan, "variants.csv");
 
-        // Assert
         var creation = Assert.Single(plan.TagCreations, tag => tag.Key == TagTypeKeyConstant.Geology);
         Assert.Equal("Limestone", creation.Name);
         Assert.All(plan.Caves, cave => Assert.Equal([creation.Id], cave.Tags
@@ -70,7 +64,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task PreexistingCaseOnlyDuplicateTagsAreNotMutatedDuringPersistence()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(PreexistingCaseOnlyDuplicateTagsAreNotMutatedDuringPersistence));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.Geology, "Foo", "zzzzzzzzzz");
@@ -78,14 +71,12 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             CaveCsv("Legacy,County A,A01,20,AA,,,,,,,1,FOO,,,,,,,false,,"),
             syncExisting: false);
         await import.ExecuteAsync(plan, "legacy.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Empty(plan.TagCreations);
         Assert.Equal("aaaaaaaaaa", Assert.Single(Assert.Single(plan.Caves).Tags).TagTypeId);
         var tags = await db.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
@@ -97,7 +88,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task ForeignCustomTagIsNotAssociatedAndLocalIntentPersists()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(ForeignCustomTagIsNotAssociatedAndLocalIntentPersists));
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
@@ -106,13 +96,11 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             CaveCsv("Tags,County A,A01,22,AA,,,,,,,1,foreign geo,,,,,,,false,,"),
             syncExisting: false);
         await import.ExecuteAsync(plan, "foreign.csv");
 
-        // Assert
         Assert.DoesNotContain(Assert.Single(plan.Caves).Tags, tag => tag.TagTypeId == foreign.Id);
         Assert.Contains(plan.TagCreations, tag => tag.Name == "foreign geo");
         Assert.False(await db.GeologyTags.AnyAsync(tag => tag.TagTypeId == foreign.Id));
@@ -123,7 +111,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task FullInsertPersistsScalarsTagsAndImportRevision()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(FullInsertPersistsScalarsTagsAndImportRevision));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -131,13 +118,11 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         var csv = CaveCsv("Full,County A,A01,30,AA,Alt,Map,Cart,123.5,45.5,20.5,4,Limestone," +
                           "Mississippian,Plateau,Artifact,Bats,2026-08-01,Reporter,true,Interesting,Full narrative");
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         var planned = Assert.Single(plan.Caves);
         await import.ExecuteAsync(plan, "full.csv");
         var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
 
-        // Assert
         Assert.Equal(9, plan.TagCreations.Count);
         Assert.Equal((planned.Id, tenant.AccountId, tenant.StateId, tenant.CountyId, 30, "Full"),
             (snapshot.CaveId, snapshot.AccountId, snapshot.State.Id, snapshot.County.Id,
@@ -168,7 +153,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task SyncUpdatePreservesEntranceAndFile()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncUpdatePreservesEntranceAndFile));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await EntranceTestData.AddEntranceAsync(database, tenant, "preserved0");
@@ -186,14 +170,12 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         var fileBefore = await FileStateAsync(db, testFile.FileId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             CaveCsv("Updated,County A,A01,1,AA,,,,200,50,12,2,,,,,,2026-08-01,,false,,Updated"),
             syncExisting: true);
         await import.ExecuteAsync(plan, "update.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         var after = await snapshots.BuildAsync(tenant.CaveId);
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Entrances),
             System.Text.Json.JsonSerializer.Serialize(after.Entrances));
@@ -205,7 +187,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task SyncNoChangeWritesNoCaveTagOrRevisionRows()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncNoChangeWritesNoCaveTagOrRevisionRows));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var sql = new SqlTimingInterceptor();
@@ -219,11 +200,9 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
             .OrderBy(row => row.Id).Select(row => row.Id).ToListAsync();
         sql.Reset();
 
-        // Act
         await import.ExecuteAsync(plan, "no-change.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Equal(CaveImportAction.NoChange, Assert.Single(plan.Caves).Action);
         Assert.Empty(plan.CreatePreview(omitNoChange: true));
         var caveAfter = await db.Caves.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == tenant.CaveId);
@@ -239,7 +218,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
     [Fact]
     public async Task CommitAbortsOnPlannedVersionDrift()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CommitAbortsOnPlannedVersionDrift));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         CaveImportPlan plan;
@@ -259,7 +237,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var execution = new CaveImportTestHarness(db, db.RequestUser);
 
-        // Act / Assert
         await Assert.ThrowsAsync<CaveRevisionConflictException>(() => execution.ExecuteAsync(plan, "conflict.csv"));
         Assert.False(await db.CaveImportBatches.AnyAsync(batch => batch.SourceFileName == "conflict.csv"));
     }

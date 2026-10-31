@@ -27,8 +27,7 @@ public partial class ImportService
         var preview = plan.CreatePreview();
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished planning entrance import");
 
-        // Planning is intentionally pure: a preview performs no staging writes,
-        // no tag/reference creation, and does not depend on transaction rollback.
+        // Preview planning is read-only: no staging writes, tag/reference creation, or rollback dependency.
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying entrance import");

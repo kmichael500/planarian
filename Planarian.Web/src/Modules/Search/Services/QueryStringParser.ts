@@ -16,7 +16,6 @@ export class QueryStringParser {
         queryObject[key] = decodeURIComponent(value);
       }
 
-      // recursively remove the '.' prefix from object properties
       const obj = queryObject[key];
       if (typeof obj === "object" && obj !== null) {
         for (const prop in obj) {

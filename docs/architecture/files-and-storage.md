@@ -1,8 +1,7 @@
 # Files and storage
 
-This page explains why File metadata lives in PostgreSQL while File bytes live in object storage, and how Cave-owned Files participate in the same revision semantics as line plots without forcing both payload types into the same storage model.
 
-## Two durability systems
+## Durability boundary
 
 A Cave File spans:
 
@@ -32,9 +31,7 @@ flowchart LR
 - `Partition` — logical namespace; Azure maps it to a container;
 - `Key` — object key within that partition.
 
-The current Azure adapter lowercases the partition before constructing the Blob container client. Container-initialization caches are scoped by the normalized Blob endpoint plus container path, not by container name alone, so separate storage endpoints in the same process cannot reuse another endpoint's successful initialization state. Query credentials are deliberately excluded from that cache key. This abstraction is intentionally scoped; older archive/photo/trip/storage paths may still use Azure-specific APIs directly.
-
-The application uses Azure's delete-if-exists operation for object cleanup. Planarian does not create Blob snapshots in this lifecycle, but provider policies can still affect physical deletion. For example, Azure requires snapshots to be deleted with the base blob when snapshots exist, and immutability/retention features can reject or defer deletion. Such provider failures leave the durable cleanup target pending rather than falsifying relational Cave state. Application history policy therefore means “do not deliberately retain removed payloads as Cave history,” not “bypass storage-provider retention guarantees.”
+The Azure adapter normalizes container names and scopes container-initialization state by storage endpoint and container. Provider retention or immutability policy can still delay or reject physical deletion; such failures leave cleanup responsibility pending without changing the committed Cave state.
 
 ## Cave asset semantics
 
@@ -46,7 +43,7 @@ Files and line plots are different storage implementations of the same **Cave-ow
 - revision history records the semantic change;
 - successful removal does not preserve the old payload indefinitely.
 
-The implementation deliberately does **not** introduce a generic `CaveAsset` persistence hierarchy. File bytes live in object storage; line-plot GeoJSON currently lives in `CaveGeoJson` JSONB. Shared code is limited to behavior that is truly common, such as stable-ID revision diffing and post-commit external-storage cleanup.
+File bytes remain in object storage and line-plot GeoJSON remains in `CaveGeoJson` JSONB; there is no generic `CaveAsset` persistence hierarchy.
 
 Published history is lightweight:
 
@@ -54,7 +51,7 @@ Published history is lightweight:
 - line-plot revisions preserve stable ID, historical name, and deterministic content hash;
 - neither published-history shape contains the removed payload or a private storage locator.
 
-Immutable proposal versions still retain the payload necessary to review exactly what was proposed. File proposals reference staged File objects; line-plot proposals currently embed exact GeoJSON. That storage-specific difference is intentional until line plots are actually migrated into the File model.
+Immutable proposal versions still retain the payload necessary to review exactly what was proposed. File proposals reference staged File objects; line-plot proposals embed exact GeoJSON. That storage-specific difference remains until line plots are migrated into the File model.
 
 ## Authoring File lifecycle
 
@@ -66,7 +63,7 @@ objects/files/{fileId}
 
 The uploaded extension is metadata, not part of object identity. The application allocates a unique address and treats it as immutable for the File lifecycle.
 
-`IObjectStorage.CreateAsync` is intentionally **create-only**. The Azure adapter supplies an `If-None-Match: *` condition so a generated-ID collision or future retry/path bug cannot overwrite bytes already stored at that address. If object creation itself fails, relational persistence does not proceed. Compensation deletes run only after this request has positively completed object creation; a create collision never deletes the pre-existing object.
+`IObjectStorage.CreateAsync` is **create-only**. The Azure adapter supplies an `If-None-Match: *` condition so a generated-ID collision or future retry/path bug cannot overwrite bytes already stored at that address. If object creation itself fails, relational persistence does not proceed. Compensation deletes run only after this request has positively completed object creation; a create collision never deletes the pre-existing object.
 
 ~~~mermaid
 stateDiagram-v2
@@ -115,11 +112,7 @@ Ordinary revisioned removal is payload-destructive, but the order is fail-safe:
 
 If external deletion fails, the File is still correctly removed from current Cave state and revision history remains correct. The durable cleanup target stays for retry and the failure is logged as a structured warning. Ordinary `CaveAssetRemoval` debt does **not** trigger the account-wide write block used for failed Reset Account cleanup.
 
-Cleanup is attempted immediately after the owning relational mutation commits. Explicit targets created by that mutation are processed to completion in bounded target/reference-query batches; this matters for supported large sync imports and hard deletes with many Files. Older pending ordinary File-cleanup debt is retried separately in a **bounded** opportunistic batch when later Cave/File authoring activity occurs. There is currently no dedicated background relay for ordinary File cleanup, so an inactive account can retain failed cleanup debt until later activity or another explicit destructive workflow (such as Reset Account) assumes responsibility. This is durable/retryable cleanup, not a guarantee of time-bounded physical deletion. Separately, expired unlinked
-never-published staging is discovered only opportunistically during later staging or temporary uploads. A completely
-inactive account may therefore retain expired staged rows/objects as well as already-queued cleanup debt until a new
-cleanup opportunity occurs. Periodic inactive-account discovery is intentionally deferred as GAP-014 storage hygiene,
-not a correctness or data-integrity gate for Cave revision publication.
+Cleanup is attempted after the owning relational mutation commits. Targets created by that mutation are processed in bounded batches; older ordinary cleanup debt is retried opportunistically during later Cave/File authoring. No periodic inactive-account sweeper exists, so inactive accounts can retain failed cleanup debt or expired unlinked staging until later activity or an explicit destructive workflow assumes responsibility.
 
 Never-published staged Files use the same ordering with purpose `UnpublishedFileRemoval`. Explicit discard, expiration, proposal rejection, and unused staged Files discarded during approval queue the exact object address and remove the File row in the same relational commit; object deletion follows afterward. Provider failure leaves the cleanup target pending instead of losing responsibility for the object.
 
@@ -178,18 +171,4 @@ If approval removes a currently published File, its `CaveAssetRemoval` cleanup t
 
 ## Other destructive paths
 
-Explicit Cave hard deletion and sync-import deletion commit `CaveAssetRemoval` targets with their relational/revision result, then process those targets after commit. Abandoned staging and proposal cleanup use `UnpublishedFileRemoval`. Account Reset folds both ordinary File-cleanup purposes into durable `AccountReset` responsibility before purging their original targets.
-
-Archive cleanup remains Azure-specific rather than using this File outbox, but follows the same safety direction: a completed final archive is not falsified by later temp/prune deletion failure. Archive generation bounds in-memory File prefetch to eight payloads of at most 8 MiB each; larger File payloads use one ETag-pinned seekable Azure read stream at a time directly into the tar, so very large account archives do not require equivalent backend RAM or local spool capacity. Archive list reads do not create a missing account container. Current archive operations use job-scoped temp/final keys. Publication reads the completed temp blob's length/ETag, stages Azure-to-Azure ranges into the final block blob with `StageBlockFromUriAsync`, pins every source range to that ETag, and publishes only by a final `CommitBlockListAsync` guarded with `If-None-Match: *`. Normal publication therefore does not relay archive bytes through Planarian and cannot overwrite an existing final object; uncommitted destination blocks are not a published archive. Source authorization is a backend-only, blob-scoped, read-only service SAS generated fresh for each block with no more than one hour of validity. It is never returned to the browser and does not restore the old client-facing SAS download model. This currently depends on the File storage connection string supplying shared-key credentials, which is the existing deployment model; if File storage later moves to Microsoft Entra credentials, archive source authorization must move with it rather than reintroducing client-facing SAS URLs. If publication fails after the final commit may have reached storage, the coordinator reconciles the completed temp and final bytes before deciding whether publication succeeded, definitely failed, or remains uncertain. New-version replicas serialize per-account archive jobs, and archive deletion takes that same PostgreSQL lease so another replica cannot remove a final object while its generating job is still active. Cleanup of another job's abandoned temp object is age-gated for mixed-version deployment safety and will not remove the source of a genuine pending legacy Blob Copy; later jobs retry stale temp and prune cleanup. All destructive paths preserve the fundamental ordering: do not destroy external bytes before the relational mutation that makes them unreachable has committed.
-
-## Read the code in this order
-
-1. `Planarian/Planarian/Modules/Files/Controllers/FileController.cs`
-2. `Planarian/Planarian/Modules/Files/Services/FileService.cs`
-3. `Planarian/Planarian/Shared/Services/IObjectStorage.cs`
-4. `Planarian/Planarian/Shared/Services/AzureBlobObjectStorage.cs`
-5. `Planarian/Planarian.Model/Database/Entities/RidgeWalker/File.cs`
-6. `Planarian/Planarian.Model/Database/Entities/RidgeWalker/StorageCleanupTarget.cs`
-7. `Planarian/Planarian/Modules/Caves/Repositories/CaveRepository.cs`
-8. File handling inside `CaveService.SaveCaveAsync`
-9. [ADR 0007 — Cave asset removal cleanup](decisions/0007-cave-asset-removal-cleanup.md)
+Hard Cave deletion and sync-import deletion use `CaveAssetRemoval`; abandoned staging and proposal cleanup use `UnpublishedFileRemoval`; Account Reset assumes unresolved File-cleanup responsibility before purging the account. Archive storage uses a separate Azure-specific lifecycle. See [Destructive operations](destructive-operations.md).

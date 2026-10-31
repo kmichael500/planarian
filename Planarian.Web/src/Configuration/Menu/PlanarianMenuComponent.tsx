@@ -11,7 +11,7 @@ const { SubMenu } = Menu;
 export interface PlanarianMenuItem extends MenuItemType {
   children?: PlanarianMenuItem[];
   requiresAuthentication: boolean;
-  action?: () => void; // Action to be executed when item is clicked
+  action?: () => void;
   isVisible?: boolean;
   permissionKey?: PermissionKey;
 }
@@ -81,9 +81,9 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
     ): PlanarianMenuItem | undefined => {
       const currentPathname = location.pathname;
 
-      // First pass: Look for an exact match
+      // Prefer exact routes before prefix matches.
       for (const item of items) {
-        if (item.key && currentPathname === String(item.key)) return item; // Exact match
+        if (item.key && currentPathname === String(item.key)) return item;
 
         if (item.children) {
           const foundChild = findSelectedItem(item.children);
@@ -91,10 +91,9 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
         }
       }
 
-      // Second pass: If no exact match is found, look for a general match
       for (const item of items) {
         if (item.key && currentPathname.startsWith(String(item.key)))
-          return item; // General match
+          return item;
 
         if (item.children) {
           const foundChild = findSelectedItem(item.children);

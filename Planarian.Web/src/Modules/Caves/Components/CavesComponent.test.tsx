@@ -6,6 +6,7 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CavesComponent } from "./CavesComponent";
 
 let mockHasFilters = false;
+let mockDisplayFeaturesEnabled = false;
 
 jest.mock("../Service/CaveService", () => ({
   CaveService: {
@@ -14,7 +15,7 @@ jest.mock("../Service/CaveService", () => ({
 }));
 
 jest.mock("../../../Shared/Permissioning/Components/ShouldDisplay", () => ({
-  useFeatureEnabled: () => ({ isFeatureEnabled: () => false }),
+  useFeatureEnabled: () => ({ isFeatureEnabled: () => mockDisplayFeaturesEnabled }),
 }));
 
 jest.mock("./CaveAdvancedSearchDrawer", () => ({
@@ -142,6 +143,7 @@ beforeEach(() => {
   localStorage.setItem("selectedFeatures", "[]");
   getCavesMock.mockReset();
   mockHasFilters = false;
+  mockDisplayFeaturesEnabled = false;
 });
 
 describe("CavesComponent narrative HTML", () => {
@@ -227,4 +229,51 @@ it("only offers Cave creation from an empty result set when the user has effecti
     </AppContext.Provider>
   );
   expect(await screen.findByRole("button", { name: "Add Cave" })).toBeInTheDocument();
+});
+
+
+it("migrates legacy saved Cave display fields before filtering and persisting preferences", async () => {
+  getCavesMock.mockResolvedValue(caveResult(""));
+  mockDisplayFeaturesEnabled = true;
+  const storageKey = "account0001-selectedFeatures";
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify([
+      "countyId",
+      "archaeologyTagIds",
+      "biologyTagIds",
+      "cartographerNameTagIds",
+      "geologicAgeTagIds",
+      "geologyTagIds",
+      "mapStatusTagIds",
+      "otherTagIds",
+      "physiographicProvinceTagIds",
+      "reportedByTagIds",
+      "lengthFeet",
+      "unknownField",
+    ])
+  );
+
+  render(
+    <AppContext.Provider value={{ currentAccountId: "account0001", hasPermission: () => false } as any}>
+      <CavesComponent />
+    </AppContext.Provider>
+  );
+
+  expect(await screen.findByText("1 result")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(JSON.parse(localStorage.getItem(storageKey) ?? "[]")).toEqual([
+      "county",
+      "archaeologyTags",
+      "biologyTags",
+      "cartographerNameTags",
+      "geologicAgeTags",
+      "geologyTags",
+      "mapStatusTags",
+      "otherTags",
+      "physiographicProvinceTags",
+      "reportedByTags",
+      "lengthFeet",
+    ])
+  );
 });

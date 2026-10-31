@@ -26,7 +26,7 @@ def git(*args: str) -> str:
 
 def tracked_markdown_files() -> list[Path]:
     output = git("ls-files", "--", "*.md")
-    return [REPO_ROOT / path for path in output.splitlines() if path]
+    return [path for item in output.splitlines() if item and (path := REPO_ROOT / item).exists()]
 
 
 def markdown_without_fenced_code(text: str) -> str:

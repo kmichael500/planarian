@@ -5,7 +5,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Import.Models;
 using Planarian.Shared.Attributes;
 
-// ReSharper disable once CheckNamespace ( for partial class compatability )
+// ReSharper disable once CheckNamespace -- partial class spans feature folders.
 namespace Planarian.Modules.Account.Controller;
 
 public partial class AccountController

@@ -5,16 +5,12 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Planarian.Migrations.Migrations
 {
-    /// <summary>
-    /// Adds Cave revision and proposal persistence, File metadata and cleanup,
-    /// authoring defaults, and tenant-safe permission contracts.
-    /// </summary>
+    /// <summary>Cave revision/proposal, File lifecycle, authoring-default, and permission schema migration.</summary>
     public partial class CaveRevisionsCompletion : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Cave revision and File schema
-
             migrationBuilder.DropForeignKey(
                 name: "FK_Caves_Users_ReportedByUserId",
                 table: "Caves");
@@ -70,7 +66,7 @@ namespace Planarian.Migrations.Migrations
                 END $$;
                 """);
 
-            // Main v32 already widened DisplayName to 1000 characters. Preserve that
+            // v32 already widened DisplayName to 1000 characters. Preserve that
             // user-facing name as Name, derive Extension from the stored filename,
             // and only then remove the legacy FileName column.
             migrationBuilder.RenameColumn(
@@ -162,14 +158,9 @@ namespace Planarian.Migrations.Migrations
                 oldMaxLength: 1000,
                 oldNullable: true);
 
-            // Preserve only legacy filename values that cannot be reconstructed from
-            // the new Name + Extension representation. This migration-owned table is
-            // intentionally outside the application model and exists only so an
-            // untouched pre-upgrade row can be downgraded without losing its v32
-            // storage filename. The migrated Name/Extension pair lets Down distinguish
-            // an untouched row from metadata intentionally edited after the upgrade.
-            // A later migration can remove this table once v32 database downgrade
-            // support is intentionally retired.
+            // Preserve v32 filenames that Name + Extension cannot reconstruct. Down restores the original
+            // filename only when migrated metadata is unchanged; later edits remain authoritative.
+            // Remove this migration-only table when v32 downgrade support is retired.
             migrationBuilder.CreateTable(
                 name: "__CaveRevisionsCompletionLegacyFileNames",
                 columns: table => new
@@ -738,7 +729,6 @@ namespace Planarian.Migrations.Migrations
                 onDelete: ReferentialAction.Restrict);
 
             // Entrance feature defaults
-
             // Track exact rows inserted by this migration. The deterministic FeatureSetting
             // ID alone is not provenance: a preexisting setting can legitimately already
             // have that ID, in which case Up must leave it alone and Down must not delete it.
@@ -772,7 +762,6 @@ namespace Planarian.Migrations.Migrations
                 """);
 
             // Durable account cleanup
-
             migrationBuilder.CreateTable(
                 name: "AccountResetCleanupTargets",
                 columns: table => new
@@ -804,7 +793,6 @@ namespace Planarian.Migrations.Migrations
                 unique: true);
 
             // File and account storage cleanup
-
             migrationBuilder.DropPrimaryKey(
                 name: "PK_AccountResetCleanupTargets",
                 table: "AccountResetCleanupTargets");
@@ -897,7 +885,6 @@ namespace Planarian.Migrations.Migrations
                 name: "RetainedCaveFileObjects");
 
             // New Cave proposals
-
             migrationBuilder.AlterColumn<string>(
                 name: "BaseRevisionId",
                 table: "CaveProposalVersions",
@@ -909,8 +896,6 @@ namespace Planarian.Migrations.Migrations
                 oldMaxLength: 10);
 
             // Permission projection
-
-            // UserCavePermissions
             migrationBuilder.Sql("""
             DROP VIEW IF EXISTS "UserCavePermissions";
             """);
@@ -991,7 +976,6 @@ namespace Planarian.Migrations.Migrations
             """);
 
             // Unique permission identity
-
             migrationBuilder.Sql("""
                 DO $$
                 BEGIN
@@ -1022,7 +1006,6 @@ namespace Planarian.Migrations.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             // Unique permission identity
-
             migrationBuilder.DropIndex(
                 name: "IX_Permissions_PermissionType_Key",
                 table: "Permissions");
@@ -1033,8 +1016,6 @@ namespace Planarian.Migrations.Migrations
                 columns: new[] { "PermissionType", "Key" });
 
             // Permission projection
-
-            // UserCavePermissions
             migrationBuilder.Sql("""
             DROP VIEW IF EXISTS "UserCavePermissions";
             """);
@@ -1108,10 +1089,8 @@ namespace Planarian.Migrations.Migrations
               AND p."PermissionType"::text = 'Cave'::text;
             """);
 
-            // New Cave proposals
-
             // A creation proposal has no published base revision, so it cannot be represented by
-            // the pre-feature schema. Fail closed with an actionable message instead of relying on
+            // the v32 schema. Fail closed with an actionable message instead of relying on
             // an incidental NOT NULL violation from ALTER TABLE.
             migrationBuilder.Sql("""
                 DO $$
@@ -1128,6 +1107,7 @@ namespace Planarian.Migrations.Migrations
                 $$;
                 """);
 
+            // New Cave proposals
             migrationBuilder.AlterColumn<string>(
                 name: "BaseRevisionId",
                 table: "CaveProposalVersions",
@@ -1140,7 +1120,6 @@ namespace Planarian.Migrations.Migrations
                 oldNullable: true);
 
             // File and account storage cleanup
-
             // Ordinary File-cleanup targets are the only durable addresses for bytes awaiting
             // deletion. Refuse to erase or reinterpret that cleanup debt during a downgrade.
             migrationBuilder.Sql("""
@@ -1222,7 +1201,6 @@ namespace Planarian.Migrations.Migrations
                 unique: true);
 
             // Durable account cleanup
-
             // Downgrading with pending targets would erase the only durable addresses
             // of blobs still awaiting deletion. Require cleanup first.
             migrationBuilder.Sql("""
@@ -1236,7 +1214,6 @@ namespace Planarian.Migrations.Migrations
                 name: "AccountResetCleanupTargets");
 
             // Entrance feature defaults
-
             migrationBuilder.Sql("""
                 DELETE FROM "FeatureSettings" AS setting
                 USING "__BackfillEntranceOtherFeatureSettingRows" AS inserted
@@ -1249,7 +1226,6 @@ namespace Planarian.Migrations.Migrations
                 name: "__BackfillEntranceOtherFeatureSettingRows");
 
             // Cave revision and File schema
-
             migrationBuilder.DropForeignKey(
                 name: "FK_Caves_CaveRevisions_AccountId_Id_CurrentRevisionId",
                 table: "Caves");

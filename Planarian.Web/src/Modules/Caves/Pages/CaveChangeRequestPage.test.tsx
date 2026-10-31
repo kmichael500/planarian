@@ -159,7 +159,7 @@ const renderRequestPage = (detail: CaveChangeRequestDetailVm,
 
 afterEach(() => jest.restoreAllMocks());
 
-it("shows an intentional loading state while the request is being fetched", () => {
+it("shows a loading state while the request is being fetched", () => {
   jest.spyOn(CaveService, "GetChangeRequest").mockImplementation(() => new Promise(() => undefined));
   const router = createMemoryRouter([{ path: "/caves/requests/:requestId", element: <CaveChangeRequestPage /> }],
     { initialEntries: ["/caves/requests/request0001"] });

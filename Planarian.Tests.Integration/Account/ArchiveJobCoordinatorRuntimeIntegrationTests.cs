@@ -222,8 +222,8 @@ public sealed class ArchiveJobCoordinatorRuntimeIntegrationTests(
             }
             catch (ApiException ex) when (ex.StatusCode == 409 && attempt < 60)
             {
-                // The terminal notification is emitted just before the archive task's
-                // PostgreSQL advisory lease is disposed. Wait for that cross-replica
+                // The terminal notification precedes disposal of the archive task's PostgreSQL
+                // advisory lease. Wait for that cross-replica
                 // lease boundary instead of introducing a timing-dependent assertion.
                 await Task.Delay(50);
             }

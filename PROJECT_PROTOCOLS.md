@@ -1,4 +1,4 @@
-# Terrane Maps Project Protocols
+# Planarian Project Protocols
 
 **Status:** Canonical project workflow router
 **Version:** 1.1
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-This document is the canonical registry and router for reusable Terrane Maps project workflows.
+This document is the canonical registry and router for reusable Planarian project workflows.
 
 It intentionally does **not** duplicate the detailed procedures in the workflow documents. Its job is to identify which applies, require that procedure to be consulted before acting, and keep the Project Instructions stable as workflows evolve.
 

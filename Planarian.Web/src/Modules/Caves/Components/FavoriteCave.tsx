@@ -26,7 +26,6 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
   useEffect(() => {
-    // Skip fetching if initialIsFavorite is provided or if caveId is missing
     if (initialIsFavorite !== undefined || !caveId) {
       setIsLoading(false);
       return;
@@ -48,7 +47,6 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
     fetchFavoriteStatus();
   }, [caveId, initialIsFavorite]);
 
-  // Update loading state when caveId changes
   useEffect(() => {
     if (!caveId) {
       setIsLoading(true);
@@ -78,19 +76,16 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
     }
   };
 
-  // Don't render anything if onlyShowWhenFavorite is true and the item is not favorited
   if (onlyShowWhenFavorite && !isFavorite && !isLoading && !isUpdating) {
     return null;
   }
 
-  // Basic icon without any custom styling
   const favoriteIcon = isFavorite ? (
     <StarFilled style={{ color: "gold" }} />
   ) : (
     <StarOutlined />
   );
 
-  // Show loading indicator if caveId is missing
   if (!caveId) {
     return (
       <PlanarianButton
@@ -102,12 +97,10 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
     );
   }
 
-  // If disabled, just render the icon without a button wrapper
   if (disabled) {
     return favoriteIcon;
   }
 
-  // Otherwise render the interactive button
   return (
     <PlanarianButton
       icon={favoriteIcon}

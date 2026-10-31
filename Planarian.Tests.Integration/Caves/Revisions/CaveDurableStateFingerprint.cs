@@ -12,7 +12,7 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 /// <summary>
 /// Observes persisted domain rows using a fresh connection: EF's change tracker, projection
 /// materialization, and uncommitted state cannot make a read-only assertion pass accidentally.
-/// Infrastructure access counters and request diagnostics are intentionally not part of this contract.
+/// Infrastructure access counters and request diagnostics are outside this contract.
 /// </summary>
 internal static class CaveDurableStateFingerprint
 {

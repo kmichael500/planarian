@@ -1,5 +1,4 @@
 export interface CaveSearchParamsVm {
-  //#region Cave
   id: string;
   isFavorite: boolean;
   name: string;
@@ -24,8 +23,6 @@ export interface CaveSearchParamsVm {
   caveReportedOnDate: string;
   caveOtherTagIds: string;
 
-  //#endregion
-  //#region Entrance
   entranceStatusTagIds: string;
   entranceDescription: string;
   entranceFieldIndicationTagIds: string;
@@ -37,8 +34,6 @@ export interface CaveSearchParamsVm {
   entrancePolygon: string;
   entranceReportedByPeopleTagIds: string;
   entranceReportedOnDate: string;
-  //#endregion
-  //#region Files
   fileTypeTagIds: string;
   fileName: string;
   fileExtension: string;

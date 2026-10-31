@@ -17,8 +17,6 @@ interface StateCountySelectProps {
   permissionKey?: PermissionKey;
 }
 
-// For each state, we store both the permitted counties (for the dropdown)
-// and the full list of counties (for tag rendering and comparisons)
 interface CountyData {
   permitted: SelectListItem<string>[];
   all: SelectListItem<string>[];
@@ -37,14 +35,12 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     countiesByState: {},
   });
 
-  // Update internal value when the prop changes
   useEffect(() => {
     if (value) {
       setInternalValue(value);
     }
   }, [value]);
 
-  // Ensure counties are loaded for any selected state
   useEffect(() => {
     if (value?.states) {
       value.states.forEach((stateId) => {
@@ -58,7 +54,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
   const [allStates, setAllStates] = useState<SelectListItem<string>[]>([]);
   const [statesLoading, setStatesLoading] = useState<boolean>(false);
 
-  // For each state, store both permitted and full county lists.
   const [countiesByStateData, setCountiesByStateData] = useState<
     Record<string, CountyData>
   >({});
@@ -79,13 +74,7 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     })();
   }, [permissionKey]);
 
-  /**
-   * Updated handleStatesChange:
-   * - For each previously selected state that is no longer in the permitted selection:
-   *    - If that state's counties include any non-permitted county, keep the state but clear out only the permitted counties.
-   *    - Otherwise (if all counties are permitted), remove the state entirely.
-   * - Also add any newly selected state.
-   */
+  // Preserve selected counties outside the user's permitted set when changing states.
   const handleStatesChange = async (selectedStateIds: string[]) => {
     const oldValue = { ...internalValue };
     const newCountiesByState: Record<string, string[]> = {
@@ -93,40 +82,31 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     };
     const newStateSelection: string[] = [];
 
-    // Process states that were previously selected.
     for (const stateId of oldValue.states) {
       if (selectedStateIds.includes(stateId)) {
-        // State is still selected from the permitted dropdown.
         newStateSelection.push(stateId);
       } else {
-        // State was removed from the dropdown.
         const countyData = countiesByStateData[stateId];
         if (countyData) {
           const permittedCountyIds = countyData.permitted.map(
             (cty) => cty.value
           );
           const currentCounties = oldValue.countiesByState[stateId] || [];
-          // Remove permitted counties from the current selection.
           const remainingCounties = currentCounties.filter(
             (countyId) => !permittedCountyIds.includes(countyId)
           );
           if (remainingCounties.length > 0) {
-            // If there is at least one non-permitted county, keep the state
-            // (with only the non-permitted counties).
             newStateSelection.push(stateId);
             newCountiesByState[stateId] = remainingCounties;
           } else {
-            // Otherwise, remove the state entirely.
             delete newCountiesByState[stateId];
           }
         } else {
-          // If no county data is available, remove the state.
           delete newCountiesByState[stateId];
         }
       }
     }
 
-    // Process new states added via the dropdown.
     for (const stateId of selectedStateIds) {
       if (!oldValue.states.includes(stateId)) {
         newStateSelection.push(stateId);
@@ -139,7 +119,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
       }
     }
 
-    // Remove duplicates if any.
     const finalStates = Array.from(new Set(newStateSelection));
 
     const newValue: StateCountyValue = {
@@ -151,10 +130,7 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     onChange?.(newValue);
   };
 
-  /**
-   * For the counties select:
-   * Merge the newly selected permitted counties with any non-permitted counties that were already selected.
-   */
+  // Preserve selected counties the current user cannot modify.
   const handleCountiesChange = (
     stateId: string,
     selectedCountyIds: string[]
@@ -182,11 +158,7 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     onChange?.(newValue);
   };
 
-  /**
-   * Load counties for a given state.
-   * When a permissionKey is provided, we fetch both the permitted list (for the dropdown)
-   * and the full list (for rendering tag labels and comparisons).
-   */
+  // Keep the full county list for labels while restricting editable options by permission.
   const loadCountiesForState = async (stateId: string) => {
     setCountiesLoading((prev) => ({ ...prev, [stateId]: true }));
     try {
@@ -242,7 +214,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
         )}
       </div>
 
-      {/* For each selected state, render a counties select */}
       {internalValue.states.map((stateId) => {
         const countyData = countiesByStateData[stateId];
         const permittedCounties = countyData ? countyData.permitted : [];
@@ -278,7 +249,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
                   const isPermitted = permittedCounties.some(
                     (cty) => cty.value === value
                   );
-                  // Use the full list to render the proper display value.
                   const displayValue = countyData?.all.find(
                     (cty) => cty.value === value
                   )?.display;

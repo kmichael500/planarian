@@ -26,8 +26,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         _tripService = tripService;
     }
 
-    #region Invitations
-
     [HttpPost("{projectId:length(10)}/members/invite")]
     public async Task<ActionResult> InviteProjectMember(string projectId, [FromBody] InviteMember invitation)
     {
@@ -35,10 +33,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new OkResult();
     }
-
-    #endregion
-
-    #region Trips
 
     [HttpPost("{projectId:length(10)}/trips")]
     public async Task<ActionResult<TripVm>> AddTrip([FromBody] CreateOrEditTripVm trip)
@@ -56,8 +50,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new JsonResult(trips);
     }
-
-    #endregion
 
     #region Project
 
@@ -128,7 +120,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new OkResult();
     }
-
 
     [HttpDelete("{projectId:length(10)}/members/{userId:length(10)}")]
     public async Task<ActionResult> DeleteProjectMember(string projectId, string userId)

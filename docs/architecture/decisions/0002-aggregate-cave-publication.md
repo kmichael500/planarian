@@ -1,6 +1,6 @@
 # ADR 0002 — Publish interactive Cave changes as one aggregate desired state
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Accepted
 **Scope:** Interactive Cave mutation
 
 ## Context
@@ -67,5 +67,5 @@ Rejected because supported import scale requires set-oriented planning/execution
 ## Related documentation
 
 - [Cave publication](../cave-publication.md)
-- [Bulk import publication ADR](0006-bulk-import-publication.md)
+- [Bulk import publication ADR](0005-bulk-import-publication.md)
 - [Cave revision contract](../../cave-revisions.md)

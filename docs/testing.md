@@ -109,7 +109,7 @@ as the canonical non-browser PR validation sequence instead of duplicating every
 Browser-specific contracts use Playwright against the disposable `e2e` development profile. The harness resets only
 `planarian_dev_e2e` and the E2E-owned blob containers in local Azurite, seeds deterministic local test accounts, builds the
 production web client, serves its generated CSP, and routes the frontend at `https://planarian.local` to the API at
-`https://planarian.local:8443`. Using the same host on a different HTTPS port is intentional: it remains cross-origin
+`https://planarian.local:8443`. Using the same host on a different HTTPS port keeps the requests cross-origin
 for CORS while preserving same-site cookie semantics consistently in Chromium and WebKit. This makes authentication cookies,
 credentialed CORS/preflight, PDF.js workers and Range requests, nested routing, unload prompts, concurrent browser sessions,
 and account switching observable in real browsers.
@@ -119,8 +119,8 @@ host IDE/build activity from racing the browser harness. The E2E profile raises 
 budgets so repeated real-browser logins across Chromium and WebKit do not exhaust the normal production limits; the
 generic development profile and application defaults remain unchanged.
 
-The runner requires exclusive ownership of the entire Planarian Compose project and refuses to run if any Compose service (including the repo editor, Postgres, or Azurite) is already running. It reports teardown failures rather than silently ignoring them. Stop a stack you intentionally own before using
-it; do not use browser E2E as a way to reset another agent's environment. Install the pinned browser engines once, then
+The runner requires exclusive ownership of the entire Planarian Compose project and refuses to run if any Compose service (including the repo editor, Postgres, or Azurite) is already running. It reports teardown failures rather than silently ignoring them. Stop a stack you own before using
+it; do not use browser E2E to reset a Compose stack owned by another session. Install the pinned browser engines once, then
 run either both supported engines or a focused project:
 
 ```bash
@@ -132,9 +132,8 @@ npm run test:browser:e2e:webkit
 
 The non-destructive runner safety regression is `node --test scripts/run-browser-e2e.test.mjs` and does not start Docker or alter application data.
 
-Pull requests also expose a separate **Browser E2E / Chromium + WebKit** check from `.github/workflows/browser-e2e-pr.yml`. The workflow intentionally has no top-level path filter so the check is always reported and can safely be required by branch protection. Its job performs a cheap changed-file check first and reports success without provisioning browsers for documentation or tests outside browser-relevant changed paths. Runtime, frontend, backend, shared-contract, E2E-harness, Docker/dev, script, or browser-workflow changes install only the pinned Chromium and WebKit engines plus their Linux dependencies, map the local HTTPS test hostnames to loopback, run the repository-owned `npm run test:browser:e2e` command, and upload `.playwright` reports/artifacts for 30 days when the job is not cancelled. CI keeps one Playwright worker and retries once for browser-level flake tolerance; a Playwright global timeout is shorter than the GitHub job timeout so Playwright can finish its own report before GitHub terminates the job.
+Pull requests also expose a separate **Browser E2E / Chromium + WebKit** check from `.github/workflows/browser-e2e-pr.yml`. The workflow has no top-level path filter so the check is always reported and can safely be required by branch protection. Its job performs a cheap changed-file check first and reports success without provisioning browsers for documentation or tests outside browser-relevant changed paths. Runtime, frontend, backend, shared-contract, E2E-harness, Docker/dev, script, or browser-workflow changes install only the pinned Chromium and WebKit engines plus their Linux dependencies, map the local HTTPS test hostnames to loopback, run the repository-owned `npm run test:browser:e2e` command, and upload `.playwright` reports/artifacts for 30 days when the job is not cancelled. CI keeps one Playwright worker and retries once for browser-level flake tolerance; a Playwright global timeout is shorter than the GitHub job timeout so Playwright can finish its own report before GitHub terminates the job.
 
-Keep this suite intentionally small. Put timing/state-machine matrices in unit/component tests and reserve Playwright for
-contracts that require an actual browser, cookie jar, navigation stack, CORS implementation, CSP enforcement, download,
-or PDF.js renderer. Playwright traces, screenshots, videos, and HTML output are written under
+Playwright is reserved for contracts that require an actual browser, cookie jar, navigation stack, CORS implementation,
+CSP enforcement, download, or PDF.js renderer. Timing/state-machine matrices belong in unit/component tests. Playwright traces, screenshots, videos, and HTML output are written under
 `Planarian.Web/.playwright/` on failures and are ignored by Git.

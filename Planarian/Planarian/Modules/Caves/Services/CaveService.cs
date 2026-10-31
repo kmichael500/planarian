@@ -133,7 +133,6 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             foreach (var entrance in cave.Entrances)
             {
-                // Build the waypoint name.
                 var caveNameEnabled = Include(FeatureKey.EnabledFieldCaveName);
                 var caveName = caveNameEnabled ? cave.Name : string.Empty;
                 var entranceNameEnabled = Include(FeatureKey.EnabledFieldEntranceName);
@@ -162,7 +161,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     waypointName = $"{waypointName} ({entranceName})";
                 }
 
-                if (entrance.IsPrimary) // Append asterisk if this is the primary entrance.
+                if (entrance.IsPrimary)
                 {
                     waypointName = $"{waypointName} *";
                 }
@@ -325,7 +324,6 @@ public class CaveService : ServiceBase<CaveRepository>
                     descriptionStringBuilder.AppendLine($"Cave Information: {"".DefaultIfNullOrWhiteSpace()}");
                 }
 
-                // Build Entrance Information only for non-null fields.
                 var entranceInfoSb = new StringBuilder();
 
                 descriptionStringBuilder.AppendLine();
@@ -423,7 +421,6 @@ public class CaveService : ServiceBase<CaveRepository>
                 descriptionStringBuilder.AppendLine();
                 descriptionStringBuilder.AppendLine(_clientUrlBuilder.BuildCaveUrl(cave.Id));
 
-                // Build the GPX waypoint.
                 sb.AppendLine($"  <wpt lat=\"{latitude}\" lon=\"{longitude}\">");
                 if (elevation > 0)
                 {
@@ -544,8 +541,7 @@ public class CaveService : ServiceBase<CaveRepository>
             stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
             reservedNewCaveId: reservedCaveId, requireOwnedTransaction: false, cancellationToken);
 
-    // Transaction-joining overload used by the approval workflow and integration rollback coverage.
-    // It is intentionally not part of CaveService's public application API.
+    // Approval-only transaction-joining entry point; not part of the public application API.
     internal async Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
         string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
         CancellationToken cancellationToken)
@@ -749,7 +745,6 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             if (!isNew)
-                // remove entrances
                 foreach (var entrance in entity.Entrances.ToList())
                 {
                     var entranceValue = values.Entrances.FirstOrDefault(e => e.Id == entrance.Id);
@@ -804,11 +799,9 @@ public class CaveService : ServiceBase<CaveRepository>
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)
                         { SRID = 4326 };
 
-                // this can only be called if the entrance already exists otherwise SaveChanges throws a
-                // Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException because it's expecting to update something
                 if (!isNewEntrance)
                 {
-                    // if the z value was not provided during import, ef core doesn't realize that the z value was added later.
+                    // Force location updates because imported rows may gain a Z value without EF detecting a change.
                     Repository.SetPropertiesModified(entrance, e => e.Location);
                 }
 
@@ -961,7 +954,6 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             // Tag association rows use identifying composite keys and can be resurrected by EF relationship fixup.
-            // Delete removed join rows explicitly inside this transaction, then detach their stale tracked instances.
             await Repository.DeleteTagAssociationsAsync(entity.Id, removedTagAssociations, cancellationToken);
 
             await Repository.SaveAggregateChangesAsync(entity.Id, expectedRevisionId,
@@ -984,8 +976,7 @@ public class CaveService : ServiceBase<CaveRepository>
             return mutationResult;
         }
 
-        // Direct manager edits must own the transaction so post-save object cleanup is truly post-commit.
-        // Proposal approval deliberately joins the outer approval transaction; its caller runs cleanup only after commit.
+        // Direct edits own the transaction; proposal approval joins its caller's transaction. Cleanup runs after commit.
         var mutation = requireOwnedTransaction
             ? await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(PublishAsync, cancellationToken)
             : await _caveMutationCoordinator.ExecuteTransactionAsync(PublishAsync, cancellationToken);

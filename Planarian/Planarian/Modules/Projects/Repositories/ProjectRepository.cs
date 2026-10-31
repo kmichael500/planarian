@@ -15,16 +15,12 @@ public class ProjectRepository : RepositoryBase
     {
     }
 
-    #region Project Member
-
     public async Task<Member?> GetProjectMember(string projectId, string userId)
     {
         return await DbContext.Members.FirstOrDefaultAsync(e =>
             e.UserId == userId && e.ProjectId == projectId &&
             e.Project!.Members.Any(member => member.UserId == RequestUser.Id));
     }
-
-    #endregion
 
     public async Task<PagedResult<ProjectVm>> GetProjects(FilterQuery query)
     {
@@ -40,7 +36,6 @@ public class ProjectRepository : RepositoryBase
                     ModifiedOn = e.ModifiedOn
                 }
             )
-            // .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
     }
 
@@ -53,15 +48,11 @@ public class ProjectRepository : RepositoryBase
             .ToListAsync();
     }
 
-    #region Trip
-
     public async Task<int> GetNumberOfTrips(string projectId)
     {
         return await DbContext.Trips.CountAsync(e =>
             e.ProjectId == projectId && e.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
-
-    #endregion
 
     #region Project
 
@@ -72,7 +63,6 @@ public class ProjectRepository : RepositoryBase
 
         return await ToProjectVm(query).FirstOrDefaultAsync();
     }
-
 
     public async Task<Project?> GetProject(string projectId)
     {

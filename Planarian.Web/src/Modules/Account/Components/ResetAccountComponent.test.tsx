@@ -8,8 +8,7 @@ jest.mock("../Services/AccountService", () => ({
   AccountService: { ResetAccount: jest.fn(), RetryResetCleanup: jest.fn(), HasPendingResetCleanup: jest.fn().mockResolvedValue(false) },
 }));
 
-// Keep the test about the Reset Account response/UX, not the reusable
-// typed-confirmation modal implementation.
+// Mock confirmation UI so assertions cover Reset Account response behavior.
 jest.mock("../../../Shared/Components/Validation/ConfirmationModalComponent", () => ({
   ConfirmationModalComponent: ({
     onConfirm,

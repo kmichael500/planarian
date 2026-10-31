@@ -1,8 +1,7 @@
-# ADR 0007 — Preserve Cave asset history without retaining removed payloads indefinitely
+# ADR 0006 — Preserve Cave asset history without retaining removed payloads indefinitely
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Accepted
 **Scope:** Published File and line-plot removal lifecycle
-**Supersedes:** [ADR 0005 — Retained File objects](0005-retained-file-objects.md)
 
 ## Context
 
@@ -31,16 +30,16 @@ For ordinary published removal:
 - failed external deletion leaves durable, observable cleanup debt for retry;
 - ordinary asset-cleanup debt does not block unrelated account writes.
 
-`StorageCleanupTarget` is shared infrastructure for post-commit external cleanup, not a historical File locator. Published payload cleanup uses `CaveAssetRemoval`; never-published staged payload cleanup uses `UnpublishedFileRemoval` after explicit discard, expiration, proposal rejection, or unused-staged-file approval cleanup. Immediate cleanup is followed by bounded opportunistic retries on later Cave/File authoring activity; ordinary File-cleanup debt does not currently have a dedicated background relay. Account Reset uses the same table with purpose `AccountReset` and keeps its stronger write-block/retry semantics. Reset absorbs pending published and unpublished File-cleanup addresses before purging those ordinary targets.
+`StorageCleanupTarget` is shared infrastructure for post-commit external cleanup, not a historical File locator. Published payload cleanup uses `CaveAssetRemoval`; never-published staged payload cleanup uses `UnpublishedFileRemoval` after explicit discard, expiration, proposal rejection, or unused-staged-file approval cleanup. Immediate cleanup is followed by bounded opportunistic retries on later Cave/File authoring activity; ordinary File-cleanup debt has no dedicated background relay. Account Reset uses the same table with purpose `AccountReset` and keeps its stronger write-block/retry semantics. Reset absorbs pending published and unpublished File-cleanup addresses before purging those ordinary targets.
 
-Proposal persistence remains storage-specific for now: staged Files reference their exact staged object, while immutable proposal versions retain exact proposed line-plot GeoJSON. This is intentional; proposal payload convergence is deferred until line plots actually move into the File model.
+Proposal persistence is storage-specific: staged Files reference their exact staged object, while immutable proposal versions retain exact proposed line-plot GeoJSON. Payload convergence is deferred until line plots move into the File model.
 
 ## Consequences
 
 ### Positive
 
 - Files and line plots have the same user-facing removal/history contract.
-- Planarian does not deliberately retain removed payloads as historical Cave content merely because they were once published.
+- Removed payloads are not retained as historical Cave content merely because they were once published.
 - File creation/removal remains crash/failure tolerant across the PostgreSQL/object-storage boundary; immutable addresses are create-only and removal uses durable post-commit cleanup.
 - Revision JSON stays provider-neutral and does not expose storage addresses.
 - The eventual line-plot-as-File migration can reuse the same semantic lifecycle rather than redesigning revisions again.
@@ -50,13 +49,13 @@ Proposal persistence remains storage-specific for now: staged Files reference th
 
 - Old published payloads are not recoverable from Planarian after successful removal cleanup.
 - External storage failures can leave cleanup debt until later authoring activity or another destructive workflow retries/assumes it; ordinary published/unpublished File cleanup does not yet have a dedicated background relay.
-- File and line-plot proposal persistence remains intentionally asymmetric until a future storage migration.
+- File and line-plot proposal persistence remains asymmetric while their payload storage differs.
 
 ## Alternatives considered
 
 ### Retain every published File byte until hard purge
 
-Superseded because the storage/privacy cost is not required for useful revision history and differs from line-plot history semantics.
+Rejected because the storage/privacy cost is not required for useful revision history and differs from line-plot history semantics.
 
 ### Delete File bytes before relational commit
 

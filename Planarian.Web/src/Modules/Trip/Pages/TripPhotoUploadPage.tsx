@@ -43,7 +43,6 @@ const TripPhotoUploadPage: React.FC = () => {
     setHeaderTitle(["Upload Photos"]);
   }, []);
 
-  //#region Upload Modal
   const [filesMetaData, setFilesMetaData] = useState<PhotoMetaData[]>([]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -118,9 +117,7 @@ const TripPhotoUploadPage: React.FC = () => {
     return false;
   };
 
-  //#endregion
 
-  //#region File MetaData
   const onDescriptionChanged = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
     file: UploadFile
@@ -201,7 +198,6 @@ const TripPhotoUploadPage: React.FC = () => {
     );
   };
 
-  //#endregion
 
   return (
     <>

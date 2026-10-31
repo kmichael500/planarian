@@ -6,8 +6,7 @@ public interface IApiRequestOrigin
 }
 
 /// <summary>
-/// Gets the public API origin for the current request. Host filtering must be configured with
-/// AllowedHosts by the deployment so request hosts are accepted only from known API domains.
+/// Public API origin for the current request. AllowedHosts must restrict requests to known API domains.
 /// </summary>
 public class ApiRequestOrigin : IApiRequestOrigin
 {

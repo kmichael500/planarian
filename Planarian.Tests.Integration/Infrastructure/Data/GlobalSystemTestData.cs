@@ -6,7 +6,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 namespace Planarian.Tests.Integration.Infrastructure.Data;
 
 /// <summary>
-/// Seeds protected global/system prerequisites that intentionally exist outside tenant-owned runtime writes.
+/// Seeds protected global/system prerequisites outside tenant-owned runtime writes.
 /// The production SaveChanges interceptor correctly protects these rows; tests that need
 /// system bootstrap state use this narrow seed path instead of weakening authorization.
 /// </summary>
@@ -72,8 +72,7 @@ internal static class GlobalSystemTestData
     {
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            // Intentionally do not call PlanarianDbContext.OnConfiguring: global reference data
-            // is seeded outside request/account authorization, like production DataGenerator.
+            // Global reference seed data bypasses request/account authorization, like production DataGenerator.
         }
     }
 }

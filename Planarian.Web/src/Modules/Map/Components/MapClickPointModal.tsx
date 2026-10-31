@@ -15,7 +15,6 @@ import {
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { PublicAccessDetails } from "./PublicAccesDetails";
 
-/** MapClickPointModal Props */
 interface MapClickPointModalProps {
   isModalVisible: boolean;
   lat: number;
@@ -29,7 +28,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   lng,
   handleCancel,
 }) => {
-  // Elevation
   const [elevation, setElevation] = useState<number | null>(null);
   const [loadingElevation, setLoadingElevation] = useState(false);
   const [errorElevation, setErrorElevation] = useState<string | null>(null);
@@ -38,7 +36,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
 
-  // --- Fetch Elevation ---
   useEffect(() => {
     if (!lat || !lng) return;
     const fetchElevation = async () => {
@@ -62,7 +59,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
     fetchElevation();
   }, [lat, lng]);
 
-  // --- Fetch Address ---
   useEffect(() => {
     if (!lat || !lng) return;
     const fetchAddress = async () => {

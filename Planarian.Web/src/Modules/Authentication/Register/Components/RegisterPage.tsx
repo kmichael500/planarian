@@ -32,7 +32,6 @@ const InvitationMessageCard: React.FC<{
   invitation?: AcceptInvitationVm;
   isLoading: boolean;
 }> = ({ invitation, isLoading }) => {
-  // Customize your message here. You can use invitation.accountName if available.
   const invitationMessage =
     invitation && invitation.accountName
       ? `You've been invited to access ${invitation.accountName} data on Planarian. Create an account to accept the invitation.`

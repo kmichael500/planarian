@@ -132,7 +132,7 @@ const parsePolygon = (rawValue?: string | null): LngLatTuple[] | null => {
       return null;
     }
 
-    // Remove closing duplicate if present so we can manage it consistently.
+    // Normalize GeoJSON's repeated closing point to the editor's open-ring representation.
     if (coordsAreEqual(coords[0], coords[coords.length - 1])) {
       coords.pop();
     }

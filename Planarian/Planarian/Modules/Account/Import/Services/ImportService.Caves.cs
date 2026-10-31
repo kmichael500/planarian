@@ -26,8 +26,7 @@ public partial class ImportService
         var preview = plan.CreatePreview(omitNoChange: isDryRun);
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished planning cave import");
 
-        // Dry run ends here. Planning is read-only, so there is no transaction to
-        // roll back and no reference/tag rows are created merely to build preview.
+        // Planning is read-only; dry runs create no transaction or reference/tag rows.
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying cave import");

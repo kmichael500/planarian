@@ -66,7 +66,6 @@ export function formatDistance(
     )} ${unitLabel}`;
   }
 
-  // Otherwise do the current default logic
   if (distanceInFeet >= milesThreshold) {
     const miles = distanceInFeet / 5280;
     const formattedMiles = miles.toLocaleString(undefined, formatOptions);
@@ -84,8 +83,6 @@ export function isNullOrWhiteSpace(
   return input.replace(/\s/g, "").length < 1;
 }
 
-//#region nameof
-
 export const nameof = <T extends object>(name: NestedKeyOf<T>): string => name;
 
 // https://dev.to/pffigueiredo/typescript-utility-keyof-nested-object-2pa3
@@ -94,8 +91,6 @@ export type NestedKeyOf<ObjectType extends object> = {
   ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`
   : `${Key}`;
 }[keyof ObjectType & (string | number)];
-
-//#endregion
 export function formatPhoneNumber(phoneNumber?: string): string {
   const formattedPhoneNumber = phoneNumber?.replace(
     /^(\+1)(\d{3})(\d{3})(\d{4})$/,
@@ -108,11 +103,9 @@ export function formatDate(
   date: Date | string | null | undefined,
   formatString: string = "YYYY MMM-DD"
 ): string | null {
-  // Check for null, undefined, or whitespace-only strings.
   if (typeof date === "string" && date.trim() === "") return null;
   if (date === null || date === undefined) return null;
 
-  // Check if the date follows the pattern "YYYY-01-01 00:00:00+00:00"
   const yearPattern = /(\d{4})-01-01 00:00:00\+00:00/;
   const match = yearPattern.exec(date.toString());
   if (match) {

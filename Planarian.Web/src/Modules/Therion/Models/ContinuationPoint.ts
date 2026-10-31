@@ -15,7 +15,6 @@ export class ContinuationPoint {
   public get classification(): LeadClassification {
     if (isNullOrWhiteSpace(this.description)) return LeadClassification.UNKNOWN;
 
-    // Define the regular expressions for "good," "decent," and "bad" leads
     const goodRegex =
       /\b(goes|airflow|stooping|stoop|amazing|borehole|exemplary|excellent|fabulous|fine|formations|first-rate|good|great|helectite|outstanding|splendid|stellar|superb|superlative|top-notch|walking|walk|wind|wonderful)\b/;
     const decentRegex =
@@ -24,12 +23,10 @@ export class ContinuationPoint {
       /\b(doesn't go|does not go|loop|loops|terrible|pinches|pinch|abysmal|appalling|atrocious|awful|bad|dismal|disappointing|dig|execrable|lamentable|miserable|ngl|n\^[0-9]+|pitiful|poor|squeeze|terrible|tiny|very bad)\b/;
 
     const leadDescription = this.description?.toLowerCase() ?? "";
-    // Count the number of "good," "decent," and "bad" words in the lead description
     const goodWordCount = (leadDescription.match(goodRegex) || []).length;
     const decentWordCount = (leadDescription.match(decentRegex) || []).length;
     const badWordCount = (leadDescription.match(badRegex) || []).length;
 
-    // Determine whether the lead is good, decent, or bad based on the word counts
     if (goodWordCount > decentWordCount && goodWordCount > badWordCount) {
       return LeadClassification.GOOD;
     }

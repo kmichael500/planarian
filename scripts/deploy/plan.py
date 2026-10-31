@@ -110,7 +110,7 @@ def diff_paths(
             "Previously deployed SHA is not an ancestor of this release; "
             "refusing an implicit rollback/divergent production release"
         )
-    # Development may deliberately move between branches. Compare the two
+    # Development may move between branches. Compare the two
     # deployed trees directly. Migration safety is stricter: any migration file
     # seen by a prior coordinated attempt is immutable because a failed run may
     # already have applied it before failing later in the release.
@@ -151,8 +151,8 @@ def release_plan(paths: list[str] | None, *, force_all: bool = False) -> dict[st
     maintenance = bool(maintenance_tasks)
 
     # Generic deployment tooling changes re-exercise app deployment without
-    # touching the database. One-off task definitions/scripts are deliberately
-    # excluded: their own manifests decide what they require and when they run.
+    # touching the database. One-off task definitions/scripts are excluded; their
+    # manifests decide what they require and when they run.
     infrastructure = has(".github/workflows/Planarian.Deploy.yml") or any(
         path.startswith("scripts/deploy/")
         and not path.startswith("scripts/deploy/tasks/")

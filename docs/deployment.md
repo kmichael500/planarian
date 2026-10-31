@@ -1,8 +1,6 @@
 # Coordinated Planarian deployments
 
-**Status:** Implemented in `feature/cave-revisions-completion`; **not live until merged,
-pushed, and the GitHub environment settings are configured**. This is stage 1:
-no App Service slots or cross-service atomic swap.
+The workflow does not use App Service slots or cross-service atomic swaps.
 
 ## Contract
 
@@ -40,7 +38,7 @@ conservatively rebuilds/deploys API, web, and pending EF migrations.
 Development may move
 between branches: the planner compares the previously deployed tree directly
 with the selected ref. Already-deployed EF migration files still cannot be
-modified or removed, so a branch-only migration can intentionally make a later
+modified or removed, so a branch-only migration can make a later
 switch back to a ref without that migration fail closed until the schema/ref is
 reconciled. Production remains stricter: the previously successful Production
 SHA must be an ancestor of the selected release tag, preventing an accidental
@@ -70,7 +68,7 @@ planner fails closed rather than guessing deployment state.
 | Coordinated workflow or generic executable deployment tooling | API and web (database only when schema/model changes require it) |
 | Deployment tests, documentation, and unrelated paths | No deployment |
 
-`force_all` is *additive* for API, web and migrations. It deliberately does
+`force_all` is *additive* for API, web and migrations. It does
 not re-run one-off release tasks unless their trigger, manifest, or script
 changed (or the task explicitly opts into the environment's first coordinated
 release).
@@ -86,8 +84,7 @@ fail closed.
 A task script receives `preflight` and `run` phases. A maintenance task also
 receives `before-migrations` and `after-api-deploy`. `preflight` validates
 configuration without mutating hosted resources; `run` performs the
-repeat-safe one-off operation. Maintenance phases own any intentional
-quiescence/resume behavior. Keep domain-specific work in the task or
+repeat-safe one-off operation. Maintenance phases own quiescence/resume behavior. Keep domain-specific work in the task or
 application command rather than teaching the permanent planner what the task
 means.
 
@@ -122,7 +119,7 @@ attempt's current state is failure, in-progress, or missing. The tracking
 record is created before maintenance/migration/application deployment begins,
 so once that boundary exists the workflow cannot prove that an interrupted
 attempt did not already commit to PostgreSQL. Edit neither that migration nor
-its designer; add a new migration instead. This deliberately errs on the safe
+its designer; add a new migration instead. This errs on the safe
 side after a partial release.
 
 The model snapshot may change with a new migration, but a snapshot-only change
@@ -137,21 +134,19 @@ preserving migration safety from every newer tracking Deployment.
 
 ## GitHub environment setup (required before enabling release)
 
-Keep environments named exactly `Development` and `Production`. Each
-environment needs the following values; their names align with the earlier
-API/web workflows where possible.
+Keep environments named exactly `Development` and `Production`. Each environment needs the following values.
 
 | Environment value | Type | Purpose |
 | --- | --- | --- |
-| `AZURE_CREDENTIALS` | Secret | Existing Azure login credentials (API deployment and quiescence) |
-| `AZURE_WEBAPP_NAME` | Secret | Existing target API App Service name |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Secret | Existing Static Web App deployment credential |
-| `DATABASE_MIGRATION_CONNECTION_STRING` | Secret | **New:** limited-scope PostgreSQL deployment identity used by the EF bundle and database-backed `Planarian.Operations` commands |
-| `AZURE_RESOURCE_GROUP` | Variable | Existing Azure resource group |
-| `REACT_APP_API_ORIGIN_MAPPINGS` | Variable | Existing frontend API origin mapping |
-| `REACT_APP_UMAMI_WEBSITE_ID` | Variable | Existing production website analytics ID; required for production web |
-| `AZURE_API_HEALTH_URL` | Variable | **New:** HTTPS unauthenticated API health/smoke URL; required for API and database releases |
-| `AZURE_WEB_HEALTH_URL` | Variable | **New:** required HTTPS website smoke URL (only for web releases) |
+| `AZURE_CREDENTIALS` | Secret | Azure login credentials for API deployment and quiescence |
+| `AZURE_WEBAPP_NAME` | Secret | Target API App Service name |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Secret | Static Web App deployment credential |
+| `DATABASE_MIGRATION_CONNECTION_STRING` | Secret | Limited-scope PostgreSQL deployment identity used by the EF bundle and database-backed `Planarian.Operations` commands |
+| `AZURE_RESOURCE_GROUP` | Variable | Azure resource group |
+| `REACT_APP_API_ORIGIN_MAPPINGS` | Variable | Frontend API origin mapping |
+| `REACT_APP_UMAMI_WEBSITE_ID` | Variable | Production website analytics ID; required for production web |
+| `AZURE_API_HEALTH_URL` | Variable | HTTPS unauthenticated API health/smoke URL; required for API and database releases |
+| `AZURE_WEB_HEALTH_URL` | Variable | Required HTTPS website smoke URL for web releases |
 | `DEPLOY_RUNNER` | Repository variable (optional) | Trusted **Linux x64** self-hosted runner label when Azure PostgreSQL is private; default is `ubuntu-latest` |
 
 The workflow also creates GitHub Deployment records in internal tracking
@@ -167,7 +162,7 @@ Creating Deployment records emits GitHub's standard `deployment` and
 either event; before activation, verify that any separately installed GitHub
 deployment integration also ignores the
 `planarian-coordinated-release` task/internal tracking environments unless it
-is intentionally meant to observe them.
+is configured to observe them.
 
 Migration bundles and registered release tasks execute **on the GitHub runner**;
 the runner must have network access to every selected task's dependencies. The
@@ -181,17 +176,17 @@ and GitHub Actions runner v2.327.1 or later for Node 24 action support. Azure
 Login v3 uses the Node 24 action runtime; keep self-hosted runners current before selecting them
 with `DEPLOY_RUNNER`. Restrict self-hosted deployment runners to trusted,
 reviewed release refs. **Never open a private production database to the public
-internet just to make GitHub-hosted runners work.**
+internet solely to support GitHub-hosted runners.**
 
 The pipeline fails before mutation if required values are missing. All action
 dependencies touched by this deployment/PR package are pinned to reviewed full
 commit SHAs rather than mutable major-version tags. Checkout credentials are
 not persisted in the deployment jobs. Azure CLI's default stdout is disabled
 for release jobs so routine command output is not copied into Actions logs;
-commands that intentionally read a value request an explicit output format.
+commands that read a value request an explicit output format.
 The Static Web Apps action is not given a GitHub repository token because this
 deployment workflow never manages PR comments. The release workflow
-intentionally supports Linux x64 deploy runners and checks that platform before
+supports Linux x64 deploy runners and checks that platform before
 any selected component is deployed. Database releases additionally build a
 self-contained `linux-x64` EF bundle. At execution time, the scoped migration
 secret is exposed to the EF bundle and `Planarian.Operations` only as
@@ -199,11 +194,10 @@ secret is exposed to the EF bundle and `Planarian.Operations` only as
 The database schema credentials must not be added to frontend builds, committed,
 or installed in the normal API process.
 
-The former `AZURE_WEBAPP_PUBLISH_PROFILE` secret is not used by the
-coordinated workflow: `az webapp deploy` uses the existing Azure login
-identity. Stage 1 preserves the existing `AZURE_CREDENTIALS` service-principal
-secret so activation does not depend on a simultaneous Azure identity
-reconfiguration. Azure Login currently recommends OIDC/federated
+`AZURE_WEBAPP_PUBLISH_PROFILE` is not used by the coordinated workflow;
+`az webapp deploy` uses the existing Azure login identity. The workflow keeps
+`AZURE_CREDENTIALS` so activation does not depend on a simultaneous Azure
+identity reconfiguration. Azure Login recommends OIDC/federated
 authentication because it avoids a long-lived cloud credential; migrating this
 workflow to OIDC is a worthwhile follow-up once the Azure federated identity is
 configured. That change would add `id-token: write` and replace `creds` with
@@ -236,7 +230,7 @@ selected ref becomes the actual successful Development baseline. The next
 Development run compares its tree against that deployed ref, even when the
 histories diverge. GitHub Environment branch/tag protection still applies; if
 the Development environment restricts deployment refs, configure that policy to
-allow only the trusted repository branches you intend to deploy manually.
+allow only trusted repository branches approved for manual deployment.
 Because a manually selected ref supplies the workflow and application code that
 will receive Development environment secrets, do not deploy unreviewed/fork
 refs through this privileged workflow. Keep the last successfully deployed
@@ -248,14 +242,13 @@ Switching branches does not make database migrations reversible. If an ad-hoc
 branch applies a migration that a later ref does not contain unchanged, the
 later deployment fails closed rather than pretending the shared Development
 database rolled back. Use branch-only migrations against the shared Development
-database only when that consequence is intentional.
+database only when that irreversible consequence is acceptable.
 
 ## Production release procedure
 
 1. Finish the release's checks, especially EF pending-model and isolated
    PostgreSQL migration/rollout tests. Verify backup and recovery readiness.
-2. Create a `planarian-release-v*` tag on the exact commit you intend to
-   release and push it. **Tags alone do not trigger Production deployment.**
+2. Create and push a `planarian-release-v*` tag on the exact release commit. **Tags alone do not trigger Production deployment.**
    Production does not require that commit to have deployed to Development.
    Protect the `planarian-release-v*` namespace with repository rules against
    force-updates/deletion, and configure the Production Environment to permit
@@ -280,7 +273,7 @@ database only when that consequence is intentional.
 The historical `planarian-api-v*` and `planarian-web-v*` tags remain valid
 Git history markers; they are not rewritten or deleted. The first coordinated
 Production release has no task-scoped Production tracking Deployment, so it
-intentionally performs a conservative full release and starts both the new
+performs a conservative full release and starts both the new
 `planarian-release-v*` tag history and durable Production deployment-state
 history from there.
 
@@ -292,7 +285,7 @@ rejected by PR migration-model validation, not fixed by arbitrary deploy SQL.
 
 ## First Cave Revisions rollout
 
-This is an intentional **maintenance-window release**, not an ordinary
+This is a **maintenance-window release**, not an ordinary
 backward-compatible migration. The existing API's Cave/Entrance/File,
 line-plot and import writes must be quiesced while creating system
 baseline revisions. The migration is
@@ -330,8 +323,8 @@ normally leaves the separate SCM/Kudu app running; this is why the workflow
 fails before stopping an App Service configured to stop Kudu too or to disable
 SCM separation. Kudu ZIP deployment can
 still fail for other environmental reasons. If it fails, the workflow
-intentionally leaves the old API stopped and does not publish the frontend. Do not remove
-the write-quiescence safety boundary just to make the deploy action pass.
+leaves the old API stopped and does not publish the frontend. Do not remove
+the write-quiescence safety boundary to make the deploy action pass.
 Choose an approved stopped-site package installation or maintenance
 mechanism if the Development rehearsal proves it is needed.
 

@@ -17,7 +17,6 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
     [Fact]
     public async Task CaveSecondRecordLateFailureRollsBackCompleteState()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CaveSecondRecordLateFailureRollsBackCompleteState));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -37,13 +36,11 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var fault = new FailAtRevisionPublicationInterceptor();
 
-        // Act
         await using var executionDb = database.CreateDbContext("a", tenant.AccountId, fault);
         var execution = new CaveImportTestHarness(executionDb, executionDb.RequestUser);
         var error = await Assert.ThrowsAsync<DbUpdateException>(
             () => execution.ExecuteAsync(plan, "rollback-cave.csv"));
 
-        // Assert
         Assert.IsType<InvalidOperationException>(error.InnerException);
         Assert.Contains("deterministic late failure", error.InnerException!.Message);
         Assert.True(fault.SawCaveWriteBeforeFailure);
@@ -53,7 +50,6 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
     [Fact]
     public async Task EntranceSecondRecordLateFailureRollsBackCompleteState()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceSecondRecordLateFailureRollsBackCompleteState));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -78,13 +74,11 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var fault = new FailAtRevisionPublicationInterceptor();
 
-        // Act
         await using var executionDb = database.CreateDbContext("a", tenant.AccountId, fault);
         var execution = new EntranceImportTestHarness(executionDb, executionDb.RequestUser);
         var error = await Assert.ThrowsAsync<DbUpdateException>(
             () => execution.ExecuteAsync(plan, "rollback-ent.csv"));
 
-        // Assert
         Assert.IsType<InvalidOperationException>(error.InnerException);
         Assert.Contains("deterministic late failure", error.InnerException!.Message);
         Assert.True(fault.SawEntranceWriteBeforeFailure);

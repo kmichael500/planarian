@@ -76,8 +76,7 @@ internal static class CurrentMainV32DatabaseCensus
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-    // Deliberately strict: a future migration that adds or removes an application table must classify it here
-    // rather than silently falling outside the preservation census.
+    // A future migration that adds or removes an application table must classify it here.
     internal static string[] ExpectedLatestTables =>
         BaselineTables.Concat(CompletionOwnedTables).Concat(MigrationOwnedTables)
             .Order(StringComparer.Ordinal)

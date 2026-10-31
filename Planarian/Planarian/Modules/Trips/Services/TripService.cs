@@ -99,7 +99,6 @@ public class TripService : ServiceBase<TripRepository>
             if (!FileValidation.IsValidPhotoFile(validationStream, fileName)) continue;
 
             var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : fileName;
-            // TODO: don't throw exception but alert user
             var entity = new Photo(tripId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();

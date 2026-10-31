@@ -208,7 +208,7 @@ internal static class DevelopmentApiVerifier
                 !feature.IsDefault &&
                 feature.Key == FeatureKey.EnabledFieldCaveAlternateNames &&
                 !feature.IsEnabled),
-            "Secondary E2E account did not expose its intentionally disabled authoring field.");
+            "Secondary E2E account did not expose its disabled authoring field.");
 
         var geology = await GetJson<List<TagTypeTableVm>>(adminClient, "/api/account/tags-table/Geology");
         Require(geology.Any(tag => tag.Name == "Copper Ridge Limestone"),

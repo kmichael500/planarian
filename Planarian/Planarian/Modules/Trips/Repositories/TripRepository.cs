@@ -18,16 +18,12 @@ public class TripRepository : RepositoryBase
     {
     }
 
-    #region Trip Member
-
     public async Task<Member?> GetTripMember(string tripId, string userId)
     {
         return await DbContext.Members.FirstOrDefaultAsync(e =>
             e.UserId == userId && e.TripId == tripId &&
             e.Trip!.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
-
-    #endregion
 
     public TagType? GetAvailableTripTag(string tagTypeId, string projectId)
     {
@@ -125,7 +121,6 @@ public class TripRepository : RepositoryBase
                 ModifiedOn = e.ModifiedOn,
                 IsTripReportCompleted = !string.IsNullOrWhiteSpace(e.TripReport)
             })
-            // .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
 
         return result;

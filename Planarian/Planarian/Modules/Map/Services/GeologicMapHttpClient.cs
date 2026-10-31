@@ -32,7 +32,6 @@ public class GeologicMapHttpClient
         double longitude,
         CancellationToken cancellationToken)
     {
-        // prepare the LL–BB parameter
         var llbValue = $"[{longitude},{latitude}],[{longitude},{latitude}]";
         var encodedLlb = UrlEncoder.Default.Encode(llbValue);
 

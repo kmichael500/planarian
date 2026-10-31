@@ -6,7 +6,7 @@ Planarian has separate platform and account authorization domains. Permission na
 
 `PlanarianAdmin` is a global, platform-scoped permission. It is intended for explicit platform operations such as Planarian Settings and account provisioning.
 
-`PlanarianAdmin` does **not** imply Account `Admin`, Cave `Manager`, Cave `View`, `AdminManager`, or an account-admin export override. A platform administrator receives account authority only when an account-scoped permission is explicitly assigned. Account creation does this intentionally by adding the creator to the new Account and granting that user Account `Admin`.
+`PlanarianAdmin` does **not** imply Account `Admin`, Cave `Manager`, Cave `View`, `AdminManager`, or an account-admin export override. A platform administrator receives account authority only when an account-scoped permission is explicitly assigned. Account creation does this by adding the creator to the new Account and granting that user Account `Admin`.
 
 Global platform permissions must not be folded into account-scoped permission queries. Direct platform checks must require a global `UserPermission` (`AccountId == null`) with the `PlanarianAdmin` key. An account-scoped `UserPermission` carrying the `PlanarianAdmin` key is malformed persisted data and must be ignored by both server authorization and client permission projection.
 

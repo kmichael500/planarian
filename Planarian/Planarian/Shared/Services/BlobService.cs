@@ -19,8 +19,6 @@ public class BlobService
         _containerClient = new BlobContainerClient(blobOptions.ConnectionString, blobOptions.ContainerName);
     }
 
-    #region Trip Photos
-
     public async Task<string> AddTripPhoto(string projectId, string tripId,
         string photoId, Stream stream, string fileExtension)
     {
@@ -37,8 +35,6 @@ public class BlobService
 
         return blobKey;
     }
-
-    #endregion
 
     public async Task<AuthenticatedFileResponse> CreateBlobResponse(string blobKey, string? fileName,
         bool download, CancellationToken cancellationToken, string? fallbackContentType = null)

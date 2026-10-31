@@ -19,7 +19,6 @@ export const CaveSearchMapControl = () => {
   >([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // State to store the candidate coordinate (if any)
   const [coordinateCandidate, setCoordinateCandidate] = useState<{
     lat: number;
     lon: number;
@@ -29,14 +28,12 @@ export const CaveSearchMapControl = () => {
   const handleSearch = useCallback(async (value: string) => {
     setInputValue(value);
 
-    // Check if input is in the format "lat, lon"
     if (value.includes(",")) {
       const parts = value.split(",");
       if (parts.length === 2) {
         const lat = parseFloat(parts[0].trim());
         const lon = parseFloat(parts[1].trim());
         if (!isNaN(lat) && !isNaN(lon)) {
-          // Store the coordinate candidate and update options
           setCoordinateCandidate({ lat, lon });
           setOptions([
             {
@@ -50,12 +47,11 @@ export const CaveSearchMapControl = () => {
       }
     }
 
-    // Clear any coordinate candidate if the input isn't a valid coordinate
     setCoordinateCandidate(null);
 
     if (value) {
       try {
-        // Reset the query builder to avoid stacking filters
+        // Start each search from a fresh query so filters cannot accumulate across keystrokes.
         queryBuilder = new QueryBuilder<CaveSearchParamsVm>("", false);
         queryBuilder = queryBuilder.filterBy(
           "name",
@@ -91,7 +87,6 @@ export const CaveSearchMapControl = () => {
     value: string,
     option: { value: string; label: string; cave: CaveSearchVm | null }
   ) => {
-    // Check if the selected option is the coordinate candidate
     if (value.startsWith("coordinate:")) {
       const coords = value.split(":")[1];
       const [lat, lon] = coords.split(",").map((v) => parseFloat(v.trim()));
@@ -111,13 +106,11 @@ export const CaveSearchMapControl = () => {
         });
       }
     }
-    // Clear the search input and drop-down options after selection
     setInputValue("");
     setOptions([]);
     setCoordinateCandidate(null);
   };
 
-  // Handler for when the user presses Enter
   const handlePressEnter = () => {
     if (coordinateCandidate) {
       map.current?.flyTo({

@@ -189,7 +189,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                     break;
                 }
 
-                // Invitation acceptance/decline deletes the temporary invitation membership after validating the code.
+                // Invitation acceptance/decline may delete the validated temporary membership outside the selected account.
                 if (entityState == EntityState.Deleted && isInvitation)
                 {
                     if (accountUser.AccountId == requestUserAccountId ||

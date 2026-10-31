@@ -2,11 +2,7 @@ import { useEffect, useRef } from "react";
 import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import type { MapRef } from "react-map-gl/maplibre";
 
-/**
- * Keeps the map view aligned with the provided bounds once the map is ready
- * and the container has a measurable size. This avoids calling fitBounds
- * while the canvas is zero-sized (which causes wildly different zoom levels).
- */
+/** Wait for map load and a non-zero container before fitting bounds. */
 export const useFitMapBounds = (
   mapRef: MapRef | undefined,
   bounds: LngLatBoundsLike | null | undefined,
@@ -59,7 +55,7 @@ export const useFitMapBounds = (
           ...optionsRef.current,
         });
       } catch (error) {
-        // Ignore fit errors – they occur if the bounds are invalid.
+        // Invalid bounds are non-fatal.
       }
     };
 

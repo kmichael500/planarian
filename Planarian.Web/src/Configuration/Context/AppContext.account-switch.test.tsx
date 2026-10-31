@@ -55,8 +55,7 @@ describe("AppProvider account refresh atomicity", () => {
   });
 
   const renderInitializedAccountA = async () => {
-    // Deliberately omit Manager from the v2 payload so any accidental fallback
-    // to legacy client-side inheritance is observable.
+    // Omit Manager so fallback to legacy client-side inheritance is observable.
     jest
       .spyOn(AppService, "InitializeApp")
       .mockResolvedValue(session("account-a", [PermissionKey.Admin], 2));

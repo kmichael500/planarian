@@ -6,7 +6,7 @@ using Planarian.Modules.Account.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
-// ReSharper disable once CheckNamespace ( for partial class compatability )
+// ReSharper disable once CheckNamespace -- partial class spans feature folders.
 namespace Planarian.Modules.Account.Controller;
 
 public partial class AccountController : PlanarianControllerBase<AccountService>

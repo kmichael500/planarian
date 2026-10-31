@@ -410,9 +410,6 @@ public class UserRepository : RepositoryBase
             .ToListAsync();
     }
 
-    /// <summary>
-    /// Return all Access Permissions the user currently has.
-    /// </summary>
     public async Task<List<UserPermissionVm>> GetUserPermissions(
         string userId)
     {

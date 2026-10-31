@@ -64,7 +64,7 @@ public class AccountService : ServiceBase<AccountRepository>
             var group = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
             await NotifyResetProgressBestEffortAsync(group, "Resetting cave and account data.");
             await Repository.ExecuteResetAsync(cancellationToken);
-            // This transition is irreversible. Ignore request disconnects during cleanup.
+            // Account purge is irreversible; ignore request disconnects during cleanup.
             try
             {
                 return await CleanupStorageAsync(group);

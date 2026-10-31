@@ -51,7 +51,6 @@ public class MapController : PlanarianControllerBase<MapService>
         CancellationToken cancellationToken)
     {
         var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, query, cancellationToken);
-        // Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
         if (mvtData == null)
         {
             return NotFound();

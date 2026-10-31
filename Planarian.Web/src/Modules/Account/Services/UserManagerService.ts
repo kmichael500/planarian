@@ -42,7 +42,6 @@ const AccountUserManagerService = {
     ).data;
   },
 
-  //#region Manage Permissions
 
   async GetCavePermissions(
     userId: string,
@@ -90,9 +89,7 @@ const AccountUserManagerService = {
     );
   },
 
-  //#endregion
 
-  //#region Select
 
   async GetPermissionSelectList(
     permissionType: PermissionType

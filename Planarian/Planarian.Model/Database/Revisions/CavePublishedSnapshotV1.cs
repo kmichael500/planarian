@@ -4,8 +4,7 @@ using System.Text.Json.Serialization;
 namespace Planarian.Model.Database.Revisions;
 
 /// <summary>
-/// Persisted historical schema. V1 is immutable after the cave-revisions feature lands;
-/// future persisted semantics require a V2 model, reader, and schema-version dispatch.
+/// Persisted historical schema. V1 semantics are immutable; changes require a V2 model, reader, and schema-version dispatch.
 /// </summary>
 public sealed record CavePublishedSnapshotV1
 {

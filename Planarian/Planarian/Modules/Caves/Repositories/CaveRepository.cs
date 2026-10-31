@@ -67,11 +67,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             Id = e.Id,
             NarrativeSnippet = isNarrativeSearch
                 ? FullTextSearchExtensions.TsHeadlineSimple(
-                    "english", // config
-                    e.Narrative, // document column
-                    narrativeSearch, // search term
+                    "english",
+                    e.Narrative,
+                    narrativeSearch,
                     "StartSel=<mark>,StopSel=</mark>,MaxWords=30,MinWords=10,MaxFragments=100,FragmentDelimiter= ...<br><br>"
-                ) // options
+                )
                 : null,
             County = new SelectListItem<string>(e.County!.Name, e.County.Id),
             CountyDisplayId = e.County!.DisplayId,
@@ -248,16 +248,16 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     private IQueryable<Cave> GetCavesQuery(FilterQuery filterQuery, string? permissionKey = null)
     {
+        // Apply account and effective-permission scope explicitly so callers can also require a specific role.
         var query = DbContext.Caves
-            .IgnoreQueryFilters() // ignoring because it makes the query too slow, we are applying the same filter to it here so we can include a permission type
+            .IgnoreQueryFilters()
             .Where(cave =>
                 cave.AccountId == RequestUser.AccountId &&
                 DbContext.UserCavePermissionView.Any(ucp =>
                     ucp.AccountId == RequestUser.AccountId
                     && ucp.UserId == RequestUser.Id &&
                     (string.IsNullOrWhiteSpace(permissionKey) ||
-                     ucp.PermissionKey ==
-                     permissionKey) // gets caves that the user has access at a specific permission level for (i.e. manager)
+                     ucp.PermissionKey == permissionKey)
                     && ucp.CaveId == cave.Id)).AsQueryable();
 
         if (!filterQuery.Conditions.Any()) return query;
@@ -288,7 +288,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         QueryOperator.Contains => query
                             .Where(e =>
                                 e.Name.ToLower().Contains(queryCondition.Value.ToLower())
-                                // || EF.Functions.ToTsVector(e.Name).Matches(EF.Functions.PlainToTsQuery(queryCondition.Value + ":*"))
                                 || EF.Functions.ToTsVector(e.AlternateNames).Matches(queryCondition.Value)
                                 || (
                                     queryCondition.Value.Contains(e.County.DisplayId)
@@ -926,8 +925,9 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     private IQueryable<Cave> GetCountyNumberQuery(string countyId)
     {
+        // County-number allocation must consider every Cave in the tenant County, not only visible Caves.
         return DbContext.Caves
-            .IgnoreQueryFilters() // need to ignore filter to calculate county number for all caves, not just ones the user has access too
+            .IgnoreQueryFilters()
             .Where(e => e.AccountId == RequestUser.AccountId && e.CountyId == countyId);
     }
 
@@ -1548,8 +1548,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     #endregion
 
-    #region GeoJson
-
     public async Task<IEnumerable<CaveGeoJson>> GetCaveGeoJsonsAsync(string caveId)
     {
         return await DbContext.CaveGeoJsons.Where(c => c.CaveId == caveId).ToListAsync();
@@ -1560,7 +1558,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         DbContext.CaveGeoJsons.Remove(geoJson);
     }
 
-    #endregion
 }
 
 public class CaveRepository : CaveRepository<PlanarianDbContext>

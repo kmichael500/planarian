@@ -1,10 +1,9 @@
 # Import architecture
 
-This page explains why **Cave and Entrance CSV imports** use a different execution path from interactive Cave editing. Account File import is a separate workflow described below.
 
 The durable compatibility requirements live in [Import compatibility](../import-compatibility.md).
 
-## Why imports are different
+## Execution model
 
 A supported import may contain roughly 10,000 Caves and around 15,000 Entrances.
 
@@ -149,8 +148,7 @@ This avoids routing thousands of Caves through an interactive service loop while
 
 The bulk executors are required to produce the same published aggregate semantics as ordinary authoring for fields both
 workflows own. Integration parity tests therefore exercise full-field create/update/clear/delete lifecycles and compare
-complete `CavePublishedSnapshotV1` values plus revision predecessor/provenance. A few workflow-shape differences are
-intentional and tested explicitly rather than normalized away:
+complete `CavePublishedSnapshotV1` values plus revision predecessor/provenance. A few workflow-shape differences are tested explicitly rather than normalized away:
 
 - interactive Cave creation requires a primary Entrance, while Cave CSV and Entrance CSV are independent imports. The
   equivalent import workflow is therefore Cave creation followed by Entrance publication, producing two Import revisions
@@ -164,7 +162,7 @@ intentional and tested explicitly rather than normalized away:
 - existing-Cave Cave sync and Entrance sync replacement canonicalize blank optional authoring text to `null` where normal
   authoring does. Characterized insert/append compatibility remains unchanged.
 
-Account File import is deliberately different again: after filename-to-Cave resolution and chunk staging it publishes
+Account File import uses a separate path: after filename-to-Cave resolution and chunk staging it publishes
 through `FileService` and the normal Cave mutation coordinator, so the resulting Cave revision is the ordinary
 ManagerEdit/Update history entry and is not linked to a `CaveImportBatch`.
 
@@ -178,7 +176,7 @@ The executor gathers current live File object addresses, queues tenant-qualified
 
 ## Lock ordering
 
-The durable order is intentionally consistent with other publication workflows:
+The lock order matches the other publication workflows:
 
 1. County resources when needed;
 2. TagType resources;
@@ -195,7 +193,7 @@ The account File-import feature does **not** use CaveImportPlanner/EntranceImpor
 
 After it resolves the target Cave from the filename/import rules, it calls `FileService.UploadCaveFile` or `FileService.PublishStagedCaveFile`. Those methods publish one target Cave through `CaveMutationCoordinator` / `CaveMutationRepository` so the File change still appears in Cave history.
 
-This distinction is important when tracing code: “import” in Planarian names more than one workflow.
+`import` names separate workflows in Planarian; account File import is not Cave/Entrance bulk import.
 
 ## Entrance import
 
@@ -210,16 +208,3 @@ Entrance import follows the same architectural pattern:
 - CaveBulkRevisionRepository.
 
 Entrance changes publish Cave revisions because Entrances are part of the semantic Cave aggregate.
-
-## Read the code in this order
-
-1. Planarian/Planarian/Modules/Account/Import/Services/ImportService.Caves.cs
-2. Planarian/Planarian/Modules/Import/Parsing/ImportCsvParsers.cs
-3. Planarian/Planarian/Modules/Import/Data/CaveImportPlanningRepository.cs
-4. Planarian/Planarian/Modules/Import/Planning/ImportPlanningState.cs
-5. Planarian/Planarian/Modules/Import/Planning/CaveImportPlanner.cs
-6. Planarian/Planarian/Modules/Import/Planning/CaveImportPlan.cs
-7. Planarian/Planarian/Modules/Import/Data/CaveImportExecutionRepository.cs
-8. Planarian/Planarian/Modules/Caves/Revisions/CaveBulkRevisionRepository.cs
-
-Then repeat the same tour with the Entrance equivalents.

@@ -15,6 +15,6 @@ public static class PermissionPolicyKey
     public const string Manager = PermissionKey.Manager;
     public const string PlanarianAdmin = PermissionKey.PlanarianAdmin;
     public const string Admin = PermissionKey.Admin;
-    public const string AdminManager = "AdminManager"; // Not actually in the database
-    public const string Export = "Export"; // Not actually in the database
+    public const string AdminManager = "AdminManager"; // Synthetic policy key; not persisted.
+    public const string Export = "Export"; // Synthetic policy key; not persisted.
 }

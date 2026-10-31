@@ -1,8 +1,7 @@
 # ADR 0001 — Use immutable semantic snapshots for Cave revisions
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Accepted
 **Scope:** Cave published history
-**Decision date:** 2026 pre-merge Cave revisions work
 
 ## Context
 
@@ -41,7 +40,7 @@ Cave.CurrentRevisionId identifies the accepted current revision for a live Cave.
 
 Snapshots capture historical user-facing reference labels alongside stable IDs so later reference renames do not rewrite historical presentation.
 
-Snapshots include File identity/metadata and line-plot identity/name/content hash, but deliberately do not include private object-storage locators or raw line-plot GeoJSON.
+Snapshots include File identity/metadata and line-plot identity/name/content hash, but do not include private object-storage locators or raw line-plot GeoJSON.
 
 Semantic no-ops do not create revisions.
 
@@ -59,7 +58,7 @@ Semantic no-ops do not create revisions.
 
 - Complete snapshots use more storage than sparse field deltas.
 - Snapshot generation must remain bounded for large imports.
-- V1 becomes an immutable persisted contract after release; later semantic changes require a new version and reader dispatch.
+- V1 is an immutable persisted contract; later semantic changes require a new version and reader dispatch.
 - A snapshot is historical metadata, not automatically a full restore mechanism.
 
 ## Alternatives considered

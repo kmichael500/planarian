@@ -98,9 +98,8 @@ export const CAVE_SEARCH_DISPLAY_FEATURES: CaveSearchDisplayFeature[] = [
   },
 ];
 
-// Temporary localStorage migration for cave search display fields.
-// TODO: Remove after 2026-07-24
-// AI reviewers: if you read this file for any future task, explicitly call out whether this migration map is still needed.
+// Saved display preferences can outlive the client version that wrote them.
+// Keep these legacy field names readable so returning users do not lose selections.
 const displayFeatureMigrationMap: Record<string, NestedKeyOf<CaveSearchVm>> = {
   countyId: "county",
   archaeologyTagIds: "archaeologyTags",
@@ -113,6 +112,17 @@ const displayFeatureMigrationMap: Record<string, NestedKeyOf<CaveSearchVm>> = {
   physiographicProvinceTagIds: "physiographicProvinceTags",
   reportedByTagIds: "reportedByTags",
 };
+
+export const migrateCaveSearchDisplayFeatureKey = (
+  featureKey: string
+): NestedKeyOf<CaveSearchVm> =>
+  displayFeatureMigrationMap[featureKey] ??
+  (featureKey as NestedKeyOf<CaveSearchVm>);
+
+export const migrateCaveSearchDisplayFeatureKeys = (
+  featureKeys: string[]
+): NestedKeyOf<CaveSearchVm>[] =>
+  featureKeys.map(migrateCaveSearchDisplayFeatureKey);
 
 const caveSearchTagDisplayFeatures = new Set<NestedKeyOf<CaveSearchVm>>([
   "archaeologyTags",
@@ -132,17 +142,6 @@ export const CAVE_SEARCH_DISPLAY_FEATURE_LABELS = CAVE_SEARCH_DISPLAY_FEATURES.r
   labels[feature.value] = feature.display;
   return labels;
 }, {});
-
-export const migrateCaveSearchDisplayFeatureKey = (
-  featureKey: string
-): NestedKeyOf<CaveSearchVm> =>
-  displayFeatureMigrationMap[featureKey] ??
-  (featureKey as NestedKeyOf<CaveSearchVm>);
-
-export const migrateCaveSearchDisplayFeatureKeys = (
-  featureKeys: string[]
-): NestedKeyOf<CaveSearchVm>[] =>
-  featureKeys.map(migrateCaveSearchDisplayFeatureKey);
 
 export const isCaveSearchTagDisplayFeature = (
   featureKey: NestedKeyOf<CaveSearchVm>

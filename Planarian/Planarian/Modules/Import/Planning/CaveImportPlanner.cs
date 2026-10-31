@@ -11,11 +11,7 @@ using Planarian.Modules.Import.Models;
 
 namespace Planarian.Modules.Import.Planning;
 
-/// <summary>
-/// Pure Cave import planner. It characterizes main's parsing/tag/sync behavior
-/// while replacing write-and-rollback preview with read-only resolution and an
-/// immutable plan.
-/// </summary>
+/// <summary>Pure Cave import planning with read-only resolution and an immutable execution plan.</summary>
 public sealed class CaveImportPlanner
 {
     public CaveImportPlan Plan(IReadOnlyList<CaveCsvModel> records, CaveImportPlanningState planningState, bool syncExisting,
@@ -130,10 +126,8 @@ public sealed class CaveImportPlanner
                     DepthFeet = record.CaveDepthFt,
                     MaxPitDepthFeet = record.MaxPitDepthFt,
                     NumberOfPits = record.NumberOfPits,
-                    // Preserve characterized insert compatibility (blank CSV Narrative becomes an empty string),
-                    // but existing Cave updates must use the same nullable-text canonicalization as normal authoring.
-                    // Otherwise a row whose preview reports only another field change can silently mutate null Narrative
-                    // to an empty string during commit.
+                    // New imports preserve blank Narrative as empty string; updates canonicalize blanks like normal authoring
+                    // so an unrelated edit cannot silently change null Narrative to empty string.
                     Narrative = existing is null ? record.Narrative?.Trim() : NormalizeOptionalText(record.Narrative),
                     CountyId = county.Id,
                     CountyNumber = record.CountyCaveNumber,

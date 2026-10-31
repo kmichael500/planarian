@@ -3,9 +3,6 @@ using Planarian.Shared.Routing;
 
 namespace Planarian.Shared.Services;
 
-/// <summary>
-/// Builds frontend URLs for the client origin configured for the current API request.
-/// </summary>
 public class ClientUrlBuilder
 {
     private readonly IClientRequestOrigin _clientRequestOrigin;

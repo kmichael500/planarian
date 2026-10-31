@@ -286,7 +286,11 @@ const CavesComponent: React.FC = () => {
         try {
           const parsedFeatures = JSON.parse(savedFeaturesJson);
           savedFeatures = Array.isArray(parsedFeatures)
-            ? migrateCaveSearchDisplayFeatureKeys(parsedFeatures)
+            ? migrateCaveSearchDisplayFeatureKeys(
+                parsedFeatures.filter(
+                  (feature): feature is string => typeof feature === "string"
+                )
+              )
             : [];
         } catch {
           savedFeatures = [];
@@ -303,12 +307,10 @@ const CavesComponent: React.FC = () => {
         }
       }
 
-      // Filter defaults against enabled features
       let filteredSelectedFeatures = savedFeatures.filter((featureKey) =>
         enabledFeatures.some((enabled) => enabled.value === featureKey)
       );
 
-      // Location check for initial setup if distanceMiles is enabled and selected
       if (filteredSelectedFeatures.includes("distanceMiles")) {
         const userLocation = await LocationHelpers.getUsersLocation(message);
         if (userLocation) {
@@ -317,7 +319,6 @@ const CavesComponent: React.FC = () => {
             userLocation.longitude
           );
         } else {
-          // Remove distanceMiles from selection if permission denied
           filteredSelectedFeatures = filteredSelectedFeatures.filter(
             (value) => value !== "distanceMiles"
           );

@@ -9,7 +9,6 @@ import { CloudDownloadOutlined } from "@ant-design/icons";
 const { Title, Paragraph } = Typography;
 
 const caveImportHeadersData = [
-  // Identification
   {
     display: "Cave Name",
     value: "CaveName",
@@ -29,7 +28,6 @@ const caveImportHeadersData = [
     },
   },
 
-  // Location
   {
     display: "State",
     value: "State",
@@ -88,7 +86,6 @@ const caveImportHeadersData = [
     },
   },
 
-  // Characteristics
   {
     display: "Cave Length",
     value: "CaveLengthFt",
@@ -182,7 +179,6 @@ const caveImportHeadersData = [
     },
   },
 
-  // Reporting
   {
     display: "Reported On Date",
     value: "ReportedOnDate",
@@ -203,7 +199,6 @@ const caveImportHeadersData = [
     },
   },
 
-  // Miscellaneous
 
   {
     display: "Is Archived",
@@ -228,7 +223,6 @@ const caveImportHeadersData = [
 ];
 
 const entranceImportHeadersData = [
-  // Identification
   {
     display: "County Code",
     value: "CountyCode",
@@ -258,7 +252,6 @@ const entranceImportHeadersData = [
     },
   },
 
-  // Location
 
   {
     display: "Decimal Latitude",
@@ -297,7 +290,6 @@ const entranceImportHeadersData = [
     },
   },
 
-  // Characteristics
   {
     display: "Entrance Description",
     value: "EntranceDescription",
@@ -345,7 +337,6 @@ const entranceImportHeadersData = [
     },
   },
 
-  // Reporting
   {
     display: "Reported On Date",
     value: "ReportedOnDate",
@@ -366,7 +357,6 @@ const entranceImportHeadersData = [
     },
   },
 
-  // Miscellaneous
   {
     display: "Is Primary Entrance",
     value: "IsPrimaryEntrance",

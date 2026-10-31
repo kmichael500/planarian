@@ -2,8 +2,7 @@
 
 Observable import compatibility is anchored to the golden fixture derived from
 `main@11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae`. Compatibility concerns preview and committed semantics, not the old
-internal implementation. Do not rewrite the fixture merely to make a refactor pass. An intentional semantic change
-requires an explicit, narrowly documented and regression-tested difference while retaining the baseline expectation.
+internal implementation. Do not rewrite the fixture merely to make a refactor pass. An approved semantic change requires an explicit, narrowly documented and regression-tested difference while retaining the baseline expectation.
 
 ## Durable contracts
 
@@ -36,5 +35,5 @@ and description values are canonicalized to `null`, matching normal authoring cl
 keeps its characterized baseline behavior. This prevents a sync preview that treats blank and absent text as equivalent
 from committing an otherwise invisible `null` to empty-string mutation.
 
-Tenant/data-integrity corrections also intentionally differ from the baseline: every File is account-owned,
+Tenant/data-integrity corrections also differ from the baseline: every File is account-owned,
 File/staged-file relationships are tenant-qualified, and migration of unassignable legacy Files fails closed.

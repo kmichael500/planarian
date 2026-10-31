@@ -53,7 +53,6 @@ const StateCountyFilterFormItem = <T extends object>({
   } as StateDropdownProps;
 
   useEffect(() => {
-    // Set default values on component load
     const stateValue = queryBuilder.getFieldValue(stateField);
     const countyValue = queryBuilder.getFieldValue(countyField);
     if (stateValue === undefined) return;

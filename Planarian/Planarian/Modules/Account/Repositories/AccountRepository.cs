@@ -155,7 +155,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         var addresses = live.Concat(pendingFileCleanup).Distinct().ToList();
 
         // The whole account container includes untracked archives/imports. Even a
-        // foreign reference to a key absent from our File table makes deleting
+        // foreign reference to a key absent from the File table makes deleting
         // that container unsafe.
         if (await IsContainerReferencedByAnotherAccountAsync(RequestUser.AccountContainerName, cancellationToken))
             throw ApiExceptionDictionary.Conflict(
@@ -195,16 +195,11 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         const int batchSize = 500;
 
-        // Revision/workflow rows deliberately use restrictive relationships so
-        // accepted history survives an ordinary Cave delete.  An account purge
-        // is the explicit exception: sever nullable workflow pointers first,
-        // then remove the dependent graph in an order that cannot cross the
-        // trusted account boundary.
+        // Restrictive revision/workflow relationships preserve history on ordinary Cave deletes.
+        // Account purge is the exception: sever nullable pointers, then delete within the account boundary.
         await DeleteRevisionWorkflowForAccountAsync(cancellationToken);
 
         int deletedCount = 0;
-
-        // Step 1: Delete entrance-related tags
 
         do
         {
@@ -251,7 +246,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         } while (deletedCount == batchSize);
 
-        // Step 2: Delete entrances
         deletedCount = 0;
 
         do
@@ -262,7 +256,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         } while (deletedCount == batchSize);
 
-        // Step 3: Delete cave-related tags
         deletedCount = 0;
 
         do
@@ -386,8 +379,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
         } while (deletedCount == batchSize);
 
-        // Step 4: Delete the cave
-
         deletedCount = 0;
 
         do
@@ -449,7 +440,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     private async Task DeleteAllTagTypes(CancellationToken cancellationToken)
     {
-        const int batchSize = 500; // Adjust based on your needs
+        const int batchSize = 500;
         int deletedCount;
 
         do
@@ -463,7 +454,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .Contains(tt.Id) && tt.AccountId == RequestUser.AccountId)
                 .ExecuteDeleteAsync(cancellationToken);
 
-        } while (deletedCount == batchSize); // Continue until fewer than batchSize rows are deleted
+        } while (deletedCount == batchSize);
     }
 
     private async Task DeleteAllCounties(CancellationToken cancellationToken)
@@ -472,7 +463,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    // deletes all cave permissions except view all
     private async Task DeleteAllCavePermissions(CancellationToken cancellationToken)
     {
         await DbContext.CavePermissions.Where(c =>
@@ -547,11 +537,11 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     #region Archive
 
+    // Archive exports bypass Cave visibility filters but remain explicitly account-scoped.
     public async Task<List<ArchiveCaveCsvModel>> GetArchiveCaves(string accountId, CancellationToken cancellationToken)
     {
         return await DbContext.Caves
             .AsNoTracking()
-            // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
             .Where(e => e.AccountId == accountId)
             .OrderBy(e => e.State.Name)
@@ -611,7 +601,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Entrances
             .AsNoTracking()
-            // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
             .Where(e => e.Cave.AccountId == accountId)
             .OrderBy(e => e.Cave.State.Name)
@@ -660,7 +649,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Files
             .AsNoTracking()
-            // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
             .Where(file => file.AccountId == accountId && !string.IsNullOrWhiteSpace(file.CaveId))
             .OrderBy(file => file.Cave.State.Name)
@@ -686,7 +674,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.CaveGeoJsons
             .AsNoTracking()
-            // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
             .Where(geoJson => geoJson.Cave.AccountId == accountId)
             .OrderBy(geoJson => geoJson.Cave.State.Name)

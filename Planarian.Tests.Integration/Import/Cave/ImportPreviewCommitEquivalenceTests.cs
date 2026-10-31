@@ -28,7 +28,6 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     [Fact]
     public async Task CaveNoChangePreviewAndCommitAreEquivalent()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CaveNoChangePreviewAndCommitAreEquivalent));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
@@ -40,13 +39,11 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         var revisionBefore = (await db.Caves.IgnoreQueryFilters()
             .SingleAsync(cave => cave.Id == tenant.CaveId)).CurrentRevisionId;
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
         await import.ExecuteAsync(plan, "no-change.csv");
         db.ChangeTracker.Clear();
         var after = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
 
-        // Assert
         Assert.Equal(CaveImportAction.NoChange, Assert.Single(plan.Caves).Action);
         Assert.Equal("no change", Assert.Single(plan.CreatePreview(omitNoChange: false)).Action);
         Assert.Empty(plan.CreatePreview(omitNoChange: true));
@@ -58,7 +55,6 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     [Fact]
     public async Task CaveSyncDeletionPreviewMatchesCommit()
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveSyncDeletionPreviewMatchesCommit));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -67,11 +63,9 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
             "\nReplacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,Replacement\n";
         var revisionsBefore = await db.CaveRevisions.CountAsync(revision => revision.CaveId == tenant.CaveId);
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
         await import.ExecuteAsync(plan, "delete.csv");
 
-        // Assert
         Assert.Equal(tenant.CaveId, Assert.Single(plan.Deletions).CaveId);
         var preview = Assert.Single(plan.CreatePreview(omitNoChange: true), row => row.Action == "delete");
         Assert.Equal(("Cave A", "A01", 1),
@@ -127,13 +121,11 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     private async Task VerifyCaveAsync(
         string scenario, bool syncExisting, string row, CaveImportAction expectedAction)
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync($"preview_cave_{scenario}");
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
 
-        // Act
         var plan = await import.PlanCsvAsync(
             ImportDryRunIntegrationTests.CaveHeader + '\n' + row + '\n', syncExisting);
         var planned = Assert.Single(plan.Caves);
@@ -141,7 +133,6 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         await import.ExecuteAsync(plan, $"{scenario}.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         Assert.Equal(expectedAction, planned.Action);
         var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
         AssertCavePreview(preview, snapshot);
@@ -155,7 +146,6 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     private async Task VerifyEntranceAsync(
         string scenario, bool syncExisting, bool seedExisting, bool importPrimary)
     {
-        // Arrange
         await using var database = await fixture.CreateDatabaseAsync($"preview_entrance_{scenario}");
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         if (seedExisting)
@@ -166,14 +156,12 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         var csv = ImportDryRunIntegrationTests.EntranceHeader +
             $"\nImported,A01,1,{importPrimary.ToString().ToLowerInvariant()},35.123,-86.456,612,Survey Grade,20,Open,Wet,Sink,2026-08-01,Surveyor,Entrance description\n";
 
-        // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting);
         var planned = Assert.Single(plan.Entrances);
         var preview = Assert.Single(plan.CreatePreview());
         await import.ExecuteAsync(plan, $"{scenario}.csv");
         db.ChangeTracker.Clear();
 
-        // Assert
         var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var committed = Assert.Single(snapshot.Entrances, entrance => entrance.Id == planned.Id);
         AssertEntrancePreview(preview, committed);

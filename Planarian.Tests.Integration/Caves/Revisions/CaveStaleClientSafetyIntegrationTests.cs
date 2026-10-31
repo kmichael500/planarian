@@ -353,7 +353,7 @@ public sealed class CaveStaleClientSafetyIntegrationTests(PostgresTestServer fix
         await CaveDurableStateFingerprint.AssertUnchangedAsync(verify, original);
 
         await CavePermissions.RevokeManagerAsync(database, own, "manager");
-        // The permission revocation is intentional: compare against the post-revocation state.
+        // Compare mutation attempts against the post-revocation state.
         var afterRevoke = await CaveDurableStateFingerprint.CaptureAsync(verify);
         await using (var actor = await CaveTestActor.CreateAsync(database, own.AccountId, "manager"))
         {
