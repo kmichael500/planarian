@@ -52,7 +52,7 @@ public sealed class ReferenceRenameScaleIntegrationTests(PostgresTestServer fixt
             .CountAsync(revision => revision.AccountId == AccountId));
         Assert.Equal(CaveCount, await verify.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(revision => revision.AccountId == AccountId &&
-                                    revision.Source == CaveRevisionSource.ManagerEdit &&
+                                    revision.Source == CaveRevisionSource.AdministrativeChange &&
                                     revision.Operation == CaveRevisionOperation.Update &&
                                     revision.PreviousRevisionId != null));
         Assert.Equal(CaveCount, await verify.Caves.IgnoreQueryFilters().AsNoTracking()

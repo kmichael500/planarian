@@ -270,7 +270,7 @@ public sealed class CountyAdministrationConcurrencyIntegrationTests(PostgresTest
         Assert.Equal(cave.CaveName, persisted.Name);
         var mergeRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == persisted.CurrentRevisionId);
         Assert.Equal(cave.RevisionId, mergeRevision.PreviousRevisionId);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, mergeRevision.Source);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, mergeRevision.Source);
     }
 
     [Fact]

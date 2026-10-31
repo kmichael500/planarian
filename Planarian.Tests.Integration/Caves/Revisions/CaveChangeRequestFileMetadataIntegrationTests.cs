@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
@@ -336,6 +337,97 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
             Assert.Empty(historical.DiffFromBase.Scalars);
             Assert.Equal([stagedFile.FileId], historical.DiffFromBase.AddedFiles);
             Assert.Empty(historical.UnavailableStagedFileIds);
+        }
+    }
+
+    [Fact]
+    public async Task StagedFileTypeRenameKeepsProposalApprovableAndPublishesCurrentLabel()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(StagedFileTypeRenameKeepsProposalApprovableAndPublishesCurrentLabel));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var stagedFile = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stageren0a");
+        var blobs = new TestFileBlobStore();
+        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("staged rename bytes"));
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string requestId;
+        string activeVersionId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var file = await contributor.Files.IgnoreQueryFilters()
+                .SingleAsync(candidate => candidate.Id == stagedFile.FileId &&
+                                          candidate.AccountId == tenant.AccountId);
+            file.Extension = ".pdf";
+            file.Name = "Survey";
+            await contributor.SaveChangesAsync();
+
+            var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                Proposal(tenant, "Staged file type rename"), default);
+            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.Name,
+                reviewer: false, default);
+            var stagedVersionId = await CurrentVersionAsync(contributor, requestId);
+
+            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
+            values.Files =
+            [
+                new EditFileMetadataVm
+                {
+                    Id = stagedFile.FileId,
+                    FileTypeTagId = stagedFile.FileTypeId,
+                    Name = "Survey"
+                }
+            ];
+            activeVersionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(
+                requestId, values, againstCurrent: false, tenant.RevisionId, stagedVersionId, default);
+        }
+
+        await using (var admin = database.CreateDbContext("manager", tenant.AccountId))
+            await IntegrationTestServices.For(admin).Account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm
+                {
+                    Name = "Renamed Document",
+                    Key = TagTypeKeyConstant.File
+                },
+                stagedFile.FileTypeId, default);
+
+        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
+            var service = IntegrationTestServices.For(reviewer, blobs).CaveChangeRequests;
+            var detail = await service.GetAsync(requestId, default);
+            Assert.False(detail.Request.IsStale);
+            Assert.Equal(tenant.RevisionId, detail.Request.CurrentRevisionId);
+            Assert.Null(detail.PublishedSinceBase);
+
+            var storedVersion = await reviewer.CaveProposalVersions
+                .SingleAsync(version => version.Id == activeVersionId);
+            var storedProposal = CaveProposalJson.Deserialize(
+                storedVersion.ProposalJson, storedVersion.SchemaVersion);
+            var storedIntent = Assert.Single(storedProposal.Files,
+                intent => intent.FileId == stagedFile.FileId);
+            Assert.Equal((stagedFile.FileTypeId, "Document"),
+                (storedIntent.FileTypeTagId, storedIntent.FileTypeName));
+
+            var decision = await service.ApproveAsync(requestId, activeVersionId, null, default);
+
+            await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+            var acceptedRevision = await verify.CaveRevisions
+                .SingleAsync(revision => revision.Id == decision.PublishedRevisionId);
+            Assert.Equal(tenant.RevisionId, acceptedRevision.PreviousRevisionId);
+            var accepted = CaveSnapshotJson.Deserialize(
+                acceptedRevision.SnapshotJson, acceptedRevision.SnapshotSchemaVersion);
+            var acceptedFile = Assert.Single(accepted.Files, file => file.Id == stagedFile.FileId);
+            Assert.Equal((stagedFile.FileTypeId, "Renamed Document"),
+                (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision));
+
+            var liveFile = await verify.Files.SingleAsync(file => file.Id == stagedFile.FileId);
+            Assert.Equal(tenant.CaveId, liveFile.CaveId);
+            Assert.Equal(stagedFile.FileTypeId, liveFile.FileTypeTagId);
         }
     }
 

@@ -56,7 +56,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
             .CountAsync(revision => revision.AccountId == accountId));
         Assert.Equal(CaveCount, await verify.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(revision => revision.AccountId == accountId &&
-                                    revision.Source == CaveRevisionSource.ManagerEdit &&
+                                    revision.Source == CaveRevisionSource.AdministrativeChange &&
                                     revision.Operation == CaveRevisionOperation.Update &&
                                     revision.PreviousRevisionId != null));
         Assert.True(await verify.TagTypes.IgnoreQueryFilters().AnyAsync(tag => tag.Id == sourceId));
@@ -99,7 +99,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
             .CountAsync(revision => revision.AccountId == accountId));
         Assert.Equal(CaveCount, await verify.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(revision => revision.AccountId == accountId &&
-                                    revision.Source == CaveRevisionSource.ManagerEdit &&
+                                    revision.Source == CaveRevisionSource.AdministrativeChange &&
                                     revision.Operation == CaveRevisionOperation.Update &&
                                     revision.PreviousRevisionId != null));
         Assert.True(await verify.Counties.IgnoreQueryFilters().AnyAsync(county => county.Id == sourceCountyId));
@@ -149,7 +149,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
             .CountAsync(revision => revision.AccountId == accountId));
         Assert.Equal(0, await verify.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(revision => revision.AccountId == accountId &&
-                                    revision.Source == CaveRevisionSource.ManagerEdit));
+                                    revision.Source == CaveRevisionSource.AdministrativeChange));
         var finalPointers = await verify.Caves.IgnoreQueryFilters().AsNoTracking()
             .Where(cave => cave.AccountId == accountId)
             .OrderBy(cave => cave.Id)

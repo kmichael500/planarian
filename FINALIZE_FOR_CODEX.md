@@ -249,6 +249,8 @@ Create an ADR only for consequential decisions that are expensive, risky, securi
 
 Do not create ADRs for routine implementation choices.
 
+For unreleased feature or refactor branches, document the final architecture intended to land on the base branch. Do not preserve superseded branch-only decisions or implementation chronology unless they create a real compatibility, migration, persisted-data, or externally observable consequence that survives the branch.
+
 An ADR should identify:
 
 - decision;

@@ -10,6 +10,7 @@ public enum CaveRevisionSource
 {
     SystemBaseline,
     ManagerEdit,
+    AdministrativeChange,
     UserSubmission,
     Import,
     System

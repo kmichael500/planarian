@@ -257,13 +257,26 @@ public sealed class CaveRevisionDiffService
         IReadOnlyList<string> RemovedIds,
         IReadOnlyList<string> RetainedIds);
 
+    public bool IsProposalCompatible(CavePublishedSnapshotV1 previous, CavePublishedSnapshotV1 current)
+    {
+        if (previous.CaveId != current.CaveId || previous.AccountId != current.AccountId) return false;
+        return IsProposalCompatible(Compare(previous, current));
+    }
+
     public bool IsSemanticEqual(CavePublishedSnapshotV1 previous, CavePublishedSnapshotV1 current)
     {
         var diff = Compare(previous, current);
-        return diff.Scalars.Count == 0 && diff.AddedTags.Count == 0 && diff.RemovedTags.Count == 0 &&
-               diff.AddedEntrances.Count == 0 && diff.RemovedEntrances.Count == 0 && diff.ChangedEntrances.Count == 0 &&
-               diff.AddedFiles.Count == 0 && diff.RemovedFiles.Count == 0 && diff.ChangedFiles.Count == 0 &&
-               diff.AddedLinePlots.Count == 0 && diff.RemovedLinePlots.Count == 0 &&
-               diff.ChangedLinePlots.Count == 0 && diff.ReferenceMetadataChanges.Count == 0;
+        return IsProposalCompatible(diff) && diff.ReferenceMetadataChanges.Count == 0;
     }
+
+    private static bool IsProposalCompatible(CaveRevisionDiff diff) =>
+        diff.Scalars.Count == 0 &&
+        diff.AddedTags.Count == 0 && diff.RemovedTags.Count == 0 &&
+        diff.AddedEntrances.Count == 0 && diff.RemovedEntrances.Count == 0 &&
+        diff.EntranceChanges.All(change =>
+            change.Scalars.Count == 0 && change.AddedTags.Count == 0 && change.RemovedTags.Count == 0) &&
+        diff.AddedFiles.Count == 0 && diff.RemovedFiles.Count == 0 &&
+        diff.FileChanges.All(change => change.Scalars.Count == 0) &&
+        diff.AddedLinePlots.Count == 0 && diff.RemovedLinePlots.Count == 0 &&
+        diff.LinePlotChanges.Count == 0;
 }

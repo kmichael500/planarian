@@ -1,4 +1,4 @@
-export type CaveRevisionSource = "SystemBaseline" | "ManagerEdit" | "UserSubmission" | "Import" | "System";
+export type CaveRevisionSource = "SystemBaseline" | "ManagerEdit" | "AdministrativeChange" | "UserSubmission" | "Import" | "System";
 export type CaveRevisionOperation = "Baseline" | "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
 
 export interface CaveRevisionListItemVm {

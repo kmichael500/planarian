@@ -88,7 +88,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
                 var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                     StringComparer.Ordinal);
-                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.ManagerEdit,
+                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
                     cancellationToken: cancellationToken);
             }
 
@@ -167,7 +167,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
             var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                 StringComparer.Ordinal);
             await _revisions.PublishAsync(before, after, expected, operations,
-                CaveRevisionSource.ManagerEdit, cancellationToken: cancellationToken);
+                CaveRevisionSource.AdministrativeChange, cancellationToken: cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (CaveRevisionConflictException)

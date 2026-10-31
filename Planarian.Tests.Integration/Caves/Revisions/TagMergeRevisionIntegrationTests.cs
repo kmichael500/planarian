@@ -36,10 +36,10 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task StableIdMergePublishesManagerEditAndPreservesHistoricalSnapshot()
+    public async Task StableIdMergePublishesAdministrativeChangeAndPreservesHistoricalSnapshot()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(StableIdMergePublishesManagerEditAndPreservesHistoricalSnapshot));
+            nameof(StableIdMergePublishesAdministrativeChangeAndPreservesHistoricalSnapshot));
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var source = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
             TagTypeKeyConstant.Biology, "Source Cricket", "biology00a");
@@ -59,7 +59,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             .Select(row => row.CurrentRevisionId).SingleAsync();
         Assert.NotEqual(previousRevisionId, currentId);
         var current = await verify.CaveRevisions.SingleAsync(revision => revision.Id == currentId);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, current.Source);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, current.Source);
         Assert.Equal(CaveRevisionOperation.Update, current.Operation);
         Assert.Equal(previousRevisionId, current.PreviousRevisionId);
         var previousSnapshot = CaveSnapshotJson.Deserialize((await verify.CaveRevisions
@@ -102,7 +102,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         Assert.NotEqual(secondBefore, pointers[second.CaveId]);
         Assert.Equal(unaffected.RevisionId, pointers[unaffected.CaveId]);
         Assert.Equal(2, await verify.CaveRevisions.CountAsync(revision =>
-            revision.Source == CaveRevisionSource.ManagerEdit &&
+            revision.Source == CaveRevisionSource.AdministrativeChange &&
             (revision.PreviousRevisionId == firstBefore || revision.PreviousRevisionId == secondBefore)));
     }
 

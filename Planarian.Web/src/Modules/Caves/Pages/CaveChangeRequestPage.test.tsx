@@ -267,6 +267,30 @@ it("keeps manager review and revise actions available without submitter edit own
   expect(within(actions).getByRole("button", { name: "Reject" })).toBeInTheDocument();
 });
 
+it("keeps metadata-compatible revision advances approvable when revision IDs differ", async () => {
+  const base = snapshot("Helms Deep Cave");
+  const current = {
+    ...base,
+    county: { ...base.county, nameAtRevision: "Renamed County", displayIdAtRevision: "R99" },
+  };
+  renderRequestPage(pageDetail({
+    request: pageRequest({
+      proposalBaseRevisionId: "base000001",
+      currentRevisionId: "administrative0002",
+      isStale: false,
+    }),
+    base,
+    current,
+    publishedSinceBase: undefined,
+  }));
+
+  await waitFor(() => expect(headerButton("Revise changes")).toBeDefined());
+  expect(headerButton("Re-review changes")).toBeUndefined();
+  expect(screen.getByRole("button", { name: "Approve and publish" })).toBeEnabled();
+  expect(screen.queryByText("Needs re-review")).not.toBeInTheDocument();
+  expect(screen.queryByText("This cave changed after these edits were submitted.")).not.toBeInTheDocument();
+});
+
 it("makes stale requests non-approvable and keeps the newer published comparison contextual", async () => {
   const stale = pageDetail({
     request: pageRequest({ isStale: true }),

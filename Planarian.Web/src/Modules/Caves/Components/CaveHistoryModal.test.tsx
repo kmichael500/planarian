@@ -107,6 +107,24 @@ it("shows approved-request attribution and links authorized reviewers back to th
 });
 
 
+it("labels administrative revisions without implying the Cave was manually edited", async () => {
+  const administrative: CaveRevisionHistoryVm = {
+    caveId: "cave-a",
+    currentRevisionId: "revision-admin",
+    revisions: [{
+      id: "revision-admin", caveId: "cave-a", sequence: 2, publishedOn: "2026-10-31T12:00:00Z",
+      actorName: "Casey Admin", source: "AdministrativeChange", operation: "Update", isCurrent: true,
+    }],
+  };
+  jest.spyOn(CaveService, "GetRevisionHistory").mockResolvedValue(administrative);
+
+  render(<MemoryRouter><CaveHistoryModal caveId="cave-a" /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: /history/i }));
+
+  expect(await screen.findByText("Administrative change")).toBeInTheDocument();
+  expect(screen.queryByText("Edited")).not.toBeInTheDocument();
+});
+
 it("presents the rollout baseline as the start of revision history, not Cave creation", async () => {
   const baseline: CaveRevisionHistoryVm = {
     caveId: "legacy-cave", currentRevisionId: "baseline001",

@@ -42,6 +42,7 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
     private readonly TagReferenceLockRepository _tagReferenceLocks;
     private readonly CountyReferenceLockRepository _countyReferenceLocks;
+    private readonly CaveRevisionDiffService _revisionDiff = new();
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
@@ -517,7 +518,8 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
         var result = await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId,
-            null, null, null, null, reservedNewCaveId: null, requireOwnedTransaction: true, cancellationToken);
+            proposalCompatibilityBaseSnapshot: null, null, null, null, null, reservedNewCaveId: null,
+            requireOwnedTransaction: true, cancellationToken);
         // Opportunistic cleanup is a side effect: rejected/stale edits must not execute it.
         // Both older debt and this publication's new targets are safe to process after commit.
         await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
@@ -528,18 +530,20 @@ public class CaveService : ServiceBase<CaveRepository>
     internal Task<CaveSaveResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
         string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
         IReadOnlySet<string> authorizedNewEntranceIds, IReadOnlySet<string> authorizedNewLinePlotIds,
-        CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
+        CavePeoplePublicationContext peoplePublicationContext, CavePublishedSnapshotV1 proposalBaseSnapshot,
+        CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
-            stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
-            reservedNewCaveId: null, requireOwnedTransaction: false, cancellationToken);
+            proposalBaseSnapshot, stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds,
+            peoplePublicationContext, reservedNewCaveId: null, requireOwnedTransaction: false, cancellationToken);
 
     internal Task<CaveSaveResult> ApproveNewCaveChangeRequestAsync(AddCaveVm values, string reservedCaveId,
         string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
         IReadOnlySet<string> authorizedNewEntranceIds, IReadOnlySet<string> authorizedNewLinePlotIds,
         CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, expectedRevisionId: null,
-            stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
-            reservedNewCaveId: reservedCaveId, requireOwnedTransaction: false, cancellationToken);
+            proposalCompatibilityBaseSnapshot: null, stagedFilePublications, authorizedNewEntranceIds,
+            authorizedNewLinePlotIds, peoplePublicationContext, reservedNewCaveId: reservedCaveId,
+            requireOwnedTransaction: false, cancellationToken);
 
     // Approval-only transaction-joining entry point; not part of the public application API.
     internal async Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
@@ -547,14 +551,15 @@ public class CaveService : ServiceBase<CaveRepository>
         CancellationToken cancellationToken)
     {
         var result = await SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
-            stagedFilePublications, new HashSet<string>(StringComparer.Ordinal),
-            new HashSet<string>(StringComparer.Ordinal), null, reservedNewCaveId: null,
-            requireOwnedTransaction: false, cancellationToken);
+            proposalCompatibilityBaseSnapshot: null, stagedFilePublications,
+            new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal), null,
+            reservedNewCaveId: null, requireOwnedTransaction: false, cancellationToken);
         return result.Mutation;
     }
 
     private async Task<CaveSaveResult> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
         string? changeRequestId, string? expectedRevisionId,
+        CavePublishedSnapshotV1? proposalCompatibilityBaseSnapshot,
         IReadOnlyList<StagedCaveFilePublication>? stagedFilePublications,
         IReadOnlySet<string>? authorizedNewEntranceIds,
         IReadOnlySet<string>? authorizedNewLinePlotIds,
@@ -607,7 +612,22 @@ public class CaveService : ServiceBase<CaveRepository>
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
             var isNewCounty = entity.CountyId != values.CountyId;
-            if (values.IsCountyNumberManuallySet || isNewCounty)
+            if (proposalCompatibilityBaseSnapshot is not null)
+            {
+                // Approval may cross an identity-preserving County rename. Hold County reference locks before
+                // TagType locks so administrative renames cannot change reference metadata between the
+                // compatibility decision and publication. County-number/move paths keep their stronger mutation lock.
+                var countyIds = new[] { entity.CountyId, values.CountyId }
+                    .Distinct(StringComparer.Ordinal).ToList();
+                var lockedCounties = values.IsCountyNumberManuallySet || isNewCounty
+                    ? await _countyReferenceLocks.LockForMutationAsync(countyIds, cancellationToken)
+                    : await _countyReferenceLocks.LockForReferenceAsync(countyIds, cancellationToken);
+                var targetCounty = lockedCounties.SingleOrDefault(county => county.Id == values.CountyId);
+                if (lockedCounties.Count != countyIds.Count || targetCounty?.StateId != values.StateId)
+                    throw ApiExceptionDictionary.BadRequest(
+                        "The selected County does not belong to the selected State.");
+            }
+            else if (values.IsCountyNumberManuallySet || isNewCounty)
             {
                 var lockedCounties = await _countyReferenceLocks.LockForMutationAsync([values.CountyId], cancellationToken);
                 if (lockedCounties.Count != 1 || lockedCounties[0].StateId != values.StateId)
@@ -630,10 +650,26 @@ public class CaveService : ServiceBase<CaveRepository>
             var peopleTagsBySelection = resolvedTags.PeopleBindings;
 
             CaveMutationPreparation? revisionPreparation = null;
+            var publicationExpectedRevisionId = expectedRevisionId;
             if (!isNew)
             {
-                revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
-                    entity.Id, expectedRevisionId, cancellationToken);
+                if (proposalCompatibilityBaseSnapshot is null)
+                {
+                    revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                        entity.Id, expectedRevisionId, cancellationToken);
+                }
+                else
+                {
+                    // County and TagType reference locks above serialize label changes. Keep Cave publication
+                    // optimistic so an unrelated direct Cave edit can still win a race and invalidate approval.
+                    revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                        entity.Id, expectedRevisionId: null, cancellationToken);
+                    if (!_revisionDiff.IsProposalCompatible(
+                            proposalCompatibilityBaseSnapshot, revisionPreparation.PreviousRevisionSnapshot))
+                        throw new CaveRevisionConflictException(
+                            entity.Id, expectedRevisionId, revisionPreparation.PreviousRevision.Id);
+                    publicationExpectedRevisionId = revisionPreparation.PreviousRevision.Id;
+                }
             }
 
             int? countyNumber = null;
@@ -956,7 +992,7 @@ public class CaveService : ServiceBase<CaveRepository>
             // Tag association rows use identifying composite keys and can be resurrected by EF relationship fixup.
             await Repository.DeleteTagAssociationsAsync(entity.Id, removedTagAssociations, cancellationToken);
 
-            await Repository.SaveAggregateChangesAsync(entity.Id, expectedRevisionId,
+            await Repository.SaveAggregateChangesAsync(entity.Id, publicationExpectedRevisionId,
                 !isNew, cancellationToken);
 
             CaveMutationResult mutationResult;

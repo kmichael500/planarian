@@ -115,7 +115,7 @@ sequenceDiagram
     Workflow->>Requests: Load current request/version/base/current revision
     Workflow->>Workflow: Verify reviewer permission and request state
     Workflow->>Workflow: Verify expected proposal version
-    Workflow->>Workflow: Verify published base is still current, or reserved Cave still does not exist
+    Workflow->>Workflow: Verify published base is current/compatible, or reserved Cave still does not exist
     Workflow->>Requests: Plan staged File publications
     Workflow->>Files: Verify external objects exist
     Workflow->>Mutation: ExecuteOwnedTransaction
@@ -137,14 +137,21 @@ External object deletion is outside that transaction and occurs only after commi
 Approval checks both:
 
 1. **Expected proposal version** — prevents a reviewer from approving an older proposal version after someone created a newer one.
-2. **Published base / reserved identity** — existing-Cave proposals require the authored base revision to still be current;
-   new-Cave proposals require the reserved Cave ID to remain unused.
+2. **Published base / reserved identity** — existing-Cave proposals require the authored base to remain semantically
+   compatible with current published state; a revision advance containing only descriptive metadata changes for the same
+   stable references is compatible. Stable-ID remaps/merges and all substantive Cave aggregate changes are not. New-Cave
+   proposals require the reserved Cave ID to remain unused.
 
-Cave xmin concurrency remains an additional protection if another write races after those checks.
+Cave xmin concurrency remains an additional protection if another write races after those checks. Approval holds the
+relevant County and TagType reference locks and re-reads the Cave revision inside the publication transaction; a compatible
+reference rename may become the actual predecessor of the accepted revision, while a substantive Cave-write race rolls
+back as a conflict.
 
-There is no silent auto-rebase.
+There is no silent auto-rebase of proposal intent. Immutable proposal versions retain their authored base and captured
+labels even when a compatible rename advances the publication chain.
 
 If a request becomes stale, a new proposal version can be authored against current published state and reviewed again.
+A metadata-only reference rename does not make the request stale.
 
 ## Rejection and request-changes
 

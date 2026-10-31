@@ -34,9 +34,11 @@ public sealed class CaveBulkRevisionRepository
         string? importBatchId = null,
         CancellationToken cancellationToken = default)
     {
-        if (source is not (CaveRevisionSource.Import or CaveRevisionSource.ManagerEdit))
+        if (source is not (CaveRevisionSource.Import or CaveRevisionSource.ManagerEdit or
+            CaveRevisionSource.AdministrativeChange))
             throw new ArgumentException(
-                "Bulk revision publication only supports Import and ManagerEdit sources.", nameof(source));
+                "Bulk revision publication only supports Import, ManagerEdit, and AdministrativeChange sources.",
+                nameof(source));
         if (source == CaveRevisionSource.Import && string.IsNullOrWhiteSpace(importBatchId))
             throw new ArgumentException("Import revision publication requires an import batch.", nameof(importBatchId));
         if (source != CaveRevisionSource.Import && importBatchId is not null)

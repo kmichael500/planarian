@@ -12,10 +12,10 @@ public sealed class CountyMergeRevisionIntegrationTests(PostgresTestServer fixtu
     : IClassFixture<PostgresTestServer>
 {
     [Fact]
-    public async Task MergeMovesCavesWithoutRenumberingAndPublishesManagerRevision()
+    public async Task MergeMovesCavesWithoutRenumberingAndPublishesAdministrativeRevision()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(MergeMovesCavesWithoutRenumberingAndPublishesManagerRevision));
+            nameof(MergeMovesCavesWithoutRenumberingAndPublishesAdministrativeRevision));
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         const string destinationId = "county00az";
         await AddCountyAsync(database, cave.AccountId, cave.StateId, destinationId, "Destination", "A99");
@@ -33,7 +33,7 @@ public sealed class CountyMergeRevisionIntegrationTests(PostgresTestServer fixtu
         Assert.True(await verify.Counties.AnyAsync(row => row.Id == cave.CountyId));
 
         var revision = await verify.CaveRevisions.SingleAsync(row => row.Id == persisted.CurrentRevisionId);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, revision.Source);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, revision.Source);
         Assert.Equal(CaveRevisionOperation.Update, revision.Operation);
         Assert.Equal(cave.RevisionId, revision.PreviousRevisionId);
         var before = CaveSnapshotJson.Deserialize((await verify.CaveRevisions

@@ -36,13 +36,15 @@ Review transitions update the request/status and append review events; they do n
 Approval requires:
 
 - the expected active proposal version;
-- for an existing Cave, the version's published base to still be current;
+- for an existing Cave, the version's published base to still be semantically compatible with current published state;
 - for a new Cave, the reserved Cave ID to remain unused;
 - current reviewer authorization for the Cave or proposed destination, respectively.
 
-Approval publishes the exact selected proposal version through normal Cave publication.
+An identity-preserving reference-metadata change, such as a TagType or County rename, is compatible: it does not rewrite the immutable proposal version, and publication uses the current label for the unchanged stable identity. Stable-ID remaps/merges and substantive Cave aggregate changes are not compatible.
 
-There is no silent automatic rebase. A stale request is revised into a new immutable version against current state and reviewed again.
+Approval publishes the exact selected proposal intent through normal Cave publication. When only compatible reference metadata advanced, the accepted revision follows the actual current Cave revision while the proposal version retains its authored base and captured historical labels.
+
+There is no silent automatic rebase of a stale proposal. A request made stale by a substantive or identity-changing publication is revised into a new immutable version against current state and reviewed again.
 
 ## Consequences
 
@@ -72,7 +74,7 @@ Rejected because aggregate intent across removals, Files, new Entrances, and lin
 
 ### Automatically rebase a stale proposal
 
-Rejected because it could publish a combination nobody explicitly authored or reviewed.
+Rejected because it could publish a combination nobody explicitly authored or reviewed. Crossing an identity-preserving reference-metadata rename is not a stale rebase: proposal intent and stable reference identities are unchanged, and the immutable proposal version is not rewritten.
 
 ## Related documentation
 

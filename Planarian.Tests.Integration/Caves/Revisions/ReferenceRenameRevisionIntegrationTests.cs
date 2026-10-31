@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
@@ -58,16 +59,18 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
                 .PublishedRevisionId!;
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
-        var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions
-            .SingleAsync(revision => revision.Id == acceptedRevisionId)).SnapshotJson, 1);
+        var acceptedRevision = await verify.CaveRevisions
+            .SingleAsync(revision => revision.Id == acceptedRevisionId);
+        var accepted = CaveSnapshotJson.Deserialize(
+            acceptedRevision.SnapshotJson, acceptedRevision.SnapshotSchemaVersion);
         Assert.Equal("Survey Grade B", accepted.Entrances.Single().LocationQualityNameAtRevision);
     }
 
     [Fact]
-    public async Task RenameOfPublishedReferenceMakesPendingProposalStaleWithoutRewritingProposalVersion()
+    public async Task RenameOfPublishedReferenceDoesNotStalePendingProposalAndApprovalUsesCurrentLabel()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(RenameOfPublishedReferenceMakesPendingProposalStaleWithoutRewritingProposalVersion));
+            nameof(RenameOfPublishedReferenceDoesNotStalePendingProposalAndApprovalUsesCurrentLabel));
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
@@ -91,16 +94,27 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
         }
 
         await using (var rename = database.CreateDbContext("manager", cave.AccountId))
-            await IntegrationTestServices.For(rename).Account.CreateOrUpdateTagType(
+        {
+            var account = IntegrationTestServices.For(rename).Account;
+            await account.CreateOrUpdateTagType(
                 new CreateEditTagTypeVm { Name = "Cave Cricket", Key = TagTypeKeyConstant.Biology },
                 biology.Id, default);
+            await account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Cavern Cricket", Key = TagTypeKeyConstant.Biology },
+                biology.Id, default);
+        }
 
+        string renameRevisionId;
+        string acceptedRevisionId;
         await using (var reviewer = await CaveTestActor.CreateAsync(database, cave.AccountId, "reviewer"))
         {
             var detail = await reviewer.ChangeRequests.GetAsync(requestId, default);
-            Assert.True(detail.Request.IsStale);
-            await Assert.ThrowsAsync<CaveRevisionConflictException>(
-                () => reviewer.ChangeRequests.ApproveAsync(requestId, versionId, null, default));
+            Assert.False(detail.Request.IsStale);
+            Assert.Null(detail.PublishedSinceBase);
+            renameRevisionId = Assert.IsType<string>(detail.Request.CurrentRevisionId);
+            Assert.NotEqual(proposalBase, renameRevisionId);
+            acceptedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(requestId, versionId, null, default))
+                .PublishedRevisionId!;
         }
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
@@ -108,8 +122,238 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
         Assert.Equal(proposalBase, stored.BaseRevisionId);
         Assert.Contains("Cricket", stored.ProposalJson);
         Assert.DoesNotContain("Cave Cricket", stored.ProposalJson);
-        Assert.Equal(CaveChangeRequestStatus.Pending,
+        Assert.DoesNotContain("Cavern Cricket", stored.ProposalJson);
+
+        var acceptedRevision = await verify.CaveRevisions.SingleAsync(revision => revision.Id == acceptedRevisionId);
+        Assert.Equal(renameRevisionId, acceptedRevision.PreviousRevisionId);
+        var accepted = CaveSnapshotJson.Deserialize(acceptedRevision.SnapshotJson, acceptedRevision.SnapshotSchemaVersion);
+        Assert.Contains(accepted.Tags,
+            tag => tag.TagTypeId == biology.Id && tag.NameAtRevision == "Cavern Cricket");
+        Assert.Equal(CaveChangeRequestStatus.Approved,
             (await verify.CaveChangeRequests.SingleAsync(request => request.Id == requestId)).Status);
+    }
+
+    [Fact]
+    public async Task DraftLoadedBeforeReferenceRenameCanPreviewAndSubmitAgainstCurrentCompatibleRevision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(DraftLoadedBeforeReferenceRenameCanPreviewAndSubmitAgainstCurrentCompatibleRevision));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var biology = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.Biology, "Cricket", "biology00a");
+        var loadedRevisionId = await AttachReferenceAndPublishAsync(
+            database, cave, TagTypeKeyConstant.Biology, biology.Id);
+        cave = cave with { RevisionId = loadedRevisionId };
+        await CavePermissions.GrantViewAsync(database, cave, "contributor");
+
+        var values = CaveChangeRequestTestSupport.PublishableValues(cave, quality.Id, "Draft survived rename");
+        values.BiologyTagIds = [biology.Id];
+
+        await using (var rename = database.CreateDbContext("manager", cave.AccountId))
+            await IntegrationTestServices.For(rename).Account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Cave Cricket", Key = TagTypeKeyConstant.Biology },
+                biology.Id, default);
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor");
+        var preview = await contributor.ChangeRequests.PreviewAsync(cave.CaveId, values, loadedRevisionId, default);
+        Assert.Contains(preview.Base.Tags,
+            tag => tag.TagTypeId == biology.Id && tag.NameAtRevision == "Cave Cricket");
+        Assert.True(preview.HasMeaningfulChanges);
+
+        var requestId = await contributor.ChangeRequests.CreateAsync(
+            cave.CaveId, values, loadedRevisionId, default);
+        var detail = await contributor.ChangeRequests.GetAsync(requestId, default);
+        Assert.False(detail.Request.IsStale);
+        Assert.NotEqual(loadedRevisionId, detail.Request.ProposalBaseRevisionId);
+        Assert.Equal(detail.Request.ProposalBaseRevisionId, detail.Request.CurrentRevisionId);
+    }
+
+    [Fact]
+    public async Task RevisingAfterReferenceRenameRebasesOnlyWhenProposalContentActuallyChanges()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RevisingAfterReferenceRenameRebasesOnlyWhenProposalContentActuallyChanges));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var biology = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.Biology, "Cricket", "biology00a");
+        var proposalBase = await AttachReferenceAndPublishAsync(
+            database, cave, TagTypeKeyConstant.Biology, biology.Id);
+        cave = cave with { RevisionId = proposalBase };
+        await CavePermissions.GrantViewAsync(database, cave, "contributor");
+
+        var values = CaveChangeRequestTestSupport.PublishableValues(cave, quality.Id, "Pending proposal");
+        values.BiologyTagIds = [biology.Id];
+
+        string requestId;
+        string versionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor"))
+        {
+            requestId = await contributor.ChangeRequests.CreateAsync(cave.CaveId, values, proposalBase, default);
+            versionId = await CaveChangeRequestTestSupport.CurrentVersionAsync(contributor.Db, requestId);
+            var storedVersion = await contributor.Db.CaveProposalVersions
+                .SingleAsync(version => version.Id == versionId);
+            var stored = CaveProposalJson.Deserialize(storedVersion.ProposalJson, storedVersion.SchemaVersion);
+            values.Entrances.Single().Id = stored.Entrances.Single().EntranceId;
+        }
+
+        await using (var rename = database.CreateDbContext("manager", cave.AccountId))
+            await IntegrationTestServices.For(rename).Account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Cave Cricket", Key = TagTypeKeyConstant.Biology },
+                biology.Id, default);
+
+        await using var author = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor");
+        var noOp = await Assert.ThrowsAsync<ApiException>(() => author.ChangeRequests.AddVersionAsync(
+            requestId, values, false, proposalBase, versionId, default));
+        Assert.Equal("The proposal does not contain any changes.", noOp.Message);
+
+        values.DepthFeet = 42;
+        var nextVersionId = await author.ChangeRequests.AddVersionAsync(
+            requestId, values, false, proposalBase, versionId, default);
+        var detail = await author.ChangeRequests.GetAsync(requestId, default);
+        Assert.False(detail.Request.IsStale);
+        Assert.Equal(nextVersionId, detail.Request.CurrentProposalVersionId);
+        Assert.NotEqual(proposalBase, detail.Request.ProposalBaseRevisionId);
+        Assert.Equal(detail.Request.ProposalBaseRevisionId, detail.Request.CurrentRevisionId);
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var next = await verify.CaveProposalVersions.SingleAsync(version => version.Id == nextVersionId);
+        Assert.Equal(detail.Request.CurrentRevisionId, next.BaseRevisionId);
+        Assert.Contains("Cave Cricket", next.ProposalJson);
+    }
+
+    [Fact]
+    public async Task CountyRenameDoesNotStalePendingProposalAndApprovalUsesCurrentMetadata()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(CountyRenameDoesNotStalePendingProposalAndApprovalUsesCurrentMetadata));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantViewAsync(database, cave, "contributor");
+        await CavePermissions.GrantManagerAsync(database, cave, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor"))
+        {
+            var values = CaveChangeRequestTestSupport.PublishableValues(cave, quality.Id, "Pending after county rename");
+            requestId = await contributor.ChangeRequests.CreateAsync(cave.CaveId, values, cave.RevisionId, default);
+            versionId = await CaveChangeRequestTestSupport.CurrentVersionAsync(contributor.Db, requestId);
+        }
+
+        await using (var admin = database.CreateDbContext("manager", cave.AccountId))
+            await IntegrationTestServices.For(admin).Account.CreateOrUpdateCounty(
+                cave.StateId,
+                new CreateCountyVm { Name = "Renamed County", CountyDisplayId = "R99" },
+                cave.CountyId, default);
+
+        string acceptedRevisionId;
+        string renameRevisionId;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, cave.AccountId, "reviewer"))
+        {
+            var detail = await reviewer.ChangeRequests.GetAsync(requestId, default);
+            Assert.False(detail.Request.IsStale);
+            Assert.Null(detail.PublishedSinceBase);
+            renameRevisionId = Assert.IsType<string>(detail.Request.CurrentRevisionId);
+            Assert.NotEqual(cave.RevisionId, renameRevisionId);
+            acceptedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(requestId, versionId, null, default))
+                .PublishedRevisionId!;
+        }
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var renameRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == renameRevisionId);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, renameRevision.Source);
+        var acceptedRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == acceptedRevisionId);
+        Assert.Equal(renameRevisionId, acceptedRevision.PreviousRevisionId);
+        var accepted = CaveSnapshotJson.Deserialize(acceptedRevision.SnapshotJson, acceptedRevision.SnapshotSchemaVersion);
+        Assert.Equal(cave.CountyId, accepted.County.Id);
+        Assert.Equal("Renamed County", accepted.County.NameAtRevision);
+        Assert.Equal("R99", accepted.County.DisplayIdAtRevision);
+    }
+
+    [Fact]
+    public async Task MultipleReferenceRenamesComposeWithoutStalingProposalAndApprovalUsesLatestMetadata()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(MultipleReferenceRenamesComposeWithoutStalingProposalAndApprovalUsesLatestMetadata));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade A", "locqual00a");
+        var biology = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.Biology, "Cricket A", "biology00a");
+        var proposalBase = await AttachReferenceAndPublishAsync(
+            database, cave, TagTypeKeyConstant.Biology, biology.Id);
+        cave = cave with { RevisionId = proposalBase };
+        await CavePermissions.GrantViewAsync(database, cave, "contributor");
+        await CavePermissions.GrantManagerAsync(database, cave, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor"))
+        {
+            var values = CaveChangeRequestTestSupport.PublishableValues(
+                cave, quality.Id, "Pending through combined renames");
+            values.BiologyTagIds = [biology.Id];
+            requestId = await contributor.ChangeRequests.CreateAsync(
+                cave.CaveId, values, proposalBase, default);
+            versionId = await CaveChangeRequestTestSupport.CurrentVersionAsync(contributor.Db, requestId);
+        }
+
+        await using (var admin = database.CreateDbContext("manager", cave.AccountId))
+        {
+            var account = IntegrationTestServices.For(admin).Account;
+            await account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Cricket B", Key = TagTypeKeyConstant.Biology },
+                biology.Id, default);
+            await account.CreateOrUpdateCounty(
+                cave.StateId,
+                new CreateCountyVm { Name = "Renamed County", CountyDisplayId = "R99" },
+                cave.CountyId, default);
+            await account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Survey Grade B", Key = TagTypeKeyConstant.LocationQuality },
+                quality.Id, default);
+            await account.CreateOrUpdateTagType(
+                new CreateEditTagTypeVm { Name = "Cricket C", Key = TagTypeKeyConstant.Biology },
+                biology.Id, default);
+        }
+
+        string latestAdministrativeRevisionId;
+        string acceptedRevisionId;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, cave.AccountId, "reviewer"))
+        {
+            var detail = await reviewer.ChangeRequests.GetAsync(requestId, default);
+            Assert.False(detail.Request.IsStale);
+            Assert.Null(detail.PublishedSinceBase);
+            latestAdministrativeRevisionId = Assert.IsType<string>(detail.Request.CurrentRevisionId);
+            Assert.NotEqual(proposalBase, latestAdministrativeRevisionId);
+
+            acceptedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(
+                requestId, versionId, null, default)).PublishedRevisionId!;
+        }
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var storedProposalVersion = await verify.CaveProposalVersions.SingleAsync(version => version.Id == versionId);
+        Assert.Equal(proposalBase, storedProposalVersion.BaseRevisionId);
+        var storedProposal = CaveProposalJson.Deserialize(
+            storedProposalVersion.ProposalJson, storedProposalVersion.SchemaVersion);
+        Assert.Equal(cave.CountyName, storedProposal.CountyNameAtRevision);
+        Assert.Contains(storedProposal.Tags,
+            tag => tag.TagTypeId == biology.Id && tag.NameAtRevision == "Cricket A");
+        Assert.Equal("Survey Grade A", storedProposal.Entrances.Single().LocationQualityNameAtRevision);
+
+        var acceptedRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == acceptedRevisionId);
+        Assert.Equal(latestAdministrativeRevisionId, acceptedRevision.PreviousRevisionId);
+        var accepted = CaveSnapshotJson.Deserialize(
+            acceptedRevision.SnapshotJson, acceptedRevision.SnapshotSchemaVersion);
+        Assert.Contains(accepted.Tags,
+            tag => tag.TagTypeId == biology.Id && tag.NameAtRevision == "Cricket C");
+        Assert.Equal("Renamed County", accepted.County.NameAtRevision);
+        Assert.Equal("R99", accepted.County.DisplayIdAtRevision);
+        Assert.Equal("Survey Grade B", accepted.Entrances.Single().LocationQualityNameAtRevision);
     }
 
     [Theory]
@@ -144,7 +388,7 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
         var before = await verify.CaveRevisions.SingleAsync(revision => revision.Id == beforeId);
         var current = await verify.CaveRevisions.SingleAsync(revision => revision.Id == caveRow.CurrentRevisionId);
         Assert.Equal(beforeId, current.PreviousRevisionId);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, current.Source);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, current.Source);
         Assert.Equal(CaveRevisionOperation.Update, current.Operation);
 
         var diff = new CaveRevisionDiffService().Compare(
@@ -207,7 +451,7 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
         {
             var current = await verify.CaveRevisions.SingleAsync(revision => revision.Id == pointers[caveId]);
             Assert.Equal(previousId, current.PreviousRevisionId);
-            Assert.Equal(CaveRevisionSource.ManagerEdit, current.Source);
+            Assert.Equal(CaveRevisionSource.AdministrativeChange, current.Source);
             Assert.Equal(CaveRevisionOperation.Update, current.Operation);
             Assert.Equal("manager", current.CreatedByUserId);
 
@@ -286,7 +530,7 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
             {
                 var current = await verify.CaveRevisions.SingleAsync(revision => revision.Id == pointers[caveId]);
                 Assert.Equal(previousId, current.PreviousRevisionId);
-                Assert.Equal(CaveRevisionSource.ManagerEdit, current.Source);
+                Assert.Equal(CaveRevisionSource.AdministrativeChange, current.Source);
                 Assert.Equal(CaveRevisionOperation.Update, current.Operation);
 
                 var previous = await verify.CaveRevisions.SingleAsync(revision => revision.Id == previousId);

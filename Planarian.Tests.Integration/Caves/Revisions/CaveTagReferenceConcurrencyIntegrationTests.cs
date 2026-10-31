@@ -123,7 +123,7 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
             .CurrentRevisionId;
         var mergeRevision = await verify.CaveRevisions.SingleAsync(revision => revision.Id == currentRevisionId);
         Assert.Equal(writerRevisionId, mergeRevision.PreviousRevisionId);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, mergeRevision.Source);
+        Assert.Equal(CaveRevisionSource.AdministrativeChange, mergeRevision.Source);
     }
 
     [Fact]

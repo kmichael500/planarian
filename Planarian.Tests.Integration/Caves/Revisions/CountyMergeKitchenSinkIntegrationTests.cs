@@ -78,7 +78,7 @@ public sealed class CountyMergeKitchenSinkIntegrationTests(PostgresTestServer fi
         Assert.NotEqual(sourceBSecond.RevisionId, caves[sourceBSecond.CaveId].CurrentRevisionId);
         Assert.Equal(destination.RevisionId, caves[destination.CaveId].CurrentRevisionId);
         Assert.Equal(4, await verify.CaveRevisions.CountAsync(revision =>
-            revision.Source == CaveRevisionSource.ManagerEdit &&
+            revision.Source == CaveRevisionSource.AdministrativeChange &&
             new[]
             {
                 first.RevisionId, sourceASecond.RevisionId, sourceBFirst.RevisionId, sourceBSecond.RevisionId

@@ -45,6 +45,7 @@ public sealed class CaveChangeRequestRepository
     private readonly PlanarianDbContext _db;
     private readonly RequestUser _user;
     private readonly AccountExecutionScope _scope;
+    private readonly CaveRevisionDiffService _diff = new();
 
     public CaveChangeRequestRepository(PlanarianDbContext db, RequestUser user)
     {
@@ -55,10 +56,25 @@ public sealed class CaveChangeRequestRepository
 
     public Task<string> CreateAsync(string caveId, string baseRevisionId, CaveProposalSnapshotV1 proposal,
         CancellationToken cancellationToken) =>
-        CreateAsync(caveId, baseRevisionId, _ => Task.FromResult(proposal), cancellationToken);
+        CreateAsync(caveId, baseRevisionId, (resolvedBaseRevisionId, _) =>
+        {
+            if (resolvedBaseRevisionId != baseRevisionId)
+                throw new CaveRevisionConflictException(caveId, baseRevisionId, resolvedBaseRevisionId);
+            return Task.FromResult(proposal);
+        }, cancellationToken);
+
+    public Task<string> CreateAsync(string caveId, string baseRevisionId,
+        Func<CancellationToken, Task<CaveProposalSnapshotV1>> buildProposal,
+        CancellationToken cancellationToken) =>
+        CreateAsync(caveId, baseRevisionId, (resolvedBaseRevisionId, token) =>
+        {
+            if (resolvedBaseRevisionId != baseRevisionId)
+                throw new CaveRevisionConflictException(caveId, baseRevisionId, resolvedBaseRevisionId);
+            return buildProposal(token);
+        }, cancellationToken);
 
     public async Task<string> CreateAsync(string caveId, string baseRevisionId,
-        Func<CancellationToken, Task<CaveProposalSnapshotV1>> buildProposal,
+        Func<string, CancellationToken, Task<CaveProposalSnapshotV1>> buildProposal,
         CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -66,10 +82,29 @@ public sealed class CaveChangeRequestRepository
                 $"SELECT *, xmin FROM \"Caves\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {caveId} FOR KEY SHARE")
             .SingleOrDefaultAsync(cancellationToken);
         if (cave is null) throw ApiExceptionDictionary.NotFound("Cave");
-        if (cave.CurrentRevisionId != baseRevisionId)
-            throw new CaveRevisionConflictException(caveId, baseRevisionId, cave.CurrentRevisionId);
+        if (cave.CurrentRevisionId is null)
+            throw ApiExceptionDictionary.BadRequest("The Cave has no published revision.");
 
-        var proposal = await buildProposal(cancellationToken);
+        if (cave.CurrentRevisionId != baseRevisionId)
+        {
+            var revisions = await _db.CaveRevisions.AsNoTracking()
+                .Where(row => row.AccountId == _scope.AccountId && row.CaveId == caveId &&
+                              (row.Id == baseRevisionId || row.Id == cave.CurrentRevisionId))
+                .ToListAsync(cancellationToken);
+            var expected = revisions.SingleOrDefault(row => row.Id == baseRevisionId);
+            if (expected is null)
+                throw new CaveRevisionConflictException(caveId, baseRevisionId, cave.CurrentRevisionId);
+            var current = revisions.SingleOrDefault(row => row.Id == cave.CurrentRevisionId)
+                          ?? throw new InvalidOperationException(
+                              $"Current revision '{cave.CurrentRevisionId}' for Cave '{caveId}' was not found.");
+            var expectedSnapshot = CaveSnapshotJson.Deserialize(expected.SnapshotJson, expected.SnapshotSchemaVersion);
+            var currentSnapshot = CaveSnapshotJson.Deserialize(current.SnapshotJson, current.SnapshotSchemaVersion);
+            if (!_diff.IsProposalCompatible(expectedSnapshot, currentSnapshot))
+                throw new CaveRevisionConflictException(caveId, baseRevisionId, cave.CurrentRevisionId);
+            baseRevisionId = cave.CurrentRevisionId;
+        }
+
+        var proposal = await buildProposal(baseRevisionId, cancellationToken);
 
         var baseRevision = await _db.CaveRevisions.SingleAsync(row => row.AccountId == _scope.AccountId &&
             row.CaveId == caveId && row.Id == baseRevisionId, cancellationToken);
@@ -182,7 +217,22 @@ public sealed class CaveChangeRequestRepository
             var currentRevisionId = await _db.Caves.Where(cave => cave.AccountId == _scope.AccountId &&
                     cave.Id == request.CaveId).Select(cave => cave.CurrentRevisionId).SingleAsync(cancellationToken);
             if (currentRevisionId != baseRevisionId)
-                throw new CaveRevisionConflictException(request.CaveId, baseRevisionId, currentRevisionId);
+            {
+                if (baseRevisionId is null || currentRevisionId is null)
+                    throw new CaveRevisionConflictException(request.CaveId, baseRevisionId, currentRevisionId);
+
+                var revisions = await _db.CaveRevisions.AsNoTracking()
+                    .Where(row => row.AccountId == _scope.AccountId && row.CaveId == request.CaveId &&
+                                  (row.Id == baseRevisionId || row.Id == currentRevisionId))
+                    .ToListAsync(cancellationToken);
+                var expected = revisions.SingleOrDefault(row => row.Id == baseRevisionId);
+                var current = revisions.SingleOrDefault(row => row.Id == currentRevisionId);
+                if (expected is null || current is null ||
+                    !_diff.IsProposalCompatible(
+                        CaveSnapshotJson.Deserialize(expected.SnapshotJson, expected.SnapshotSchemaVersion),
+                        CaveSnapshotJson.Deserialize(current.SnapshotJson, current.SnapshotSchemaVersion)))
+                    throw new CaveRevisionConflictException(request.CaveId, baseRevisionId, currentRevisionId);
+            }
         }
 
         await ClaimAuthoringStagedFilesAsync(request, proposal.Files

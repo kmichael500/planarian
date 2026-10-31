@@ -14,6 +14,7 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 const sourceLabel = (revision: CaveRevisionListItemVm) => {
   if (revision.changeRequestId) return "Changes approved";
   if (revision.source === "Import") return "Imported";
+  if (revision.source === "AdministrativeChange") return "Administrative change";
   if (revision.source === "SystemBaseline" && revision.operation === "Baseline") return "Revision history starts here";
   if (revision.operation === "Create") return "Created";
   if (revision.operation === "Archive") return "Archived";
