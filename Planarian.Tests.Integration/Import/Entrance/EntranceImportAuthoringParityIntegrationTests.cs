@@ -57,9 +57,9 @@ public sealed class EntranceImportAuthoringParityIntegrationTests(PostgresTestSe
 
         await using var directVerify = directDatabase.CreateDbContext("verify", directTenant.AccountId);
         await using var importVerify = importDatabase.CreateDbContext("verify", importTenant.AccountId);
-        var directSnapshot = await new CavePublishedSnapshotRepository(directVerify, directVerify.RequestUser)
+        var directSnapshot = await new CavePublishedSnapshotReader(directVerify, directVerify.RequestUser)
             .BuildAsync(directTenant.CaveId);
-        var importSnapshot = await new CavePublishedSnapshotRepository(importVerify, importVerify.RequestUser)
+        var importSnapshot = await new CavePublishedSnapshotReader(importVerify, importVerify.RequestUser)
             .BuildAsync(importTenant.CaveId);
         ImportParityAssertions.AssertPublishedSnapshotsEqual(
             directSnapshot, importSnapshot, normalizeEntranceIds: true);
@@ -147,9 +147,9 @@ public sealed class EntranceImportAuthoringParityIntegrationTests(PostgresTestSe
 
         await using var directVerify = directDatabase.CreateDbContext("verify", directTenant.AccountId);
         await using var importVerify = importDatabase.CreateDbContext("verify", importTenant.AccountId);
-        var directAfter = await new CavePublishedSnapshotRepository(directVerify, directVerify.RequestUser)
+        var directAfter = await new CavePublishedSnapshotReader(directVerify, directVerify.RequestUser)
             .BuildAsync(directTenant.CaveId);
-        var importAfter = await new CavePublishedSnapshotRepository(importVerify, importVerify.RequestUser)
+        var importAfter = await new CavePublishedSnapshotReader(importVerify, importVerify.RequestUser)
             .BuildAsync(importTenant.CaveId);
         ImportParityAssertions.AssertPublishedSnapshotsEqual(
             directAfter, importAfter, normalizeEntranceIds: true);

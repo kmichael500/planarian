@@ -4,6 +4,7 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Files.Services;
 
 /// <summary>
@@ -25,17 +26,17 @@ public sealed class StorageCleanupService : AccountServiceBase
         [StorageCleanupPurpose.CaveAssetRemoval, StorageCleanupPurpose.UnpublishedFileRemoval,
          StorageCleanupPurpose.ImportSourceRemoval];
 
-    private readonly StorageCleanupRepository _repository;
+    private readonly StorageCleanupStore _store;
     private readonly IObjectStorage _objectStorage;
     private readonly ILogger<StorageCleanupService> _logger;
 
     public StorageCleanupService(
-        StorageCleanupRepository repository,
+        StorageCleanupStore store,
         RequestUser requestUser,
         IObjectStorage objectStorage,
         ILogger<StorageCleanupService> logger) : base(requestUser)
     {
-        _repository = repository;
+        _store = store;
         _objectStorage = objectStorage;
         _logger = logger;
     }
@@ -62,8 +63,8 @@ public sealed class StorageCleanupService : AccountServiceBase
     {
         try
         {
-            _repository.ForgetTrackedChanges();
-            var targets = await _repository.QueueAsync(
+            _store.ForgetTrackedChanges();
+            var targets = await _store.QueueAsync(
                 purpose,
                 [StorageCleanupAddress.Object(address)],
                 CancellationToken.None);
@@ -117,7 +118,7 @@ public sealed class StorageCleanupService : AccountServiceBase
         List<StorageCleanupTarget> pending;
         try
         {
-            pending = await _repository.GetTargetsAsync(purposes, targetIds, maxCount, cancellationToken);
+            pending = await _store.GetTargetsAsync(purposes, targetIds, maxCount, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -130,7 +131,7 @@ public sealed class StorageCleanupService : AccountServiceBase
         HashSet<string> referencedTargetIds;
         try
         {
-            referencedTargetIds = await _repository.GetTargetIdsReferencedByLiveObjectsAsync(
+            referencedTargetIds = await _store.GetTargetIdsReferencedByLiveObjectsAsync(
                 pending, cancellationToken);
         }
         catch (Exception exception)
@@ -183,7 +184,7 @@ public sealed class StorageCleanupService : AccountServiceBase
         {
             try
             {
-                await _repository.DeferFailedAsync(purposes, failed, CancellationToken.None);
+                await _store.DeferFailedAsync(purposes, failed, CancellationToken.None);
             }
             catch (Exception exception)
             {
@@ -196,7 +197,7 @@ public sealed class StorageCleanupService : AccountServiceBase
         if (completed.Count == 0) return;
         try
         {
-            await _repository.CompleteAsync(purposes, completed, CancellationToken.None);
+            await _store.CompleteAsync(purposes, completed, CancellationToken.None);
         }
         catch (Exception exception)
         {

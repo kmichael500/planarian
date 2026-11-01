@@ -3,11 +3,12 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Files.Repositories;
 
 /// <summary>
 /// General persisted Cave File queries. Staged/authoring lifecycle operations belong
-/// to AuthoringFileRepository so callers cannot accidentally mix published and staged rules.
+/// to AuthoringFileStore so callers cannot accidentally mix published and staged rules.
 /// </summary>
 public class FileRepository<TDbContext> : RepositoryBase<TDbContext>
     where TDbContext : PlanarianDbContextBase

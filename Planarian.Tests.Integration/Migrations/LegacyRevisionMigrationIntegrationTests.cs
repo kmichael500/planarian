@@ -31,7 +31,7 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
 
         await using (var rollout = database.CreateDbContext("revision-rollout", accountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rollout).InitializeAsync();
             Assert.Equal(1, result.InitializedCaveCount);
         }
 

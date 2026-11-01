@@ -13,6 +13,8 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 using Planarian.Tests;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
@@ -28,7 +30,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             $"{nameof(BulkPublisherRejectsSourcesWithoutSupportedProvenance)}_{source}");
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("manager", cave.AccountId);
-        await Assert.ThrowsAsync<ArgumentException>(() => new CaveBulkRevisionRepository(db, db.RequestUser)
+        await Assert.ThrowsAsync<ArgumentException>(() => new CaveBulkRevisionPublisher(db, db.RequestUser)
             .PublishAsync(new Dictionary<string, CavePublishedSnapshotV1>(),
                 new Dictionary<string, CavePublishedSnapshotV1>(),
                 new Dictionary<string, string?>(),
@@ -324,12 +326,12 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             tag => tag.TagTypeId == destination.Id);
     }
 
-    private static TagTypeAdministrationRepository Repository(Planarian.Model.Database.PlanarianDbContext db)
+    private static TagTypeAdministrationPersistence Repository(Planarian.Model.Database.PlanarianDbContext db)
     {
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeAdministrationRepository(db, db.RequestUser,
-            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser));
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        return new TagTypeAdministrationPersistence(db, db.RequestUser,
+            new TagReferenceLocker(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(db, db.RequestUser));
     }
 
     private static async Task<string> AttachBiologyAndPublishAsync(PostgresTestDatabase database,
@@ -347,7 +349,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
     {
         await using var ownedDb = existingDb is null ? database.CreateDbContext("publish-current", cave.AccountId) : null;
         var db = existingDb ?? ownedDb!;
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(cave.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(cave.CaveId);
         var current = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == cave.CaveId);
         var revision = new CaveRevision
         {

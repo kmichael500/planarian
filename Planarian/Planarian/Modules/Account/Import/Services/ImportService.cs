@@ -30,12 +30,12 @@ public partial class ImportService : AccountServiceBase
     private readonly ChunkedUploadService _chunkedUploadService;
     private readonly CaveImportCsvParser _caveParser;
     private readonly EntranceImportCsvParser _entranceParser;
-    private readonly CaveImportPlanningRepository _cavePlanningRepository;
-    private readonly EntranceImportPlanningRepository _entrancePlanningRepository;
+    private readonly CaveImportPlanningReader _cavePlanningReader;
+    private readonly EntranceImportPlanningReader _entrancePlanningReader;
     private readonly CaveImportPlanner _cavePlanner;
     private readonly EntranceImportPlanner _entrancePlanner;
-    private readonly CaveImportExecutionRepository _caveExecutor;
-    private readonly EntranceImportExecutionRepository _entranceExecutor;
+    private readonly CaveImportPersistence _cavePersistence;
+    private readonly EntranceImportPersistence _entrancePersistence;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         ImportSourceService importSourceService, StorageCleanupService storageCleanup,
@@ -46,10 +46,10 @@ public partial class ImportService : AccountServiceBase
         CaveRepository caveRepository,
         FileRepository fileRepository,
         ChunkedUploadService chunkedUploadService, CaveImportCsvParser caveParser,
-        EntranceImportCsvParser entranceParser, CaveImportPlanningRepository cavePlanningRepository,
-        EntranceImportPlanningRepository entrancePlanningRepository, CaveImportPlanner cavePlanner,
-        EntranceImportPlanner entrancePlanner, CaveImportExecutionRepository caveExecutor,
-        EntranceImportExecutionRepository entranceExecutor) : base(requestUser)
+        EntranceImportCsvParser entranceParser, CaveImportPlanningReader cavePlanningReader,
+        EntranceImportPlanningReader entrancePlanningReader, CaveImportPlanner cavePlanner,
+        EntranceImportPlanner entrancePlanner, CaveImportPersistence cavePersistence,
+        EntranceImportPersistence entrancePersistence) : base(requestUser)
     {
         _fileService = fileService;
         _importSourceService = importSourceService;
@@ -63,12 +63,12 @@ public partial class ImportService : AccountServiceBase
         _chunkedUploadService = chunkedUploadService;
         _caveParser = caveParser;
         _entranceParser = entranceParser;
-        _cavePlanningRepository = cavePlanningRepository;
-        _entrancePlanningRepository = entrancePlanningRepository;
+        _cavePlanningReader = cavePlanningReader;
+        _entrancePlanningReader = entrancePlanningReader;
         _cavePlanner = cavePlanner;
         _entrancePlanner = entrancePlanner;
-        _caveExecutor = caveExecutor;
-        _entranceExecutor = entranceExecutor;
+        _cavePersistence = cavePersistence;
+        _entrancePersistence = entrancePersistence;
     }
 
     public Task<(Stream Stream, string FileName)> OpenCsvImportSourceDownloadAsync(

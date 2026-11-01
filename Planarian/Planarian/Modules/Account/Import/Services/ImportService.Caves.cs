@@ -18,7 +18,7 @@ public partial class ImportService
         await using (var stream = await _importSourceService.OpenReadAsync(temporaryFileId, cancellationToken))
         {
             var records = await _caveParser.ParseAsync(stream, cancellationToken);
-            var state = await _cavePlanningRepository.LoadAsync(records, syncExisting, cancellationToken);
+            var state = await _cavePlanningReader.LoadAsync(records, syncExisting, cancellationToken);
             plan = _cavePlanner.Plan(records, state, syncExisting, cancellationToken);
         }
 
@@ -29,10 +29,10 @@ public partial class ImportService
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying cave import");
-        var result = await _caveExecutor.ExecuteUploadedAsync(plan, temporaryFileId, cancellationToken);
+        var result = await _cavePersistence.ExecuteUploadedAsync(plan, temporaryFileId, cancellationToken);
 
         // Relational state, revision history, and cleanup responsibility commit atomically
-        // inside the executor. External deletion is attempted only after that commit.
+        // inside the persistence component. External deletion is attempted only after that commit.
         await _storageCleanup.CleanupAssetRemovalTargetsAsync(
             result.StorageCleanupTargetIds, CancellationToken.None);
 

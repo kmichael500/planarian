@@ -13,6 +13,8 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 using Planarian.Tests;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixture)
@@ -541,12 +543,12 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         Assert.Equal(before, await CurrentRevisionAsync(verify, accountA.CaveId));
     }
 
-    private static TagTypeAdministrationRepository Repository(Planarian.Model.Database.PlanarianDbContext db)
+    private static TagTypeAdministrationPersistence Repository(Planarian.Model.Database.PlanarianDbContext db)
     {
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeAdministrationRepository(db, db.RequestUser,
-            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser));
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        return new TagTypeAdministrationPersistence(db, db.RequestUser,
+            new TagReferenceLocker(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(db, db.RequestUser));
     }
 
     private static bool NeedsEntrance(TagRelationshipPath path) => path is
@@ -669,7 +671,7 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         PostgresTestDatabase database, PublishedCaveTestData cave)
     {
         await using var db = database.CreateDbContext("publish-current", cave.AccountId);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(cave.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(cave.CaveId);
         var current = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == cave.CaveId);
         var revision = new CaveRevision
         {

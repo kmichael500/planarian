@@ -6,6 +6,7 @@ using Planarian.Modules.Account.Services;
 using Planarian.Tests.Integration.Infrastructure.Actors;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Tests.Integration.AccountReset;
 
 public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestServer fixture)
@@ -17,7 +18,7 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         await using var database = await fixture.CreateDatabaseAsync(nameof(HttpWritesRespectDatabaseLeasesAcrossTenants));
         var a = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var b = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
-        var locks = new AccountMaintenanceLockRepository(new ServerOptions
+        var locks = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
@@ -70,7 +71,7 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         });
         await context.SaveChangesAsync();
 
-        var maintenance = new AccountMaintenanceLockRepository(new ServerOptions
+        var maintenance = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
@@ -113,7 +114,7 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         });
         await context.SaveChangesAsync();
 
-        var maintenance = new AccountMaintenanceLockRepository(new ServerOptions
+        var maintenance = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
@@ -140,11 +141,11 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
             nameof(ArchiveJobLeaseSerializesOneAccountAcrossReplicasWithoutBlockingMaintenanceSharedLease));
         var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
-        var firstLocks = new AccountMaintenanceLockRepository(new ServerOptions
+        var firstLocks = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
-        var secondLocks = new AccountMaintenanceLockRepository(new ServerOptions
+        var secondLocks = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
@@ -172,11 +173,11 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ArchiveLeasesFitTheBoundedMaintenancePoolOneConnectionPerAccount));
-        var locks = new AccountMaintenanceLockRepository(new ServerOptions
+        var locks = new AccountMaintenanceLockManager(new ServerOptions
         {
             SqlConnectionString = database.ConnectionString
         });
-        var leases = new List<AccountMaintenanceLockRepository.Lease>();
+        var leases = new List<AccountMaintenanceLockManager.Lease>();
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try

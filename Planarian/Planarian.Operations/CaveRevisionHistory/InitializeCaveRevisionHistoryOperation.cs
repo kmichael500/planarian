@@ -12,7 +12,7 @@ internal sealed class InitializeCaveRevisionHistoryOperation : IPlanarianOperati
             throw new InvalidOperationException(
                 $"{ConnectionStringEnvironmentVariable} is required to run this operation.");
 
-        var result = await CaveRevisionRolloutRepository.InitializeAsync(connectionString, cancellationToken);
+        var result = await CaveRevisionRolloutOperation.InitializeAsync(connectionString, cancellationToken);
 
         Console.WriteLine(result.AlreadyComplete
             ? $"Cave revision history is already initialized. Boundary: {result.RevisionHistoryStartedOn:O}"

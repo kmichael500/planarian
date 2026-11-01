@@ -4,7 +4,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Account.Repositories;
+namespace Planarian.Modules.Account.Persistence;
 
 public sealed record LockedCounty(string Id, string AccountId, string StateId, string DisplayId, string Name);
 
@@ -12,11 +12,11 @@ public sealed record LockedCounty(string Id, string AccountId, string StateId, s
 /// Coordinates County reference writers with administrative County mutations.
 /// The caller owns the transaction; locks remain held until that transaction completes.
 /// </summary>
-public sealed class CountyReferenceLockRepository : AccountScopedRepositoryBase
+public sealed class CountyReferenceLocker : AccountScopedDataAccessBase
 {
     private const int BatchSize = 500;
 
-    public CountyReferenceLockRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
+    public CountyReferenceLocker(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
     }
 

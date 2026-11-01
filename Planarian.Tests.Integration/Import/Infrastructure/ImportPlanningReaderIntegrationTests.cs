@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Planarian.Tests;
 
-public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer fixture)
+public sealed class ImportPlanningReaderIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
 {
     [Fact]
@@ -37,7 +37,7 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
         await using var db = database.CreateDbContext("repository", accountA.AccountId);
         var records = new[] { CaveRecord(accountA) };
 
-        var state = await new CaveImportPlanningRepository(db, db.RequestUser)
+        var state = await new CaveImportPlanningReader(db, db.RequestUser)
             .LoadAsync(records, syncExisting: true);
 
         var cave = Assert.Single(state.ExistingCaves);
@@ -91,7 +91,7 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
         }).ToList();
         counter.Reset();
 
-        var state = await new EntranceImportPlanningRepository(db, db.RequestUser).LoadAsync(records);
+        var state = await new EntranceImportPlanningReader(db, db.RequestUser).LoadAsync(records);
 
         Assert.Equal(targetCount, state.Caves.Count);
         Assert.DoesNotContain(state.Caves, cave => cave.Id == accountB.CaveId);

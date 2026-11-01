@@ -24,29 +24,29 @@ flowchart LR
     Service["ImportService"]
     CSV["CSV file"]
     Parser["Typed parser"]
-    PlanningRepo["Planning repository"]
+    PlanningReader["Planning reader"]
     Planner["Pure planner"]
     Plan["Immutable import plan"]
     Preview["Dry-run preview"]
-    Executor["Execution repository"]
-    Snapshots["CavePublishedSnapshotRepository"]
-    Bulk["CaveBulkRevisionRepository"]
+    Persistence["Import persistence"]
+    Snapshots["CavePublishedSnapshotReader"]
+    Bulk["CaveBulkRevisionPublisher"]
     DB[("PostgreSQL")]
     Cleanup["Object storage cleanup"]
 
     Service -->|"read source"| CSV
     CSV -->|"stream"| Parser
     Parser -->|"typed records"| Planner
-    PlanningRepo -->|"account-scoped materialized state"| Planner
+    PlanningReader -->|"account-scoped materialized state"| Planner
     Planner -->|"deterministic result"| Plan
     Plan -->|"read-only result"| Preview
-    Service -->|"accepted plan"| Executor
-    Plan -->|"immutable instructions"| Executor
-    Executor -->|"locks + set-oriented writes"| DB
-    Executor -->|"build before/after"| Snapshots
-    Executor -->|"snapshots + expected revisions"| Bulk
+    Service -->|"accepted plan"| Persistence
+    Plan -->|"immutable instructions"| Persistence
+    Persistence -->|"locks + set-oriented writes"| DB
+    Persistence -->|"build before/after"| Snapshots
+    Persistence -->|"snapshots + expected revisions"| Bulk
     Bulk -->|"revisions + current pointers"| DB
-    Executor -->|"return durable cleanup-target IDs after commit"| Service
+    Persistence -->|"return durable cleanup-target IDs after commit"| Service
     Service -->|"best-effort external delete"| Cleanup
 ~~~
 
@@ -58,7 +58,7 @@ Parsing is database-free.
 
 ## Phase 2 — Load planning state
 
-Planning repositories load only the current account state required by the planner, such as:
+Planning readers load only the current account state required by the planner, such as:
 
 - eligible States/Counties;
 - existing Cave identities/current revisions when sync is enabled;
@@ -94,7 +94,7 @@ This makes preview safer and makes preview/commit equivalence testable.
 
 ## Commit execution
 
-Execution repositories own the write transaction.
+Import persistence components own the write transaction.
 
 For Cave import they:
 
@@ -110,7 +110,7 @@ For Cave import they:
 10. apply set-oriented Cave/tag/Entrance changes in bounded batches;
 11. queue any relational cleanup responsibility required by sync deletion;
 12. capture after snapshots;
-13. call CaveBulkRevisionRepository;
+13. call CaveBulkRevisionPublisher;
 14. commit;
 15. return durable storage-cleanup target IDs for bounded post-commit processing.
 
@@ -118,9 +118,9 @@ If any relational step fails, the transaction rolls back. Import-source promotio
 
 ## Revision publication
 
-CaveBulkRevisionRepository has a different execution shape from the interactive mutation repository, but it does not
+CaveBulkRevisionPublisher has a different execution shape from the interactive `CaveMutationPersistence` path, but it does not
 have different revision semantics. Both paths build `CavePublishedSnapshotV1` through
-`CavePublishedSnapshotRepository` and use `CaveRevisionDiffService` for semantic change detection. For a Cave that
+`CavePublishedSnapshotReader` and use `CaveRevisionDiffService` for semantic change detection. For a Cave that
 already has revision history, bulk publication compares the resulting snapshot with the stored current published
 revision, not merely with the live rows captured immediately before the bulk write. This preserves the same behavior for
 reference-label drift and semantic no-ops as interactive publication. Every pre-existing Cave must already have its
@@ -148,7 +148,7 @@ This avoids routing thousands of Caves through an interactive service loop while
 
 ## Authoring parity and identity boundaries
 
-The bulk executors are required to produce the same published aggregate semantics as ordinary authoring for fields both
+The bulk persistence components are required to produce the same published aggregate semantics as ordinary authoring for fields both
 workflows own. Integration parity tests therefore exercise full-field create/update/clear/delete lifecycles and compare
 complete `CavePublishedSnapshotV1` values plus revision predecessor/provenance. A few workflow-shape differences are tested explicitly rather than normalized away:
 
@@ -174,7 +174,7 @@ Sync import can plan Cave deletion.
 
 Before delete execution, open change requests block hard deletion.
 
-The executor gathers current live File object addresses, queues tenant-qualified `CaveAssetRemoval` cleanup targets in the same import transaction that removes the relational graph and publishes delete revisions, then commits. A File with only one half of its object-storage address fails the import closed rather than committing a deletion that cannot carry cleanup responsibility. After commit, ImportService processes every cleanup target created by that import in bounded target/reference-query batches; provider failures leave durable debt for later retry. Pending ordinary asset-cleanup debt is independent operational state rather than historical Cave content.
+The Cave import persistence component gathers current live File object addresses, queues tenant-qualified `CaveAssetRemoval` cleanup targets in the same import transaction that removes the relational graph and publishes delete revisions, then commits. A File with only one half of its object-storage address fails the import closed rather than committing a deletion that cannot carry cleanup responsibility. After commit, ImportService processes every cleanup target created by that import in bounded target/reference-query batches; provider failures leave durable debt for later retry. Pending ordinary asset-cleanup debt is independent operational state rather than historical Cave content.
 
 ## Lock ordering
 
@@ -191,9 +191,9 @@ See [Cave revisions](../cave-revisions.md) for the exact lock contract.
 
 ## File import is a separate path
 
-The account File-import feature does **not** use CaveImportPlanner/EntranceImportPlanner or CaveBulkRevisionRepository.
+The account File-import feature does **not** use CaveImportPlanner/EntranceImportPlanner or CaveBulkRevisionPublisher.
 
-After it resolves the target Cave from the filename/import rules, it calls `FileService.UploadCaveFile` or `FileService.PublishStagedCaveFile`. Those methods publish one target Cave through `CaveMutationCoordinator` / `CaveMutationRepository` so the File change still appears in Cave history.
+After it resolves the target Cave from the filename/import rules, it calls `FileService.UploadCaveFile` or `FileService.PublishStagedCaveFile`. Those methods publish one target Cave through `CaveMutationCoordinator` / `CaveMutationPersistence` so the File change still appears in Cave history.
 
 `import` names separate workflows in Planarian; account File import is not Cave/Entrance bulk import.
 
@@ -202,11 +202,11 @@ After it resolves the target Cave from the filename/import rules, it calls `File
 Entrance import follows the same architectural pattern:
 
 - typed parser;
-- planning repository;
+- planning reader;
 - pure EntranceImportPlanner;
 - immutable plan;
-- execution repository;
+- import persistence component;
 - before/after Cave snapshots;
-- CaveBulkRevisionRepository.
+- CaveBulkRevisionPublisher.
 
 Entrance changes publish Cave revisions because Entrances are part of the semantic Cave aggregate.

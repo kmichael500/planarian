@@ -34,8 +34,8 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
             entity.Extension = ".pdf";
             entity.Name = "Survey";
             await seed.SaveChangesAsync();
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             tenant = tenant with { RevisionId = (await mutations.PublishExistingAsync(tenant.CaveId,
                 tenant.RevisionId, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { }))
                 .RevisionId! };
@@ -229,8 +229,8 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
 
         await using (var seed = database.CreateDbContext("proposal-name-validation-baseline", tenant.AccountId))
         {
-            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
-                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+            var mutation = await new CaveMutationPersistence(seed, seed.RequestUser,
+                    new CavePublishedSnapshotReader(seed, seed.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, _ => { });
             tenant = tenant with { RevisionId = mutation.RevisionId! };

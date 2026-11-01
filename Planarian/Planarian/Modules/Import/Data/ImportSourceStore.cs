@@ -7,6 +7,7 @@ using Planarian.Modules.Import.Planning;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Import.Data;
 
 public sealed record ImportSourceAccessInfo(
@@ -22,9 +23,9 @@ public sealed record PersistedImportSource(string Id, string FileName);
 /// Database lifecycle for Cave/Entrance CSV import provenance.
 /// Row locking serializes promotion and expiration cleanup on the source itself.
 /// </summary>
-public sealed class ImportSourceRepository : AccountScopedRepositoryBase
+public sealed class ImportSourceStore : AccountScopedDataAccessBase
 {
-    public ImportSourceRepository(PlanarianDbContext dbContext, RequestUser requestUser)
+    public ImportSourceStore(PlanarianDbContext dbContext, RequestUser requestUser)
         : base(dbContext, requestUser)
     {
     }
@@ -130,7 +131,7 @@ public sealed class ImportSourceRepository : AccountScopedRepositoryBase
 
             if (expired.Count == 0) return [];
 
-            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+            var cleanupTargets = await StorageCleanupStore.QueueAsync(
                 DbContext,
                 accountId,
                 UserId,

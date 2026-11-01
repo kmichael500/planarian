@@ -15,8 +15,8 @@ flowchart LR
     FileImport["File import"]
     BulkFlows["Cave/Entrance CSV import<br/>Tag/County administration"]
 
-    Single["Single-Cave publication<br/>CaveMutationRepository"]
-    Bulk["Bulk publication<br/>CaveBulkRevisionRepository"]
+    Single["Single-Cave publication<br/>CaveMutationPersistence"]
+    Bulk["Bulk publication<br/>CaveBulkRevisionPublisher"]
 
     DB[("PostgreSQL / PostGIS")]
     ObjectStorage["Object storage"]
@@ -60,14 +60,14 @@ Controller
     ↓
 Service / workflow coordinator
     ↓
-Pure planning/domain logic + feature repository capabilities
+Pure planning/domain logic + feature data-access capabilities
     ↓
-Repository / data-access layer
+Data-access / persistence layer
     ↓
 EF Core / Npgsql / PostgreSQL
 ~~~
 
-Application services orchestrate use cases. Repositories own provider-specific persistence, row locks, set-based SQL, and transaction mechanics. See [Data-access architecture](docs/data-access-architecture.md).
+Application services orchestrate use cases. Data-access components own provider-specific persistence, row locks, set-based SQL, and transaction mechanics. Resource/aggregate repositories are one kind of data-access component; narrower capabilities are named by role. See [Data-access architecture](docs/data-access-architecture.md).
 
 ### Cave publication is aggregate publication
 
@@ -91,7 +91,7 @@ See [Files and storage](docs/architecture/files-and-storage.md).
 
 ### Bulk imports use a separate execution path
 
-Cave and Entrance CSV imports parse and plan without mutating the database, then apply immutable plans with explicit locks and set-oriented writes. They publish revisions through `CaveBulkRevisionRepository` rather than invoking interactive Cave publication once per row.
+Cave and Entrance CSV imports parse and plan without mutating the database, then apply immutable plans with explicit locks and set-oriented writes. They publish revisions through `CaveBulkRevisionPublisher` rather than invoking interactive Cave publication once per row.
 
 Account File import is a one-Cave workflow and uses the single-Cave publication boundary.
 

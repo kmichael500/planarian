@@ -112,8 +112,8 @@ public sealed class CaveChangeRequestPeopleTagIntegrationTests(PostgresTestServe
             seed.CartographerNameTags.Add(new CartographerNameTag
                 { Id = "cartlink0a", CaveId = tenant.CaveId, TagTypeId = person.Id });
             await seed.SaveChangesAsync();
-            revisionId = (await new CaveMutationRepository(seed, seed.RequestUser,
-                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+            revisionId = (await new CaveMutationPersistence(seed, seed.RequestUser,
+                    new CavePublishedSnapshotReader(seed, seed.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, _ => { })).RevisionId!;
         }

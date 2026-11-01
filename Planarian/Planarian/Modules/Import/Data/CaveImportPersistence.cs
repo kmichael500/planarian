@@ -15,30 +15,33 @@ using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Import.Data;
 
 public sealed record DeferredImportObjectCleanup(string? StorageKey, string? StoragePartition);
 public sealed record CaveImportExecutionResult(string ImportBatchId, IReadOnlyList<string> StorageCleanupTargetIds);
 
-public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
+public sealed class CaveImportPersistence : AccountScopedDataAccessBase
 {
     private const int CaveBatchSize = 1000;
     private const int LookupBatchSize = 500;
     private const int AssociationBatchSize = 10_000;
 
-    private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveBulkRevisionRepository _revisionPublisher;
-    private readonly TagReferenceLockRepository _tagReferenceLocks;
-    private readonly CountyReferenceLockRepository _countyReferenceLocks;
+    private readonly CavePublishedSnapshotReader _snapshotReader;
+    private readonly CaveBulkRevisionPublisher _revisionPublisher;
+    private readonly TagReferenceLocker _tagReferenceLocker;
+    private readonly CountyReferenceLocker _countyReferenceLocker;
 
-    public CaveImportExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotRepository snapshots, CaveBulkRevisionRepository revisionPublisher,
-        TagReferenceLockRepository tagReferenceLocks, CountyReferenceLockRepository countyReferenceLocks) : base(db, requestUser)
+    public CaveImportPersistence(PlanarianDbContext db, RequestUser requestUser,
+        CavePublishedSnapshotReader snapshotReader, CaveBulkRevisionPublisher revisionPublisher,
+        TagReferenceLocker tagReferenceLocker, CountyReferenceLocker countyReferenceLocker) : base(db, requestUser)
     {
-        _snapshots = snapshots;
+        _snapshotReader = snapshotReader;
         _revisionPublisher = revisionPublisher;
-        _tagReferenceLocks = tagReferenceLocks;
-        _countyReferenceLocks = countyReferenceLocks;
+        _tagReferenceLocker = tagReferenceLocker;
+        _countyReferenceLocker = countyReferenceLocker;
     }
 
     public Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string? sourceFileName,
@@ -61,7 +64,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
         return RunInOwnedTransactionAsync(async token =>
         {
             if (plan.CountyCreations.Count > 0)
-                await _countyReferenceLocks.LockAdministrationNamespaceAsync(token);
+                await _countyReferenceLocker.LockAdministrationNamespaceAsync(token);
             await LockAndVerifyExistingCountyReferencesAsync(plan, token);
             await LockAndVerifyExistingTagReferencesAsync(plan, token);
             await LockAndVerifyExistingCavesAsync(plan, token);
@@ -70,7 +73,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
 
             PersistedImportSource? persistedSource = null;
             if (sourceFileId is not null)
-                persistedSource = await ImportSourceRepository.PromoteAsync(
+                persistedSource = await ImportSourceStore.PromoteAsync(
                     DbContext, Scope.AccountId, Scope.UserId, sourceFileId, token);
 
             var mutationExistingIds = plan.Caves
@@ -81,7 +84,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
                 .ToList();
             var before = mutationExistingIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(mutationExistingIds, token))
+                : (await _snapshotReader.BuildManyAsync(mutationExistingIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
 
             var batch = new CaveImportBatch
@@ -117,7 +120,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
             var liveMutationIds = changedCaves.Select(c => c.Id).ToList();
             var after = liveMutationIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(liveMutationIds, token))
+                : (await _snapshotReader.BuildManyAsync(liveMutationIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
 
             var expectedRevisions = mutationExistingIds.Where(plan.ExistingTargets.ContainsKey)
@@ -149,7 +152,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
             .Distinct()
             .ToList();
 
-        return await StorageCleanupRepository.QueueAsync(
+        return await StorageCleanupStore.QueueAsync(
             DbContext,
             Scope.AccountId,
             Scope.UserId,
@@ -219,7 +222,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
     {
         var creationTagIds = plan.TagCreations.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
         var existingTagIds = plan.TagNamesById.Keys.Where(id => !creationTagIds.Contains(id)).ToList();
-        var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingTagIds, cancellationToken);
+        var lockedTags = await _tagReferenceLocker.LockForReferenceAsync(existingTagIds, cancellationToken);
         if (lockedTags.Count != existingTagIds.Distinct(StringComparer.Ordinal).Count())
             throw new ImportPlanConcurrencyException("A referenced Tag changed ownership or disappeared.");
         foreach (var tag in lockedTags)
@@ -236,7 +239,7 @@ public sealed class CaveImportExecutionRepository : AccountScopedRepositoryBase
         var expectations = plan.Caves.Where(cave => !createdCountyIds.Contains(cave.CountyId))
             .GroupBy(cave => cave.CountyId)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        var locked = await _countyReferenceLocks.LockForReferenceAsync(expectations.Keys, cancellationToken);
+        var locked = await _countyReferenceLocker.LockForReferenceAsync(expectations.Keys, cancellationToken);
         if (locked.Count != expectations.Count)
             throw new ImportPlanConcurrencyException(
                 "A referenced County changed ownership or disappeared after import planning.");

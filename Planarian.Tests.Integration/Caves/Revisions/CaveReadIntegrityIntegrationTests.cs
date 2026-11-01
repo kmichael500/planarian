@@ -18,6 +18,7 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Map.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture)
@@ -62,8 +63,8 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
             seed.BiologyTags.Add(new BiologyTag
             { Id = "biolink00a", CaveId = cave.CaveId, TagTypeId = biology.Id });
             await seed.SaveChangesAsync();
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             revisionId = (await mutations.PublishExistingAsync(cave.CaveId, cave.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId!;
         }
@@ -84,9 +85,9 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
         await using var contributorReads = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor", blobs);
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         var repository = new CaveRepository(manager.Db, manager.Db.RequestUser);
-        var map = new MapRepository(manager.Db, manager.Db.RequestUser, repository);
+        var map = new MapReader(manager.Db, manager.Db.RequestUser, repository);
         var revision = new CaveRevisionService(repository,
-            new CaveRevisionQueryRepository(manager.Db, manager.Db.RequestUser));
+            new CaveRevisionReader(manager.Db, manager.Db.RequestUser));
         var filter = new FilterQuery();
         var advanced = new FilterQuery
         {
@@ -236,7 +237,7 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
         Assert.Contains("bootstrap", proposalFailure.Message, StringComparison.OrdinalIgnoreCase);
         var repo = new CaveRepository(manager.Db, manager.Db.RequestUser);
         var revisions = new CaveRevisionService(repo,
-            new CaveRevisionQueryRepository(manager.Db, manager.Db.RequestUser));
+            new CaveRevisionReader(manager.Db, manager.Db.RequestUser));
         await Assert.ThrowsAsync<InvalidOperationException>(() => revisions.ListAsync(cave.CaveId, default));
         await Assert.ThrowsAsync<InvalidOperationException>(() => revisions.CompareAsync(cave.CaveId, cave.RevisionId, default));
         var request = PublishableValues(cave, quality.Id, "Must not establish baseline");

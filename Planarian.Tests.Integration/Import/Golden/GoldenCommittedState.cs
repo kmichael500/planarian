@@ -28,7 +28,7 @@ internal sealed record GoldenCommittedState(
     {
         var caveRows = await db.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == accountId)
             .Include(cave => cave.County).Include(cave => cave.State).AsNoTracking().ToListAsync();
-        var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
         var caves = new List<GoldenCommittedCave>();
         foreach (var cave in caveRows.OrderBy(value => value.County.DisplayId).ThenBy(value => value.CountyNumber))
         {

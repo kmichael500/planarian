@@ -8,6 +8,7 @@ using Planarian.Model.Shared;
 using Planarian.Shared.Email.Models;
 using Planarian.Shared.Options;
 
+using Planarian.Shared.Email.Repositories;
 namespace Planarian.Shared.Email.Services;
 
 public enum MailgunWebhookProcessingResult

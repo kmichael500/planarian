@@ -84,9 +84,9 @@ public sealed partial class CaveImportAuthoringParityIntegrationTests
 
         await using var directVerify = directDatabase.CreateDbContext("verify", directTenant.AccountId);
         await using var importVerify = importDatabase.CreateDbContext("verify", importTenant.AccountId);
-        var directSnapshot = await new CavePublishedSnapshotRepository(directVerify, directVerify.RequestUser)
+        var directSnapshot = await new CavePublishedSnapshotReader(directVerify, directVerify.RequestUser)
             .BuildAsync(directTenant.CaveId);
-        var importSnapshot = await new CavePublishedSnapshotRepository(importVerify, importVerify.RequestUser)
+        var importSnapshot = await new CavePublishedSnapshotReader(importVerify, importVerify.RequestUser)
             .BuildAsync(newImportedCaveId);
         ImportParityAssertions.AssertPublishedSnapshotsEqual(
             directSnapshot with { CaveId = "<identity-moved-cave>" },
@@ -138,10 +138,10 @@ public sealed partial class CaveImportAuthoringParityIntegrationTests
         CavePublishedSnapshotV1 directBefore;
         CavePublishedSnapshotV1 importBefore;
         await using (var directBeforeDb = directDatabase.CreateDbContext("before", directTenant.AccountId))
-            directBefore = await new CavePublishedSnapshotRepository(directBeforeDb, directBeforeDb.RequestUser)
+            directBefore = await new CavePublishedSnapshotReader(directBeforeDb, directBeforeDb.RequestUser)
                 .BuildAsync(directTenant.CaveId);
         await using (var importBeforeDb = importDatabase.CreateDbContext("before", importTenant.AccountId))
-            importBefore = await new CavePublishedSnapshotRepository(importBeforeDb, importBeforeDb.RequestUser)
+            importBefore = await new CavePublishedSnapshotReader(importBeforeDb, importBeforeDb.RequestUser)
                 .BuildAsync(importTenant.CaveId);
         ImportParityAssertions.AssertPublishedSnapshotsEqual(directBefore, importBefore);
 

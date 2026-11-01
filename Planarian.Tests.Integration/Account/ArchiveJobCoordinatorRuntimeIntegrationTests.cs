@@ -19,6 +19,7 @@ using Planarian.Shared.Models;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Tests.Integration.AccountArchive;
 
 public sealed class ArchiveJobCoordinatorRuntimeIntegrationTests(
@@ -401,7 +402,7 @@ public sealed class ArchiveJobCoordinatorRuntimeIntegrationTests(
 
         var coordinator = new ArchiveJobCoordinator(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            new AccountMaintenanceLockRepository(new ServerOptions
+            new AccountMaintenanceLockManager(new ServerOptions
             {
                 SqlConnectionString = database.ConnectionString
             }));

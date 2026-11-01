@@ -17,6 +17,7 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
@@ -47,8 +48,8 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         string newerRevisionId;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             newerRevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
                 cave => cave.Narrative = "Ordinary update was not blocked")).RevisionId!;
@@ -170,7 +171,7 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
 
         await using var blocker = database.CreateDbContext("allocator-blocker", target.AccountId);
         await using var blockerTransaction = await blocker.Database.BeginTransactionAsync();
-        await new CountyReferenceLockRepository(blocker, blocker.RequestUser)
+        await new CountyReferenceLocker(blocker, blocker.RequestUser)
             .LockForMutationAsync([target.CountyId]);
 
         await using var reviewerOne = database.CreateDbContext("reviewer", target.AccountId);
@@ -257,7 +258,7 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
 
         await using var blocker = database.CreateDbContext("manual-blocker", target.AccountId);
         await using var blockerTransaction = await blocker.Database.BeginTransactionAsync();
-        await new CountyReferenceLockRepository(blocker, blocker.RequestUser)
+        await new CountyReferenceLocker(blocker, blocker.RequestUser)
             .LockForMutationAsync([target.CountyId]);
 
         await using var reviewerOne = database.CreateDbContext("reviewer", target.AccountId);
@@ -320,8 +321,8 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {
             await using var transaction = await reviewer.Database.BeginTransactionAsync();
-            var mutations = new CaveMutationRepository(reviewer, reviewer.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser));
+            var mutations = new CaveMutationPersistence(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotReader(reviewer, reviewer.RequestUser));
             var preparation = await mutations.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId);
 
             await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
@@ -474,8 +475,8 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         string managerRevisionId;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             managerRevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
                 cave => cave.Narrative = "Concurrent manager edit")).RevisionId!;

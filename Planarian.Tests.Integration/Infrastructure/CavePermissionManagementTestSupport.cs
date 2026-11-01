@@ -15,6 +15,7 @@ using Planarian.Shared.Services;
 using Planarian.Tests.Integration.Infrastructure.Actors;
 using Southport.Messaging.Email.MailGun;
 
+using Planarian.Shared.Email.Repositories;
 namespace Planarian.Tests.Integration.Infrastructure;
 
 internal static class CavePermissionManagementTestSupport
@@ -41,10 +42,7 @@ internal static class CavePermissionManagementTestSupport
             MjmlSecretKey = "integration-test"
         };
         var emailService = new EmailService(
-            new MessageTypeRepository(
-                db,
-                db.RequestUser,
-                new MjmlService(new HttpClient(new NoExternalHttpHandler()), emailOptions)),
+            new MessageTypeRepository(db, db.RequestUser),
             db.RequestUser,
             new MailGunMessageFactory(
                 new HttpClient(new NoExternalHttpHandler()),
@@ -55,6 +53,7 @@ internal static class CavePermissionManagementTestSupport
                 })),
             new ClientUrlBuilder(new FixedClientRequestOrigin()),
             new MessageLogRepository(db, db.RequestUser),
+            new MjmlService(new HttpClient(new NoExternalHttpHandler()), emailOptions),
             emailOptions,
             new TestHostEnvironment(),
             NullLogger<EmailService>.Instance);

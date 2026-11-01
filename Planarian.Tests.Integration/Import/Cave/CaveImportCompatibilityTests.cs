@@ -35,7 +35,7 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         Assert.Equal(["Foo"], Assert.Single(plan.CreatePreview(false)).Geology);
         Assert.Single(await db.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
             tag.Key == TagTypeKeyConstant.Geology && tag.Name.ToLower() == "foo").ToListAsync());
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(planned.Id);
         Assert.Contains(snapshot.Tags, tag => tag.TagTypeId == existing.Id && tag.NameAtRevision == "Foo");
     }
 
@@ -121,7 +121,7 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         var planned = Assert.Single(plan.Caves);
         await import.ExecuteAsync(plan, "full.csv");
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(planned.Id);
 
         Assert.Equal(9, plan.TagCreations.Count);
         Assert.Equal((planned.Id, tenant.AccountId, tenant.StateId, tenant.CountyId, 30, "Full"),
@@ -164,7 +164,7 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
             await seed.SaveChangesAsync();
         }
         await using var db = database.CreateDbContext("a", tenant.AccountId);
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
         var before = await snapshots.BuildAsync(tenant.CaveId);
         var fileBefore = await FileStateAsync(db, testFile.FileId);
         var import = new CaveImportTestHarness(db, db.RequestUser);

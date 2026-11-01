@@ -10,6 +10,7 @@ using Planarian.Tests.Integration.Infrastructure.Actors;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixture)
@@ -412,8 +413,8 @@ public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixtu
 
         await using var first = await CaveTestActor.CreateAsync(database, tenant.AccountId, "owner");
         await using var second = await CaveTestActor.CreateAsync(database, tenant.AccountId, "owner");
-        var firstRepository = new StorageCleanupRepository(first.Db, first.Db.RequestUser);
-        var secondRepository = new StorageCleanupRepository(second.Db, second.Db.RequestUser);
+        var firstRepository = new StorageCleanupStore(first.Db, first.Db.RequestUser);
+        var secondRepository = new StorageCleanupStore(second.Db, second.Db.RequestUser);
 
         var concurrent = await Task.WhenAll(
             firstRepository.QueueAsync(StorageCleanupPurpose.UnpublishedFileRemoval, [address], default),
@@ -429,7 +430,7 @@ public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixtu
 
         await using var otherActor = await CaveTestActor.CreateAsync(
             database, other.AccountId, "owner");
-        var otherTarget = Assert.Single(await new StorageCleanupRepository(
+        var otherTarget = Assert.Single(await new StorageCleanupStore(
             otherActor.Db, otherActor.Db.RequestUser).QueueAsync(
                 StorageCleanupPurpose.UnpublishedFileRemoval, [address], default));
         Assert.NotEqual(firstTarget.Id, otherTarget.Id);
@@ -469,8 +470,8 @@ public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixtu
         actor.Db.StorageCleanupTargets.AddRange(completed, unrelated);
         await actor.Db.SaveChangesAsync();
 
-        var repo = new StorageCleanupRepository(actor.Db, actor.Db.RequestUser);
-        Assert.Equal(1, await repo.CompleteAsync(
+        var cleanupStore = new StorageCleanupStore(actor.Db, actor.Db.RequestUser);
+        Assert.Equal(1, await cleanupStore.CompleteAsync(
             [StorageCleanupPurpose.UnpublishedFileRemoval], [completed.Id], default));
 
         Assert.Equal(EntityState.Detached, actor.Db.Entry(completed).State);
@@ -499,8 +500,8 @@ public sealed class ExternalFileCleanupIntegrationTests(PostgresTestServer fixtu
         };
         actor.Db.StorageCleanupTargets.Add(unsaved);
 
-        var repository = new StorageCleanupRepository(actor.Db, actor.Db.RequestUser);
-        var deleted = await repository.CompleteAsync(
+        var cleanupStore = new StorageCleanupStore(actor.Db, actor.Db.RequestUser);
+        var deleted = await cleanupStore.CompleteAsync(
             [StorageCleanupPurpose.UnpublishedFileRemoval], [unsaved.Id], default);
 
         Assert.Equal(0, deleted);

@@ -15,6 +15,8 @@ using Xunit;
 
 using Planarian.Tests;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServer fixture)
@@ -102,11 +104,11 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
             pidCommand.CommandText = "select pg_backend_pid()";
             mergeBackendPid = Convert.ToInt32(await pidCommand.ExecuteScalarAsync());
         }
-        var snapshots = new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser);
-        var mergeRepository = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
-            new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser));
-        var merge = mergeRepository.MergeAsync([source.Id], destination.Id);
+        var snapshots = new CavePublishedSnapshotReader(mergeDb, mergeDb.RequestUser);
+        var tagAdministration = new TagTypeAdministrationPersistence(mergeDb, mergeDb.RequestUser,
+            new TagReferenceLocker(mergeDb, mergeDb.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(mergeDb, mergeDb.RequestUser));
+        var merge = tagAdministration.MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergeBackendPid);
 
         holdReferenceLock.Resume.TrySetResult();
@@ -143,10 +145,10 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
         await using (var seed = database.CreateDbContext("seed-source", cave.AccountId))
         {
             seed.BiologyTags.Add(new BiologyTag
-                { Id = IdGenerator.Generate(), CaveId = cave.CaveId, TagTypeId = source.Id });
+            { Id = IdGenerator.Generate(), CaveId = cave.CaveId, TagTypeId = source.Id });
             await seed.SaveChangesAsync();
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             beforeRevision = (await mutations.PublishExistingAsync(cave.CaveId, cave.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId!;
         }
@@ -170,11 +172,11 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
             command.CommandText = "select pg_backend_pid()";
             mergeBackendPid = Convert.ToInt32(await command.ExecuteScalarAsync());
         }
-        var mergeRepository = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
-            new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
-            new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
-            new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser));
-        var merge = mergeRepository.MergeAsync([source.Id], destination.Id);
+        var tagAdministration = new TagTypeAdministrationPersistence(mergeDb, mergeDb.RequestUser,
+            new TagReferenceLocker(mergeDb, mergeDb.RequestUser),
+            new CavePublishedSnapshotReader(mergeDb, mergeDb.RequestUser),
+            new CaveBulkRevisionPublisher(mergeDb, mergeDb.RequestUser));
+        var merge = tagAdministration.MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergeBackendPid);
 
         holdReferenceLock.Resume.TrySetResult();

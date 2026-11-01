@@ -8,10 +8,10 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Import.Data;
 
-public sealed class EntranceImportPlanningRepository : AccountScopedRepositoryBase
+public sealed class EntranceImportPlanningReader : AccountScopedDataAccessBase
 {
 
-    public EntranceImportPlanningRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
+    public EntranceImportPlanningReader(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
     }
 

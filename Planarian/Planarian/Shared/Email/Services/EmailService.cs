@@ -13,6 +13,7 @@ using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.MailGun;
 
+using Planarian.Shared.Email.Repositories;
 namespace Planarian.Shared.Email.Services;
 
 public class EmailService : ServiceBase<MessageTypeRepository>
@@ -20,18 +21,20 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     private readonly IEmailMessageFactory _emailMessageFactory;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly MessageLogRepository _messageLogRepository;
+    private readonly MjmlService _mjmlService;
     private readonly EmailOptions _emailOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(MessageTypeRepository repository, RequestUser requestUser,
         IEmailMessageFactory emailMessageFactory, ClientUrlBuilder clientUrlBuilder,
-        MessageLogRepository messageLogRepository, EmailOptions emailOptions,
+        MessageLogRepository messageLogRepository, MjmlService mjmlService, EmailOptions emailOptions,
         IHostEnvironment hostEnvironment, ILogger<EmailService> logger) : base(repository, requestUser)
     {
         _emailMessageFactory = emailMessageFactory;
         _clientUrlBuilder = clientUrlBuilder;
         _messageLogRepository = messageLogRepository;
+        _mjmlService = mjmlService;
         _emailOptions = emailOptions;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
@@ -48,8 +51,9 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         try
         {
-            var messageType =
-                await Repository.GetMessageTypeVm(TemplateKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
+            await EnsureMessageTypeHtmlAsync(cancellationToken);
+            var messageType = await Repository.GetMessageTypeVm(
+                TemplateKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, cancellationToken);
 
             if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
@@ -117,6 +121,18 @@ public class EmailService : ServiceBase<MessageTypeRepository>
                 messageLog?.Id,
                 providerSubmissionSucceeded ? MessageDeliveryStatus.Submitted : MessageDeliveryStatus.SendFailed);
         }
+    }
+
+    private async Task EnsureMessageTypeHtmlAsync(CancellationToken cancellationToken)
+    {
+        var pending = await Repository.GetPendingHtmlAsync(cancellationToken);
+        if (pending.Count == 0) return;
+
+        var rendered = new Dictionary<string, string>(pending.Count, StringComparer.Ordinal);
+        foreach (var messageType in pending)
+            rendered[messageType.Id] = await _mjmlService.MjmlToHtml(messageType.Mjml);
+
+        await Repository.SaveRenderedHtmlAsync(rendered, cancellationToken);
     }
 
     private async Task TryMarkSubmissionFailed(MessageLog? messageLog, string? error)

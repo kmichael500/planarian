@@ -91,8 +91,8 @@ means.
 A completed one-off should be retired after it has successfully run in every
 environment that still needs it. For the Cave rollout, that means deleting its
 manifest/script and then removing the Cave-specific Operations command and
-`CaveRevisionRolloutRepository`; the generic `Planarian.Operations` host and
-permanent `CavePublishedSnapshotRepository` remain. The API has no rollout-specific
+`CaveRevisionRolloutOperation`; the generic `Planarian.Operations` host and
+permanent `CavePublishedSnapshotReader` remain. The API has no rollout-specific
 startup code to clean up. Git history preserves exactly what executed.
 
 All selected components are **built before any hosted mutation**. Then the
@@ -307,8 +307,8 @@ The registered task causes the generic release lifecycle to do the following
    schema connection string (EF tracks applied versions).
 4. Run `dotnet Planarian.Operations.dll initialize-cave-revision-history`
    from the newly built operations artifact using the same scoped database
-   connection secret as the EF bundle. The Cave operation's Operations-only
-   repository owns its `PlanarianDbContext`/Npgsql setup and rollout SQL; it does
+   connection secret as the EF bundle. The Operations-only `CaveRevisionRolloutOperation` owns its
+   `PlanarianDbContext`/Npgsql setup and rollout SQL; it does
    not boot the web host or load Azure App Configuration. This command is resumable,
    idempotent, and verifies that no Cave remains without a current revision before
    it exits.

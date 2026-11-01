@@ -46,7 +46,7 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
         }
 
         await using var verify = database.CreateDbContext("manager", tenant.AccountId);
-        var actual = await new CavePublishedSnapshotRepository(verify, verify.RequestUser).BuildAsync(tenant.CaveId);
+        var actual = await new CavePublishedSnapshotReader(verify, verify.RequestUser).BuildAsync(tenant.CaveId);
         var expected = await BuildLegacyAsync(verify, tenant.AccountId, tenant.CaveId);
         Assert.Equal(CaveSnapshotJson.Serialize(expected), CaveSnapshotJson.Serialize(actual));
     }

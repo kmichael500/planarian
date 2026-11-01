@@ -17,7 +17,7 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => snapshots.BuildAsync(accountB.CaveId));
         await AssertAccountBIsUnchangedAsync(database, accountB);
@@ -31,10 +31,10 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
         var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        var repository = new CaveMutationRepository(db, db.RequestUser, snapshots);
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        var mutationPersistence = new CaveMutationPersistence(db, db.RequestUser, snapshots);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.PublishExistingAsync(
+        await Assert.ThrowsAsync<InvalidOperationException>(() => mutationPersistence.PublishExistingAsync(
             accountB.CaveId,
             expectedRevisionId: null,
             CaveRevisionSource.ManagerEdit,

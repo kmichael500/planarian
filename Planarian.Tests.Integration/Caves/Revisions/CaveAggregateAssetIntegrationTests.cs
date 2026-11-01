@@ -170,8 +170,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         string revisionWithFile;
         await using (var seed = database.CreateDbContext("file-revision-seed", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             revisionWithFile = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId!;
         }
@@ -216,8 +216,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
 
         await using (var seed = database.CreateDbContext("cleanup-revision-seed", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             tenant = tenant with { RevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId! };
         }
@@ -548,8 +548,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
 
         await using (var seed = database.CreateDbContext("file-rename-baseline", tenant.AccountId))
         {
-            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
-                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+            var mutation = await new CaveMutationPersistence(seed, seed.RequestUser,
+                    new CavePublishedSnapshotReader(seed, seed.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, _ => { });
             tenant = tenant with { RevisionId = mutation.RevisionId! };
@@ -604,8 +604,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
 
         await using (var seed = database.CreateDbContext("file-name-validation-baseline", tenant.AccountId))
         {
-            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
-                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+            var mutation = await new CaveMutationPersistence(seed, seed.RequestUser,
+                    new CavePublishedSnapshotReader(seed, seed.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, _ => { });
             tenant = tenant with { RevisionId = mutation.RevisionId! };

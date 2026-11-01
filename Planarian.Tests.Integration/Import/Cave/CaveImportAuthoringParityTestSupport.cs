@@ -66,9 +66,9 @@ public sealed partial class CaveImportAuthoringParityIntegrationTests
     {
         await using var directDb = directDatabase.CreateDbContext("parity-verify", directTenant.AccountId);
         await using var importDb = importDatabase.CreateDbContext("parity-verify", importTenant.AccountId);
-        var direct = await new CavePublishedSnapshotRepository(directDb, directDb.RequestUser)
+        var direct = await new CavePublishedSnapshotReader(directDb, directDb.RequestUser)
             .BuildAsync(directTenant.CaveId);
-        var imported = await new CavePublishedSnapshotRepository(importDb, importDb.RequestUser)
+        var imported = await new CavePublishedSnapshotReader(importDb, importDb.RequestUser)
             .BuildAsync(importTenant.CaveId);
         ImportParityAssertions.AssertPublishedSnapshotsEqual(direct, imported);
     }

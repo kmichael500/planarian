@@ -42,12 +42,12 @@ public sealed class CaveBulkRevisionSemanticParityIntegrationTests(PostgresTestS
 
         await using (var bulk = database.CreateDbContext("bulk", cave.AccountId))
         {
-            var snapshots = new CavePublishedSnapshotRepository(bulk, bulk.RequestUser);
+            var snapshots = new CavePublishedSnapshotReader(bulk, bulk.RequestUser);
             var live = await snapshots.BuildAsync(cave.CaveId);
             Assert.Contains(live.Tags, tag => tag.TagTypeId == reporter.Id && tag.NameAtRevision == "Alice Renamed");
 
             await using var transaction = await bulk.Database.BeginTransactionAsync();
-            await new CaveBulkRevisionRepository(bulk, bulk.RequestUser).PublishAsync(
+            await new CaveBulkRevisionPublisher(bulk, bulk.RequestUser).PublishAsync(
                 new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal) { [cave.CaveId] = live },
                 new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal) { [cave.CaveId] = live },
                 new Dictionary<string, string?>(StringComparer.Ordinal) { [cave.CaveId] = publishedRevisionId },
@@ -99,7 +99,7 @@ public sealed class CaveBulkRevisionSemanticParityIntegrationTests(PostgresTestS
                     { Id = IdGenerator.Generate(), CaveId = cave.CaveId, TagTypeId = second.Id });
             await seed.SaveChangesAsync();
 
-            var live = await new CavePublishedSnapshotRepository(seed, seed.RequestUser).BuildAsync(cave.CaveId);
+            var live = await new CavePublishedSnapshotReader(seed, seed.RequestUser).BuildAsync(cave.CaveId);
             var reordered = live with { Tags = live.Tags.Reverse().ToList() };
             Assert.NotEqual(CaveSnapshotJson.Serialize(live), CaveSnapshotJson.Serialize(reordered));
             Assert.True(new CaveRevisionDiffService().IsSemanticEqual(reordered, live));
@@ -123,9 +123,9 @@ public sealed class CaveBulkRevisionSemanticParityIntegrationTests(PostgresTestS
 
         await using (var bulk = database.CreateDbContext("bulk", cave.AccountId))
         {
-            var live = await new CavePublishedSnapshotRepository(bulk, bulk.RequestUser).BuildAsync(cave.CaveId);
+            var live = await new CavePublishedSnapshotReader(bulk, bulk.RequestUser).BuildAsync(cave.CaveId);
             await using var transaction = await bulk.Database.BeginTransactionAsync();
-            await new CaveBulkRevisionRepository(bulk, bulk.RequestUser).PublishAsync(
+            await new CaveBulkRevisionPublisher(bulk, bulk.RequestUser).PublishAsync(
                 new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal) { [cave.CaveId] = live },
                 new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal) { [cave.CaveId] = live },
                 new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -150,7 +150,7 @@ public sealed class CaveBulkRevisionSemanticParityIntegrationTests(PostgresTestS
         PublishedCaveTestData cave)
     {
         await using var db = database.CreateDbContext("publish-current", cave.AccountId);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(cave.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(cave.CaveId);
         var current = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == cave.CaveId);
         var revision = new CaveRevision
         {

@@ -622,7 +622,7 @@ public sealed class ImportSourceFileRetentionIntegrationTests(PostgresTestServer
             cleanupBackendPid = Convert.ToInt32(await command.ExecuteScalarAsync());
         }
 
-        var cleanupTask = new ImportSourceRepository(cleanup, cleanup.RequestUser)
+        var cleanupTask = new ImportSourceStore(cleanup, cleanup.RequestUser)
             .RemoveExpiredAsync(16, default);
         await WaitForLockWaitAsync(database, cave.AccountId, cleanupBackendPid);
 
@@ -782,7 +782,7 @@ public sealed class ImportSourceFileRetentionIntegrationTests(PostgresTestServer
         }
 
         await using var cleanup = database.CreateDbContext("cleanup", cave.AccountId);
-        var targetIds = await new ImportSourceRepository(cleanup, cleanup.RequestUser)
+        var targetIds = await new ImportSourceStore(cleanup, cleanup.RequestUser)
             .RemoveExpiredAsync(16, default);
 
         Assert.Equal(16, targetIds.Count);

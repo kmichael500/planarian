@@ -15,6 +15,7 @@ using Planarian.Tests.Integration.Infrastructure.Concurrency;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestCreateIntegrationTests(PostgresTestServer fixture)
@@ -614,7 +615,7 @@ public sealed class CaveChangeRequestCreateIntegrationTests(PostgresTestServer f
 
         await using var blocker = database.CreateDbContext("county-blocker", source.AccountId);
         await using var blockerTransaction = await blocker.Database.BeginTransactionAsync();
-        await new CountyReferenceLockRepository(blocker, blocker.RequestUser)
+        await new CountyReferenceLocker(blocker, blocker.RequestUser)
             .LockForMutationAsync([source.CountyId]);
 
         await using var reviewerOne = database.CreateDbContext("reviewer", source.AccountId);
@@ -709,11 +710,11 @@ public sealed class CaveChangeRequestCreateIntegrationTests(PostgresTestServer f
         CavePublishedSnapshotV1 proposalSnapshot;
         await using (var manager = await CaveTestActor.CreateAsync(
                          directDatabase, directSource.AccountId, "manager", directBlobs))
-            directSnapshot = await new CavePublishedSnapshotRepository(manager.Db, manager.Db.RequestUser)
+            directSnapshot = await new CavePublishedSnapshotReader(manager.Db, manager.Db.RequestUser)
                 .BuildAsync(directCaveId);
         await using (var reviewer = await CaveTestActor.CreateAsync(
                          proposalDatabase, proposalSource.AccountId, "reviewer", proposalBlobs))
-            proposalSnapshot = await new CavePublishedSnapshotRepository(reviewer.Db, reviewer.Db.RequestUser)
+            proposalSnapshot = await new CavePublishedSnapshotReader(reviewer.Db, reviewer.Db.RequestUser)
                 .BuildAsync(proposalCaveId);
 
         Assert.Equal(1, directSnapshot.CountyNumber);
@@ -858,7 +859,7 @@ public sealed class CaveChangeRequestCreateIntegrationTests(PostgresTestServer f
 
         await using var blocker = database.CreateDbContext("county-blocker", source.AccountId);
         await using var blockerTransaction = await blocker.Database.BeginTransactionAsync();
-        await new CountyReferenceLockRepository(blocker, blocker.RequestUser)
+        await new CountyReferenceLocker(blocker, blocker.RequestUser)
             .LockForMutationAsync([source.CountyId]);
 
         await using var reviewerOne = database.CreateDbContext("reviewer", source.AccountId);
@@ -1135,9 +1136,9 @@ public sealed class CaveChangeRequestCreateIntegrationTests(PostgresTestServer f
             values.Entrances.Single().Id = proposal.Entrances.Single().EntranceId;
 
             var requestRepository = new CaveChangeRequestRepository(reviewer.Db, reviewer.Db.RequestUser);
-            var mutationCoordinator = new CaveMutationCoordinator(new CaveMutationRepository(
+            var mutationCoordinator = new CaveMutationCoordinator(new CaveMutationPersistence(
                 reviewer.Db, reviewer.Db.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer.Db, reviewer.Db.RequestUser)));
+                new CavePublishedSnapshotReader(reviewer.Db, reviewer.Db.RequestUser)));
             var peopleContext = new CavePeoplePublicationContext(
                 new CavePeoplePublicationScope([], []),
                 proposal.Entrances.ToDictionary(

@@ -20,13 +20,13 @@ internal sealed record CaveRevisionRolloutResult(DateTime RevisionHistoryStarted
 /// prevents ordinary editor traffic from establishing a legacy Cave's history boundary. The command is resumable while
 /// only rollout baselines exist and fails closed after live revision publication has begun.
 /// </summary>
-internal sealed class CaveRevisionRolloutRepository
+internal sealed class CaveRevisionRolloutOperation
 {
     private const int BatchSize = 2500;
 
     private readonly PlanarianDbContext _db;
 
-    internal CaveRevisionRolloutRepository(PlanarianDbContext db)
+    internal CaveRevisionRolloutOperation(PlanarianDbContext db)
     {
         _db = db;
     }
@@ -42,7 +42,7 @@ internal sealed class CaveRevisionRolloutRepository
             .Options;
 
         await using var db = new PlanarianDbContext(options);
-        return await new CaveRevisionRolloutRepository(db).InitializeAsync(cancellationToken);
+        return await new CaveRevisionRolloutOperation(db).InitializeAsync(cancellationToken);
     }
 
     internal async Task<CaveRevisionRolloutResult> InitializeAsync(CancellationToken cancellationToken = default)
@@ -128,7 +128,7 @@ internal sealed class CaveRevisionRolloutRepository
                         break;
                     }
 
-                    var snapshots = await CavePublishedSnapshotRepository.ForTrustedAccountScope(_db, accountId)
+                    var snapshots = await CavePublishedSnapshotReader.ForTrustedAccountScope(_db, accountId)
                         .BuildManyAsync(caveIds, cancellationToken);
                     await InsertBaselinesAndAdvancePointersAsync(
                         accountId, snapshots, revisionHistoryStartedOn, cancellationToken);

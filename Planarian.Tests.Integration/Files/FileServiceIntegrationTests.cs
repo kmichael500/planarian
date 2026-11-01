@@ -8,6 +8,7 @@ using Planarian.Tests.Integration.Infrastructure.Actors;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests.Integration.Files;
 
 public sealed class FileServiceIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
@@ -61,7 +62,7 @@ public sealed class FileServiceIntegrationTests(PostgresTestServer fixture) : IC
         }
 
         await using (var cleanup = database.CreateDbContext("cleanup", tenant.AccountId))
-            await new Planarian.Modules.Files.Repositories.AuthoringFileRepository(cleanup, cleanup.RequestUser, TimeProvider.System)
+            await new Planarian.Modules.Files.Persistence.AuthoringFileStore(cleanup, cleanup.RequestUser, TimeProvider.System)
                 .RemoveExpiredAsync(16, default);
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);

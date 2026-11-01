@@ -8,6 +8,7 @@ using Xunit;
 using static Planarian.Tests.MigrationTestSupport;
 using Planarian.Operations.CaveRevisionHistory;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests;
 
 [Collection(MigrationIntegrationCollection.Name)]
@@ -265,7 +266,7 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
 
         await using var db = database.CreateDbContext(
             CurrentMainV32CensusSeeder.UserAlpha, CurrentMainV32CensusSeeder.AccountAlpha);
-        var files = new Planarian.Modules.Files.Repositories.AuthoringFileRepository(db, db.RequestUser, TimeProvider.System);
+        var files = new Planarian.Modules.Files.Persistence.AuthoringFileStore(db, db.RequestUser, TimeProvider.System);
 
         var cleanupTargets = await files.RemoveExpiredAsync(16, default);
         db.ChangeTracker.Clear();
@@ -303,7 +304,7 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
         var caveRowsBefore = await CurrentMainV32DatabaseCensus.CaptureCaveRolloutRowsAsync(database);
         var effectivePermissionsBefore = await CurrentMainV32DatabaseCensus.CaptureUserCavePermissionsAsync(database);
 
-        var result = await new CaveRevisionRolloutRepository(rolloutDb).InitializeAsync();
+        var result = await new CaveRevisionRolloutOperation(rolloutDb).InitializeAsync();
 
         Assert.False(result.AlreadyComplete);
         Assert.Equal(3, result.InitializedCaveCount);
@@ -320,7 +321,7 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
 
         var beforeRerun = await CurrentMainV32DatabaseCensus.CaptureExactTablesAsync(
             database, CurrentMainV32DatabaseCensus.ExpectedLatestTables);
-        var rerun = await new CaveRevisionRolloutRepository(rolloutDb).InitializeAsync();
+        var rerun = await new CaveRevisionRolloutOperation(rolloutDb).InitializeAsync();
         var afterRerun = await CurrentMainV32DatabaseCensus.CaptureExactTablesAsync(
             database, CurrentMainV32DatabaseCensus.ExpectedLatestTables);
 

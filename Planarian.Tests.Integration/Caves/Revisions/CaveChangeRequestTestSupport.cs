@@ -33,8 +33,8 @@ internal static class CaveChangeRequestTestSupport
         seed.EntranceHydrologyTags.Add(new EntranceHydrologyTag
             { Id = "hydrolinkA", EntranceId = entranceId, TagTypeId = hydrology.Id });
         await seed.SaveChangesAsync();
-        var revision = await new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+        var revision = await new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser))
             .PublishExistingAsync(cave.CaveId, cave.RevisionId, CaveRevisionSource.ManagerEdit,
                 CaveRevisionOperation.Update, _ => { });
         return new TaggedPublishedCave(cave with { RevisionId = revision.RevisionId! }, biology.Id,
@@ -157,8 +157,8 @@ internal static class CaveChangeRequestTestSupport
         string revisionId;
         await using (var manager = database.CreateDbContext("measurement-seed", cave.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             revisionId = (await mutations.PublishExistingAsync(cave.CaveId, cave.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, entity =>
                 {

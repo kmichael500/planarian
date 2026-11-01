@@ -122,19 +122,19 @@ class WorkflowContractTests(unittest.TestCase):
         library_project = (
             REPO_ROOT / "Planarian/Planarian.Library/Planarian.Library.csproj"
         ).read_text(encoding="utf-8")
-        rollout_repository_path = (
+        rollout_operation_path = (
             REPO_ROOT
-            / "Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutRepository.cs"
+            / "Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutOperation.cs"
         )
 
         self.assertNotIn("initialize-cave-revision-history", web_program)
-        self.assertNotIn("CaveRevisionRolloutRepository", web_program)
+        self.assertNotIn("CaveRevisionRolloutOperation", web_program)
         self.assertNotIn("CaveRevisionReadinessRepository", web_program)
         self.assertNotIn("initialize-cave-revision-history", operations_program)
-        self.assertNotIn("CaveRevisionRolloutRepository", operations_program)
-        self.assertTrue(rollout_repository_path.is_file())
+        self.assertNotIn("CaveRevisionRolloutOperation", operations_program)
+        self.assertTrue(rollout_operation_path.is_file())
         self.assertFalse(
-            (REPO_ROOT / "Planarian/Planarian.Library/Caves/Revisions/CaveRevisionRolloutRepository.cs").exists()
+            (REPO_ROOT / "Planarian/Planarian.Library/Caves/Revisions/CaveRevisionRolloutOperation.cs").exists()
         )
         self.assertFalse(
             (REPO_ROOT / "Planarian/Planarian.Library/Caves/Revisions/CaveRevisionReadinessRepository.cs").exists()
@@ -148,29 +148,29 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('<InternalsVisibleTo Include="Planarian.Operations" />', library_project)
         self.assertNotIn("Planarian.Library", model_project)
         self.assertIn("Planarian.Model", library_project)
-        snapshot_repository = (
+        snapshot_reader = (
             REPO_ROOT
-            / "Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs"
+            / "Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotReader.cs"
         ).read_text(encoding="utf-8")
-        self.assertNotIn("ForRevisionRollout", snapshot_repository)
+        self.assertNotIn("ForRevisionRollout", snapshot_reader)
         self.assertIn(
-            "internal static CavePublishedSnapshotRepository ForTrustedAccountScope",
-            snapshot_repository,
+            "internal static CavePublishedSnapshotReader ForTrustedAccountScope",
+            snapshot_reader,
         )
-        rollout_repository = rollout_repository_path.read_text(encoding="utf-8")
-        self.assertIn("internal sealed class CaveRevisionRolloutRepository", rollout_repository)
-        self.assertEqual(4, rollout_repository.count("IgnoreQueryFilters()"))
+        rollout_operation = rollout_operation_path.read_text(encoding="utf-8")
+        self.assertIn("internal sealed class CaveRevisionRolloutOperation", rollout_operation)
+        self.assertEqual(4, rollout_operation.count("IgnoreQueryFilters()"))
         self.assertEqual(
             2,
-            rollout_repository.count("knownAccountIds.Contains(revision.AccountId)"),
+            rollout_operation.count("knownAccountIds.Contains(revision.AccountId)"),
         )
         self.assertEqual(
             1,
-            rollout_repository.count("knownAccountIds.Contains(cave.AccountId)"),
+            rollout_operation.count("knownAccountIds.Contains(cave.AccountId)"),
         )
         self.assertEqual(
             1,
-            rollout_repository.count("accountIds.Contains(cave.AccountId)"),
+            rollout_operation.count("accountIds.Contains(cave.AccountId)"),
         )
 
     def test_registered_tasks_are_generic_and_maintenance_resume_is_explicit(self):

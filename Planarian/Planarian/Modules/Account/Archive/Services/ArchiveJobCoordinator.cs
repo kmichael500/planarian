@@ -18,6 +18,7 @@ using Planarian.Modules.Notifications.Services;
 using Planarian.Shared.Models;
 using Planarian.Shared.Services;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Modules.Account.Archive.Services;
 
 public class ArchiveJobCoordinator
@@ -38,10 +39,10 @@ public class ArchiveJobCoordinator
     private readonly HashSet<string> _resettingAccounts = new(StringComparer.Ordinal);
     private readonly object _accountMaintenanceGate = new();
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly AccountMaintenanceLockRepository _maintenance;
+    private readonly AccountMaintenanceLockManager _maintenance;
     private readonly ILogger<ArchiveJobCoordinator> _logger;
 
-    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory, AccountMaintenanceLockRepository maintenance,
+    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory, AccountMaintenanceLockManager maintenance,
         ILogger<ArchiveJobCoordinator>? logger = null)
     {
         _scopeFactory = scopeFactory;

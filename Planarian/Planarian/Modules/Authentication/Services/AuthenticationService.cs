@@ -7,6 +7,7 @@ using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
 
+using Planarian.Shared.Email.Repositories;
 namespace Planarian.Modules.Authentication.Services;
 
 public class AuthenticationService : ServiceBase<AuthenticationRepository>

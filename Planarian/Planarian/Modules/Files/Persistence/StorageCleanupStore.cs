@@ -7,7 +7,7 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
-namespace Planarian.Modules.Files.Repositories;
+namespace Planarian.Modules.Files.Persistence;
 
 public sealed record StorageCleanupAddress(string StoragePartition, string StorageKey, bool IsContainer = false)
 {
@@ -20,12 +20,12 @@ public sealed record StorageCleanupAddress(string StoragePartition, string Stora
 /// Queueing is idempotent at the PostgreSQL unique constraint rather than through
 /// caller-specific check-then-insert logic.
 /// </summary>
-public class StorageCleanupRepository<TDbContext> : AccountScopedRepositoryBase<TDbContext>
+public class StorageCleanupStore<TDbContext> : AccountScopedDataAccessBase<TDbContext>
     where TDbContext : PlanarianDbContextBase
 {
     private const int LookupBatchSize = 500;
 
-    public StorageCleanupRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public StorageCleanupStore(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -224,9 +224,9 @@ public class StorageCleanupRepository<TDbContext> : AccountScopedRepositoryBase<
     }
 }
 
-public sealed class StorageCleanupRepository : StorageCleanupRepository<PlanarianDbContext>
+public sealed class StorageCleanupStore : StorageCleanupStore<PlanarianDbContext>
 {
-    public StorageCleanupRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public StorageCleanupStore(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 }

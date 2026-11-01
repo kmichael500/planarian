@@ -14,6 +14,8 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
@@ -34,8 +36,8 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
         string beforeRevision;
         await using (var seed = database.CreateDbContext("publish-file", cave.AccountId))
         {
-            var mutations = new CaveMutationRepository(seed, seed.RequestUser,
-                new CavePublishedSnapshotRepository(seed, seed.RequestUser));
+            var mutations = new CaveMutationPersistence(seed, seed.RequestUser,
+                new CavePublishedSnapshotReader(seed, seed.RequestUser));
             beforeRevision = (await mutations.PublishExistingAsync(cave.CaveId, cave.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId!;
         }
@@ -67,10 +69,10 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
                 command.CommandText = "select pg_backend_pid()";
                 mergePid = Convert.ToInt32(await command.ExecuteScalarAsync());
             }
-            var merge = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
-                new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
-                new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
-                new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser))
+            var merge = new TagTypeAdministrationPersistence(mergeDb, mergeDb.RequestUser,
+                new TagReferenceLocker(mergeDb, mergeDb.RequestUser),
+                new CavePublishedSnapshotReader(mergeDb, mergeDb.RequestUser),
+                new CaveBulkRevisionPublisher(mergeDb, mergeDb.RequestUser))
                 .MergeAsync([file.FileTypeId], mergeDestination.Id);
             await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
 

@@ -2,6 +2,7 @@ using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Modules.Account.Services;
 
 /// <summary>
@@ -12,7 +13,7 @@ namespace Planarian.Modules.Account.Services;
 public sealed class AccountMaintenanceMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, RequestUser requestUser,
-        AccountMaintenanceLockRepository maintenance,
+        AccountMaintenanceLockManager maintenance,
         AccountRepository accountRepository)
     {
         var accountId = requestUser.AccountId;

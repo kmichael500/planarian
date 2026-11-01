@@ -23,14 +23,14 @@ public sealed class CaveChangeRequestService : AccountServiceBase
     private readonly CaveChangeRequestRepository _requests;
     private readonly CaveRepository _caves;
     private readonly CaveService _caveService;
-    private readonly CaveRevisionQueryRepository _revisions;
+    private readonly CaveRevisionReader _revisions;
     private readonly CaveMutationCoordinator _mutations;
     private readonly FileService _files;
     private readonly StorageCleanupService _storageCleanup;
     private readonly CaveRevisionDiffService _diff = new();
 
     public CaveChangeRequestService(CaveChangeRequestRepository requests, CaveRepository caves,
-        CaveService caveService, CaveRevisionQueryRepository revisions, CaveMutationCoordinator mutations,
+        CaveService caveService, CaveRevisionReader revisions, CaveMutationCoordinator mutations,
         FileService files, StorageCleanupService storageCleanup, RequestUser user) : base(user)
     {
         _requests = requests;

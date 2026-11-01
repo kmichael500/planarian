@@ -15,6 +15,7 @@ using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Services;
 using Planarian.Shared.Base;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Caves.Revisions;
 
 public sealed class CaveChangeRequestReadRow
@@ -46,15 +47,22 @@ public sealed class CaveChangeRequestRepository : AccountScopedRepositoryBase
     private static readonly string[] CaveManagerSatisfyingPermissionKeys =
         PermissionPolicy.GetSatisfyingCavePermissionKeys(PermissionPolicyKey.Manager);
     private readonly CaveRevisionDiffService _diff = new();
-    private readonly AuthoringFileRepository<PlanarianDbContext> _authoringFiles;
+    private readonly AuthoringFileStore<PlanarianDbContext> _authoringFileStore;
 
     public CaveChangeRequestRepository(
         PlanarianDbContext db,
         RequestUser user,
-        TimeProvider? timeProvider = null) : base(db, user)
+        AuthoringFileStore authoringFileStore) : base(db, user)
     {
-        _authoringFiles = new AuthoringFileRepository<PlanarianDbContext>(
-            db, user, timeProvider ?? TimeProvider.System);
+        _authoringFileStore = authoringFileStore;
+    }
+
+    internal CaveChangeRequestRepository(
+        PlanarianDbContext db,
+        RequestUser user,
+        TimeProvider? timeProvider = null)
+        : this(db, user, new AuthoringFileStore(db, user, timeProvider ?? TimeProvider.System))
+    {
     }
 
     public Task<string> CreateAsync(string caveId, string baseRevisionId, CaveProposalSnapshotV1 proposal,
@@ -329,12 +337,12 @@ public sealed class CaveChangeRequestRepository : AccountScopedRepositoryBase
 
     public Task<IReadOnlySet<string>> GetAuthorableStagedFileIdsAsync(
         IEnumerable<string> fileIds, string? requestId, CancellationToken cancellationToken) =>
-        _authoringFiles.GetAuthorableIdsAsync(fileIds, requestId, cancellationToken);
+        _authoringFileStore.GetAuthorableIdsAsync(fileIds, requestId, cancellationToken);
 
     public Task<IReadOnlyList<StagedCaveFilePublication>> PlanStagedFilePublicationsAsync(
         string requestId, IReadOnlyDictionary<string, string> extensionsByFileId,
         CancellationToken cancellationToken) =>
-        _authoringFiles.PlanRequestPublicationsAsync(
+        _authoringFileStore.PlanRequestPublicationsAsync(
             requestId, extensionsByFileId, cancellationToken);
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
@@ -571,12 +579,12 @@ public sealed class CaveChangeRequestRepository : AccountScopedRepositoryBase
 
     private Task<IReadOnlyList<StorageCleanupTarget>> RemoveRemainingStagedFilesAsync(
         string requestId, CancellationToken cancellationToken) =>
-        _authoringFiles.RemoveRequestClaimsAndUnreferencedAsync(requestId, cancellationToken);
+        _authoringFileStore.RemoveRequestClaimsAndUnreferencedAsync(requestId, cancellationToken);
 
     private Task ClaimAuthoringStagedFilesAsync(
         CaveChangeRequest request, IEnumerable<string> fileIds,
         CancellationToken cancellationToken) =>
-        _authoringFiles.ClaimAsync(request.Id, fileIds, cancellationToken);
+        _authoringFileStore.ClaimAsync(request.Id, fileIds, cancellationToken);
 
     private static void RequireAwaitingReviewer(CaveChangeRequestStatus status)
     {

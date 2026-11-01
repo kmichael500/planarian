@@ -14,25 +14,26 @@ using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Modules.Import.Data;
 
-public sealed class EntranceImportExecutionRepository : AccountScopedRepositoryBase
+public sealed class EntranceImportPersistence : AccountScopedDataAccessBase
 {
     private const int CaveBatchSize = 500;
     private const int EntranceBatchSize = 1500;
     private const int AssociationBatchSize = 4000;
 
-    private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveBulkRevisionRepository _revisionPublisher;
-    private readonly TagReferenceLockRepository _tagReferenceLocks;
+    private readonly CavePublishedSnapshotReader _snapshotReader;
+    private readonly CaveBulkRevisionPublisher _revisionPublisher;
+    private readonly TagReferenceLocker _tagReferenceLocker;
 
-    public EntranceImportExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotRepository snapshots, CaveBulkRevisionRepository revisionPublisher,
-        TagReferenceLockRepository tagReferenceLocks) : base(db, requestUser)
+    public EntranceImportPersistence(PlanarianDbContext db, RequestUser requestUser,
+        CavePublishedSnapshotReader snapshotReader, CaveBulkRevisionPublisher revisionPublisher,
+        TagReferenceLocker tagReferenceLocker) : base(db, requestUser)
     {
-        _snapshots = snapshots;
+        _snapshotReader = snapshotReader;
         _revisionPublisher = revisionPublisher;
-        _tagReferenceLocks = tagReferenceLocks;
+        _tagReferenceLocker = tagReferenceLocker;
     }
 
     public Task<string> ExecuteAsync(EntranceImportPlan plan, string? sourceFileName,
@@ -56,13 +57,13 @@ public sealed class EntranceImportExecutionRepository : AccountScopedRepositoryB
 
             PersistedImportSource? persistedSource = null;
             if (sourceFileId is not null)
-                persistedSource = await ImportSourceRepository.PromoteAsync(
+                persistedSource = await ImportSourceStore.PromoteAsync(
                     DbContext, Scope.AccountId, Scope.UserId, sourceFileId, token);
 
             var targetIds = plan.Targets.Keys.Order(StringComparer.Ordinal).ToList();
             var before = targetIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(targetIds, token))
+                : (await _snapshotReader.BuildManyAsync(targetIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
 
             var batch = new CaveImportBatch
@@ -91,7 +92,7 @@ public sealed class EntranceImportExecutionRepository : AccountScopedRepositoryB
 
             var after = targetIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(targetIds, token))
+                : (await _snapshotReader.BuildManyAsync(targetIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
             var expected = plan.Targets.ToDictionary(pair => pair.Key, pair => pair.Value.CurrentRevisionId,
                 StringComparer.Ordinal);
@@ -164,7 +165,7 @@ public sealed class EntranceImportExecutionRepository : AccountScopedRepositoryB
     {
         var creationIds = plan.TagCreations.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
         var existingIds = plan.TagNamesById.Keys.Where(id => !creationIds.Contains(id)).ToList();
-        var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingIds, cancellationToken);
+        var lockedTags = await _tagReferenceLocker.LockForReferenceAsync(existingIds, cancellationToken);
         if (lockedTags.Count != existingIds.Distinct(StringComparer.Ordinal).Count())
             throw new ImportPlanConcurrencyException("A referenced Entrance Tag changed ownership or disappeared.");
         foreach (var tag in lockedTags)

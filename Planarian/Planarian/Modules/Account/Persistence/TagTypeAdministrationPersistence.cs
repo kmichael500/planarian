@@ -10,30 +10,32 @@ using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Modules.Account.Model;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
-namespace Planarian.Modules.Account.Repositories;
+using Planarian.Modules.Tags.Persistence;
+namespace Planarian.Modules.Account.Persistence;
 
 public sealed record TagTypeMutationResult(string Id, string Name, string? AccountId);
 
-public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBase
+public sealed class TagTypeAdministrationPersistence : AccountScopedDataAccessBase
 {
     private const int BatchSize = 500;
     private const int DeleteBatchSize = 100;
-    private readonly TagReferenceLockRepository _tagLocks;
-    private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveBulkRevisionRepository _revisions;
+    private readonly TagReferenceLocker _tagReferenceLocker;
+    private readonly CavePublishedSnapshotReader _snapshotReader;
+    private readonly CaveBulkRevisionPublisher _revisionPublisher;
 
-    public TagTypeAdministrationRepository(PlanarianDbContext db, RequestUser requestUser,
-        TagReferenceLockRepository tagLocks, CavePublishedSnapshotRepository snapshots,
-        CaveBulkRevisionRepository revisions) : base(db, requestUser)
+    public TagTypeAdministrationPersistence(PlanarianDbContext db, RequestUser requestUser,
+        TagReferenceLocker tagReferenceLocker, CavePublishedSnapshotReader snapshotReader,
+        CaveBulkRevisionPublisher revisionPublisher) : base(db, requestUser)
     {
-        _tagLocks = tagLocks;
-        _snapshots = snapshots;
-        _revisions = revisions;
+        _tagReferenceLocker = tagReferenceLocker;
+        _snapshotReader = snapshotReader;
+        _revisionPublisher = revisionPublisher;
     }
 
     public async Task<TagTypeMutationResult> RenameAsync(string tagTypeId, string name,
@@ -44,7 +46,7 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
-            var locked = await _tagLocks.LockForDestructiveMutationAsync([tagTypeId], cancellationToken);
+            var locked = await _tagReferenceLocker.LockForDestructiveMutationAsync([tagTypeId], cancellationToken);
             if (locked.Count != 1) throw ApiExceptionDictionary.NotFound("Tag Type Id");
 
             var lockedTag = locked.Single();
@@ -74,7 +76,7 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
                         StringComparer.Ordinal, cancellationToken);
             var before = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                : (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
 
             tag.Name = name;
@@ -82,11 +84,11 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
 
             if (affectedIds.Count > 0)
             {
-                var after = (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                var after = (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
                 var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                     StringComparer.Ordinal);
-                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
+                await _revisionPublisher.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
                     cancellationToken: cancellationToken);
             }
 
@@ -120,7 +122,7 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
         {
             var requestedIds = sourceIds.Append(destinationId).Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal).ToList();
-            var lockedTags = await _tagLocks.LockForDestructiveMutationAsync(requestedIds, cancellationToken);
+            var lockedTags = await _tagReferenceLocker.LockForDestructiveMutationAsync(requestedIds, cancellationToken);
             if (lockedTags.Count != requestedIds.Count)
                 throw ApiExceptionDictionary.BadRequest(
                     "One or more source or destination tag types do not exist or are not available to this account.");
@@ -149,7 +151,7 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
                 throw TagAdministrationConcurrencyConflict();
             var before = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                : (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
 
             foreach (var sourceId in sourceIds)
@@ -158,11 +160,11 @@ public sealed class TagTypeAdministrationRepository : AccountScopedRepositoryBas
 
             var after = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                : (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
             var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                 StringComparer.Ordinal);
-            await _revisions.PublishAsync(before, after, expected, operations,
+            await _revisionPublisher.PublishAsync(before, after, expected, operations,
                 CaveRevisionSource.AdministrativeChange, cancellationToken: cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }

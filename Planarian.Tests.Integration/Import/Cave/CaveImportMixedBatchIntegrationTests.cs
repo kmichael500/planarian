@@ -41,7 +41,7 @@ public sealed class CaveImportMixedBatchIntegrationTests(PostgresTestServer fixt
         CavePublishedSnapshotV1 deleteBefore;
         await using (var before = database.CreateDbContext("before", account.AccountId))
         {
-            var beforeSnapshots = new CavePublishedSnapshotRepository(before, before.RequestUser);
+            var beforeSnapshots = new CavePublishedSnapshotReader(before, before.RequestUser);
             updateBefore = await beforeSnapshots.BuildAsync(update.CaveId);
             deleteBefore = await beforeSnapshots.BuildAsync(deleted.CaveId);
         }
@@ -93,7 +93,7 @@ public sealed class CaveImportMixedBatchIntegrationTests(PostgresTestServer fixt
         Assert.Equal("No Change Cave", liveCaves.Single(row => row.CountyNumber == 2).Name);
         Assert.Equal("Inserted Cave", liveCaves.Single(row => row.CountyNumber == 4).Name);
 
-        var snapshots = new CavePublishedSnapshotRepository(verify, verify.RequestUser);
+        var snapshots = new CavePublishedSnapshotReader(verify, verify.RequestUser);
         var updateAfter = await snapshots.BuildAsync(update.CaveId);
         Assert.Equal(
             System.Text.Json.JsonSerializer.Serialize(updateBefore.Entrances),
@@ -223,8 +223,8 @@ public sealed class CaveImportMixedBatchIntegrationTests(PostgresTestServer fixt
         PostgresTestDatabase database, PublishedCaveTestData cave)
     {
         await using var db = database.CreateDbContext("aggregate-baseline", cave.AccountId);
-        var mutation = await new CaveMutationRepository(
-                db, db.RequestUser, new CavePublishedSnapshotRepository(db, db.RequestUser))
+        var mutation = await new CaveMutationPersistence(
+                db, db.RequestUser, new CavePublishedSnapshotReader(db, db.RequestUser))
             .PublishExistingAsync(cave.CaveId, cave.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { });
         return mutation.RevisionId!;

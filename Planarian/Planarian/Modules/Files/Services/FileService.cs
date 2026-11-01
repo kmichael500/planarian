@@ -17,6 +17,8 @@ using Planarian.Shared.Models;
 using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
+using Planarian.Modules.Tags.Persistence;
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
@@ -28,9 +30,9 @@ public class FileService : ServiceBase<FileRepository>
     private readonly SettingsRepository _settingsRepository;
     private readonly CaveRepository _caveRepository;
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
-    private readonly TagReferenceLockRepository _tagReferenceLocks;
+    private readonly TagReferenceLocker _tagReferenceLocker;
     private readonly IObjectStorage _objectStorage;
-    private readonly AuthoringFileRepository _authoringFiles;
+    private readonly AuthoringFileStore _authoringFileStore;
     private readonly StorageCleanupService _storageCleanup;
     private readonly AzureBlobTransportService _blobTransport;
     private readonly TimeProvider _timeProvider;
@@ -38,8 +40,8 @@ public class FileService : ServiceBase<FileRepository>
     public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
         SettingsRepository settingsRepository, CaveRepository caveRepository,
         RequestThrottleService requestThrottleService, CaveMutationCoordinator caveMutationCoordinator,
-        TagReferenceLockRepository tagReferenceLocks, IObjectStorage objectStorage,
-        AuthoringFileRepository authoringFiles, StorageCleanupService storageCleanup,
+        TagReferenceLocker tagReferenceLocker, IObjectStorage objectStorage,
+        AuthoringFileStore authoringFileStore, StorageCleanupService storageCleanup,
         AzureBlobTransportService blobTransport,
         TimeProvider timeProvider) : base(
         repository, requestUser)
@@ -49,9 +51,9 @@ public class FileService : ServiceBase<FileRepository>
         _caveRepository = caveRepository;
         _requestThrottleService = requestThrottleService;
         _caveMutationCoordinator = caveMutationCoordinator;
-        _tagReferenceLocks = tagReferenceLocks;
+        _tagReferenceLocker = tagReferenceLocker;
         _objectStorage = objectStorage;
-        _authoringFiles = authoringFiles;
+        _authoringFileStore = authoringFileStore;
         _storageCleanup = storageCleanup;
         _blobTransport = blobTransport;
         _timeProvider = timeProvider;
@@ -294,7 +296,7 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task DeleteAuthoringStagedFileAsync(string fileId, CancellationToken cancellationToken)
     {
-        var cleanupTargetIds = await _authoringFiles.RemoveUnclaimedAsync(fileId, cancellationToken);
+        var cleanupTargetIds = await _authoringFileStore.RemoveUnclaimedAsync(fileId, cancellationToken);
         await _storageCleanup.CleanupUnpublishedFileTargetsAsync(cleanupTargetIds, CancellationToken.None);
     }
 
@@ -305,7 +307,7 @@ public class FileService : ServiceBase<FileRepository>
             .Distinct(StringComparer.Ordinal).ToList();
         if (requestedIds.Count == 0) return;
 
-        var staged = await _authoringFiles.GetUnclaimedObjectsAsync(requestedIds, cancellationToken);
+        var staged = await _authoringFileStore.GetUnclaimedObjectsAsync(requestedIds, cancellationToken);
         if (staged.Count != requestedIds.Count)
             throw ApiExceptionDictionary.NotFound("Staged file");
 
@@ -331,7 +333,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<(Stream Stream, string FileName)> OpenAuthoringStagedFileAsync(string fileId,
         CancellationToken cancellationToken)
     {
-        var file = await _authoringFiles.GetUnclaimedAccessAsync(fileId, cancellationToken);
+        var file = await _authoringFileStore.GetUnclaimedAccessAsync(fileId, cancellationToken);
         if (file is null)
             throw ApiExceptionDictionary.NotFound("Staged file");
         var stored = await _objectStorage.OpenReadAsync(
@@ -370,12 +372,12 @@ public class FileService : ServiceBase<FileRepository>
     }
 
     private async Task<List<string>> RemoveExpiredFiles(CancellationToken cancellationToken) =>
-        (await _authoringFiles.RemoveExpiredAsync(
+        (await _authoringFileStore.RemoveExpiredAsync(
             OpportunisticCleanupBatchSize, cancellationToken)).ToList();
 
     private async Task LockPublishedFileTypeAsync(string tagTypeId, CancellationToken cancellationToken)
     {
-        var locked = await _tagReferenceLocks.LockForReferenceAsync([tagTypeId], cancellationToken);
+        var locked = await _tagReferenceLocker.LockForReferenceAsync([tagTypeId], cancellationToken);
         if (locked.Count != 1 || locked[0].Key != TagTypeKeyConstant.File)
             throw ApiExceptionDictionary.BadRequest(
                 "The selected file type changed or disappeared. Retry with current data.");

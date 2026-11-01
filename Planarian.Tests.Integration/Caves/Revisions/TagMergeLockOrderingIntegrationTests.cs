@@ -12,6 +12,8 @@ using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Tags.Repositories;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests;
 
 public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixture)
@@ -197,11 +199,11 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
             (await verify.CaveRevisions.SingleAsync(row => row.Id == currentRevisionId)).Source);
     }
 
-    private static TagTypeAdministrationRepository MergeRepository(
+    private static TagTypeAdministrationPersistence MergeRepository(
         Planarian.Model.Database.PlanarianDbContext db) => new(db, db.RequestUser,
-        new TagReferenceLockRepository(db, db.RequestUser),
-        new CavePublishedSnapshotRepository(db, db.RequestUser),
-        new CaveBulkRevisionRepository(db, db.RequestUser));
+        new TagReferenceLocker(db, db.RequestUser),
+        new CavePublishedSnapshotReader(db, db.RequestUser),
+        new CaveBulkRevisionPublisher(db, db.RequestUser));
 
     private static async Task<string> AttachGeologyAndPublishAsync(PostgresTestDatabase database,
         PublishedCaveTestData cave, string tagId)
@@ -218,8 +220,8 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
     {
         await using var owned = existing is null ? database.CreateDbContext("publish-current", cave.AccountId) : null;
         var db = existing ?? owned!;
-        var mutations = new CaveMutationRepository(db, db.RequestUser,
-            new CavePublishedSnapshotRepository(db, db.RequestUser));
+        var mutations = new CaveMutationPersistence(db, db.RequestUser,
+            new CavePublishedSnapshotReader(db, db.RequestUser));
         return (await mutations.PublishExistingAsync(cave.CaveId, cave.RevisionId,
             CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, _ => { })).RevisionId!;
     }

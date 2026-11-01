@@ -406,8 +406,8 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
 
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Narrative = "C");
         }
@@ -449,8 +449,8 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
         string revisionB;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             revisionB = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Narrative = "B"))
                 .RevisionId!;
@@ -466,8 +466,8 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
 
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             await mutations.PublishExistingAsync(tenant.CaveId, revisionB, CaveRevisionSource.ManagerEdit,
                 CaveRevisionOperation.Update, cave => cave.Narrative = "C");
         }
@@ -674,8 +674,8 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {
             await using var transaction = await reviewer.Database.BeginTransactionAsync();
-            var mutations = new CaveMutationRepository(reviewer, reviewer.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser));
+            var mutations = new CaveMutationPersistence(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotReader(reviewer, reviewer.RequestUser));
             var requests = new CaveChangeRequestRepository(reviewer, reviewer.RequestUser);
             var preparation = await mutations.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId);
             (await reviewer.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId)).Name = "Accepted proposal";

@@ -15,6 +15,7 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTestServer fixture)
@@ -161,7 +162,7 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
 
         await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
         {
-            var cleanupTargets = await new AuthoringFileRepository(contributor, contributor.RequestUser, TimeProvider.System)
+            var cleanupTargets = await new AuthoringFileStore(contributor, contributor.RequestUser, TimeProvider.System)
                 .RemoveExpiredAsync(16, default);
             contributor.ChangeTracker.Clear();
             Assert.Empty(cleanupTargets);
@@ -223,8 +224,8 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
         string currentRevisionId;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             currentRevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
                 cave => cave.Narrative = "Published while author is revising")).RevisionId!;

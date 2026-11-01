@@ -9,6 +9,7 @@ using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using Xunit;
 
+using Planarian.Shared.Email.Repositories;
 namespace Planarian.Tests.Unit.Email;
 
 public sealed class EmailServiceResilienceTests
@@ -72,11 +73,12 @@ public sealed class EmailServiceResilienceTests
     {
         var requestUser = new RequestUser(dbContext);
         return new EmailService(
-            new MessageTypeRepository(dbContext, requestUser, null!),
+            new MessageTypeRepository(dbContext, requestUser),
             requestUser,
             null!,
             new ClientUrlBuilder(origin),
             new MessageLogRepository(dbContext, requestUser),
+            null!,
             new EmailOptions { Domain = "mg.example.com" },
             null!,
             NullLogger<EmailService>.Instance);

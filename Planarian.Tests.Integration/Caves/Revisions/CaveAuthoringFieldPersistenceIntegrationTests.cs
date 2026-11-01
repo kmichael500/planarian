@@ -202,7 +202,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
             firstRevisionJson = CaveSnapshotJson.Serialize(snapshot);
             AssertFullPublishedSnapshot(snapshot, references, stagedFileId, primaryEntranceId, secondaryEntranceId,
                 linePlotId);
-            var rebuilt = await new CavePublishedSnapshotRepository(verify.Db, verify.Db.RequestUser)
+            var rebuilt = await new CavePublishedSnapshotReader(verify.Db, verify.Db.RequestUser)
                 .BuildAsync(tenant.CaveId);
             Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
         }
@@ -388,7 +388,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
             Assert.Null(snapshotEntrance.PitDepthFeet);
             Assert.Empty(snapshotEntrance.Tags);
 
-            var rebuilt = await new CavePublishedSnapshotRepository(verify.Db, verify.Db.RequestUser)
+            var rebuilt = await new CavePublishedSnapshotReader(verify.Db, verify.Db.RequestUser)
                 .BuildAsync(tenant.CaveId);
             Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
 
@@ -496,7 +496,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
             firstRevisionId = live.CurrentRevisionId!;
             var revision = await manager.Db.CaveRevisions.SingleAsync(row => row.Id == firstRevisionId);
             var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
-            var rebuilt = await new CavePublishedSnapshotRepository(manager.Db, manager.Db.RequestUser)
+            var rebuilt = await new CavePublishedSnapshotReader(manager.Db, manager.Db.RequestUser)
                 .BuildAsync(tenant.CaveId);
             Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
         }
@@ -571,7 +571,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
 
             var revision = await manager.Db.CaveRevisions.SingleAsync(row => row.Id == live.CurrentRevisionId);
             var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
-            var rebuilt = await new CavePublishedSnapshotRepository(manager.Db, manager.Db.RequestUser)
+            var rebuilt = await new CavePublishedSnapshotReader(manager.Db, manager.Db.RequestUser)
                 .BuildAsync(tenant.CaveId);
             Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
         }
@@ -663,7 +663,7 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
 
         var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
         AssertFullPublishedSnapshot(snapshot, references, stagedFileId, primary.Id, secondary.Id, linePlot.Id);
-        var rebuilt = await new CavePublishedSnapshotRepository(verify.Db, verify.Db.RequestUser)
+        var rebuilt = await new CavePublishedSnapshotReader(verify.Db, verify.Db.RequestUser)
             .BuildAsync(createdCaveId);
         Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
     }

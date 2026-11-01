@@ -12,6 +12,8 @@ using Planarian.Operations.CaveRevisionHistory;
 
 using Planarian.Tests;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 [Collection(ScaleIntegrationCollection.Name)]
@@ -35,7 +37,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
 
         await using (var rollout = database.CreateDbContext("rollout-scale", accountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rollout).InitializeAsync();
             Assert.Equal(CaveCount, result.InitializedCaveCount);
         }
 
@@ -76,7 +78,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
 
         await using (var rollout = database.CreateDbContext("rollout-scale", accountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rollout).InitializeAsync();
             Assert.Equal(CaveCount, result.InitializedCaveCount);
         }
 
@@ -120,7 +122,7 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
 
         await using (var rollout = database.CreateDbContext("rollout", accountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rollout).InitializeAsync();
             Assert.Equal(MultiBatchCount, result.InitializedCaveCount);
         }
 
@@ -159,13 +161,13 @@ public sealed class ReferenceMergeScaleIntegrationTests(PostgresTestServer fixtu
             Assert.Equal(revisionId, finalPointers[caveId]);
     }
 
-    private static TagTypeAdministrationRepository TagRepository(
+    private static TagTypeAdministrationPersistence TagRepository(
         Planarian.Model.Database.PlanarianDbContext db)
     {
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeAdministrationRepository(db, db.RequestUser,
-            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser));
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        return new TagTypeAdministrationPersistence(db, db.RequestUser,
+            new TagReferenceLocker(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(db, db.RequestUser));
     }
 
     private static async Task SeedLegacyBiologyCavesAsync(PostgresTestDatabase database, int caveCount,

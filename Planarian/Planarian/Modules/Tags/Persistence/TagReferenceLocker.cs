@@ -4,7 +4,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Tags.Repositories;
+namespace Planarian.Modules.Tags.Persistence;
 
 public sealed record LockedTagType(string Id, string Name, string Key, string? AccountId, bool IsDefault);
 
@@ -12,11 +12,11 @@ public sealed record LockedTagType(string Id, string Name, string Key, string? A
 /// Coordinates published Cave reference writers with destructive TagType mutations.
 /// The caller owns the transaction; locks remain held until that transaction completes.
 /// </summary>
-public sealed class TagReferenceLockRepository : AccountScopedRepositoryBase
+public sealed class TagReferenceLocker : AccountScopedDataAccessBase
 {
     private const int BatchSize = 500;
 
-    public TagReferenceLockRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
+    public TagReferenceLocker(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
     }
 

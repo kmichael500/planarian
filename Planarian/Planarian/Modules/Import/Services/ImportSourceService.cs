@@ -20,19 +20,19 @@ public sealed class ImportSourceService : AccountServiceBase
     private const int OpportunisticCleanupBatchSize = 16;
     private static readonly TimeSpan UploadLifetime = TimeSpan.FromDays(10);
 
-    private readonly ImportSourceRepository _repository;
+    private readonly ImportSourceStore _store;
     private readonly StorageCleanupService _cleanup;
     private readonly IObjectStorage _objectStorage;
     private readonly TimeProvider _timeProvider;
 
     public ImportSourceService(
-        ImportSourceRepository repository,
+        ImportSourceStore store,
         StorageCleanupService cleanup,
         RequestUser requestUser,
         IObjectStorage objectStorage,
         TimeProvider timeProvider) : base(requestUser)
     {
-        _repository = repository;
+        _store = store;
         _cleanup = cleanup;
         _objectStorage = objectStorage;
         _timeProvider = timeProvider;
@@ -48,7 +48,7 @@ public sealed class ImportSourceService : AccountServiceBase
         var parsed = FileNamePolicy.Parse(fileName);
 
         await _cleanup.CleanupImportSourceTargetsAsync(cancellationToken: CancellationToken.None);
-        var expiredTargetIds = await _repository.RemoveExpiredAsync(
+        var expiredTargetIds = await _store.RemoveExpiredAsync(
             OpportunisticCleanupBatchSize, cancellationToken);
         await _cleanup.CleanupImportSourceTargetsAsync(expiredTargetIds, CancellationToken.None);
 
@@ -78,8 +78,8 @@ public sealed class ImportSourceService : AccountServiceBase
 
             source.BlobContainer = address.Partition;
             source.BlobKey = address.Key;
-            _repository.Add(source);
-            await _repository.SaveChangesAsync(cancellationToken);
+            _store.Add(source);
+            await _store.SaveChangesAsync(cancellationToken);
         }
         catch (StorageObjectAlreadyExistsException)
         {
@@ -103,7 +103,7 @@ public sealed class ImportSourceService : AccountServiceBase
 
     public async Task<Stream> OpenReadAsync(string sourceId, CancellationToken cancellationToken)
     {
-        var source = await _repository.GetAsync(sourceId, cancellationToken);
+        var source = await _store.GetAsync(sourceId, cancellationToken);
         if (source is null)
             throw ApiExceptionDictionary.NotFound("Import source");
 
@@ -133,7 +133,7 @@ public sealed class ImportSourceService : AccountServiceBase
         string sourceId,
         CancellationToken cancellationToken)
     {
-        var source = await _repository.GetAsync(sourceId, cancellationToken);
+        var source = await _store.GetAsync(sourceId, cancellationToken);
         if (source is null || source.ExpiresOn is not null)
             throw ApiExceptionDictionary.NotFound("Import source");
 

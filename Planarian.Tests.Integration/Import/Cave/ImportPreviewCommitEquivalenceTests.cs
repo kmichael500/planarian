@@ -35,14 +35,14 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         var import = new CaveImportTestHarness(db, db.RequestUser);
         var csv = ImportDryRunIntegrationTests.CaveHeader +
             "\nCave A,County A,A01,1,AA,,,,,,,,,,,,,,,false,,\n";
-        var before = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var before = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var revisionBefore = (await db.Caves.IgnoreQueryFilters()
             .SingleAsync(cave => cave.Id == tenant.CaveId)).CurrentRevisionId;
 
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
         await import.ExecuteAsync(plan, "no-change.csv");
         db.ChangeTracker.Clear();
-        var after = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var after = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
 
         Assert.Equal(CaveImportAction.NoChange, Assert.Single(plan.Caves).Action);
         Assert.Equal("no change", Assert.Single(plan.CreatePreview(omitNoChange: false)).Action);
@@ -134,7 +134,7 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         db.ChangeTracker.Clear();
 
         Assert.Equal(expectedAction, planned.Action);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(planned.Id);
         AssertCavePreview(preview, snapshot);
         var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(candidate => candidate.Id == planned.Id);
         Assert.NotNull(cave.CurrentRevisionId);
@@ -162,7 +162,7 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         await import.ExecuteAsync(plan, $"{scenario}.csv");
         db.ChangeTracker.Clear();
 
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var committed = Assert.Single(snapshot.Entrances, entrance => entrance.Id == planned.Id);
         AssertEntrancePreview(preview, committed);
         Assert.Equal(preview.EntranceCountChange, snapshot.Entrances.Count - (seedExisting ? 1 : 0));

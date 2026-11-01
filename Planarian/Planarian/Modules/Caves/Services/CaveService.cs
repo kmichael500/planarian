@@ -30,6 +30,8 @@ using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Modules.Caves.Services;
 
 internal sealed record CaveSaveResult(
@@ -42,15 +44,15 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
-    private readonly TagReferenceLockRepository _tagReferenceLocks;
-    private readonly CountyReferenceLockRepository _countyReferenceLocks;
+    private readonly TagReferenceLocker _tagReferenceLocker;
+    private readonly CountyReferenceLocker _countyReferenceLocker;
     private readonly CaveRevisionDiffService _revisionDiff = new();
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         StorageCleanupService storageCleanup,
         FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
-        CaveMutationCoordinator caveMutationCoordinator, TagReferenceLockRepository tagReferenceLocks,
-        CountyReferenceLockRepository countyReferenceLocks) : base(
+        CaveMutationCoordinator caveMutationCoordinator, TagReferenceLocker tagReferenceLocker,
+        CountyReferenceLocker countyReferenceLocker) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -58,8 +60,8 @@ public class CaveService : ServiceBase<CaveRepository>
         _featureSettingRepository = featureSettingRepository;
         _clientUrlBuilder = clientUrlBuilder;
         _caveMutationCoordinator = caveMutationCoordinator;
-        _tagReferenceLocks = tagReferenceLocks;
-        _countyReferenceLocks = countyReferenceLocks;
+        _tagReferenceLocker = tagReferenceLocker;
+        _countyReferenceLocker = countyReferenceLocker;
     }
 
     #region Caves
@@ -624,8 +626,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 var countyIds = new[] { entity.CountyId, values.CountyId }
                     .Distinct(StringComparer.Ordinal).ToList();
                 var lockedCounties = values.IsCountyNumberManuallySet || isNewCounty
-                    ? await _countyReferenceLocks.LockForMutationAsync(countyIds, cancellationToken)
-                    : await _countyReferenceLocks.LockForReferenceAsync(countyIds, cancellationToken);
+                    ? await _countyReferenceLocker.LockForMutationAsync(countyIds, cancellationToken)
+                    : await _countyReferenceLocker.LockForReferenceAsync(countyIds, cancellationToken);
                 var targetCounty = lockedCounties.SingleOrDefault(county => county.Id == values.CountyId);
                 if (lockedCounties.Count != countyIds.Count || targetCounty?.StateId != values.StateId)
                     throw ApiExceptionDictionary.BadRequest(
@@ -633,7 +635,7 @@ public class CaveService : ServiceBase<CaveRepository>
             }
             else if (values.IsCountyNumberManuallySet || isNewCounty)
             {
-                var lockedCounties = await _countyReferenceLocks.LockForMutationAsync([values.CountyId], cancellationToken);
+                var lockedCounties = await _countyReferenceLocker.LockForMutationAsync([values.CountyId], cancellationToken);
                 if (lockedCounties.Count != 1 || lockedCounties[0].StateId != values.StateId)
                     throw ApiExceptionDictionary.BadRequest(
                         "The selected County does not belong to the selected State.");
@@ -647,7 +649,7 @@ public class CaveService : ServiceBase<CaveRepository>
             var existingTagIds = CollectExistingStableTagTypeIds(entity)
                 .Concat(resolvedTags.TargetExistingIds)
                 .Distinct(StringComparer.Ordinal).ToList();
-            var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingTagIds, cancellationToken);
+            var lockedTags = await _tagReferenceLocker.LockForReferenceAsync(existingTagIds, cancellationToken);
             if (lockedTags.Count != existingTagIds.Count)
                 throw ApiExceptionDictionary.BadRequest(
                     "One or more selected tag references changed or disappeared. Retry with current data.");

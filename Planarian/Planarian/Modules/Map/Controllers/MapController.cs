@@ -89,7 +89,7 @@ public class MapController : PlanarianControllerBase<MapService>
         Response.Headers["Cache-Control"] = "private, no-cache";
         return new JsonResult(element.Value);
     }
-    
+
     [HttpPost("hydrology/gages")]
     [Throttle(RequestsPerMinute = 60)]
     public async Task<ActionResult<IReadOnlyList<NearbyStreamGage>>> GetNearbyStreamGages(

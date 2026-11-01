@@ -22,7 +22,7 @@ public sealed class CaveRevisionRolloutScaleIntegrationTests(PostgresTestServer 
         await SeedTenThousandLegacyCavesAsync(database, accountId);
 
         await using var db = database.CreateDbContext("rollout-scale", accountId);
-        var result = await new CaveRevisionRolloutRepository(db).InitializeAsync();
+        var result = await new CaveRevisionRolloutOperation(db).InitializeAsync();
 
         Assert.Equal(CaveCount, result.InitializedCaveCount);
         Assert.Equal(4, result.BatchCount);

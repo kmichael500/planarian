@@ -9,6 +9,7 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Tests.Integration.AccountReset;
 
 public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServer fixture)
@@ -264,7 +265,7 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         var scopeFactory = new ServiceCollection().BuildServiceProvider()
             .GetRequiredService<IServiceScopeFactory>();
         var coordinator = new ArchiveJobCoordinator(scopeFactory,
-            new Planarian.Modules.Account.Repositories.AccountMaintenanceLockRepository(
+            new Planarian.Modules.Account.Persistence.AccountMaintenanceLockManager(
                 new Planarian.Library.Options.ServerOptions
                 { SqlConnectionString = database.ConnectionString }));
         var blobs = new TestFileBlobStore();
@@ -440,7 +441,7 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(SharedLeaseInAnotherDatabaseConnectionBlocksResetBeforeAnyDeletion));
         var account = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locks = new Planarian.Modules.Account.Repositories.AccountMaintenanceLockRepository(
+        var locks = new Planarian.Modules.Account.Persistence.AccountMaintenanceLockManager(
             new Planarian.Library.Options.ServerOptions { SqlConnectionString = database.ConnectionString });
         await using (var activeWriter = await locks.TryAcquireAsync(account.AccountId, exclusive: false))
         {

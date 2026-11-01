@@ -189,8 +189,8 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
         {
             await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
             var services = IntegrationTestServices.For(reviewer, blobs);
-            var mutations = new CaveMutationCoordinator(new CaveMutationRepository(reviewer, reviewer.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser)));
+            var mutations = new CaveMutationCoordinator(new CaveMutationPersistence(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotReader(reviewer, reviewer.RequestUser)));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => mutations.ExecuteOwnedTransactionAsync(async token =>
             {
@@ -393,8 +393,8 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
                 Name = "Rollback attachment"
             }];
             var services = IntegrationTestServices.For(reviewer);
-            var mutations = new CaveMutationCoordinator(new CaveMutationRepository(reviewer, reviewer.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser)));
+            var mutations = new CaveMutationCoordinator(new CaveMutationPersistence(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotReader(reviewer, reviewer.RequestUser)));
             await Assert.ThrowsAsync<InvalidOperationException>(() => mutations.ExecuteOwnedTransactionAsync(async token =>
             {
                 await services.Caves.ApproveChangeRequestAsync(values, tenant.RevisionId, requestId,

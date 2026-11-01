@@ -11,7 +11,7 @@ using Planarian.Tests;
 
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
-public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServer fixture)
+public sealed class CaveRevisionReaderIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
 {
     [Fact]
@@ -51,19 +51,19 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
         }
 
         await using var db = database.CreateDbContext("user-a", tenant.AccountId);
-        var repository = new CaveRevisionQueryRepository(db, db.RequestUser);
-        var result = await repository.ListAsync(tenant.CaveId, default);
+        var reader = new CaveRevisionReader(db, db.RequestUser);
+        var result = await reader.ListAsync(tenant.CaveId, default);
 
         Assert.NotNull(result);
         Assert.Equal(secondId, result.Value.CurrentRevisionId);
         Assert.Equal([tenant.RevisionId, secondId], result.Value.Item2.Select(row => row.Revision.Id));
-        var comparison = await new CaveRevisionService(new CaveRepository(db, db.RequestUser), repository)
+        var comparison = await new CaveRevisionService(new CaveRepository(db, db.RequestUser), reader)
             .CompareAsync(tenant.CaveId, secondId, default);
         Assert.Equal(tenant.RevisionId, comparison.PreviousRevision!.Id);
         Assert.Equal("Cave A", comparison.Previous!.Name);
         Assert.Equal("Changed cave", comparison.Current.Name);
-        Assert.Null(await repository.ListAsync(other.CaveId, default));
-        Assert.Null(await repository.GetAsync(tenant.CaveId, other.RevisionId, default));
+        Assert.Null(await reader.ListAsync(other.CaveId, default));
+        Assert.Null(await reader.GetAsync(tenant.CaveId, other.RevisionId, default));
     }
 
 
@@ -82,7 +82,7 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
 
         await using var db = database.CreateDbContext("user-a", tenant.AccountId);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new CaveRevisionQueryRepository(db, db.RequestUser).ListAsync(tenant.CaveId, default));
+            new CaveRevisionReader(db, db.RequestUser).ListAsync(tenant.CaveId, default));
         Assert.Contains("Revision history rollout must complete", error.Message, StringComparison.Ordinal);
     }
 
@@ -101,7 +101,7 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
 
         await using var db = database.CreateDbContext("user-a", tenant.AccountId);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new CaveRevisionQueryRepository(db, db.RequestUser).ListAsync(tenant.CaveId, default));
+            new CaveRevisionReader(db, db.RequestUser).ListAsync(tenant.CaveId, default));
     }
 
 }

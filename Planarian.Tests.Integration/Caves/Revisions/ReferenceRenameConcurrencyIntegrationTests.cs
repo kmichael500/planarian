@@ -475,8 +475,8 @@ public sealed class ReferenceRenameConcurrencyIntegrationTests(PostgresTestServe
         db.BiologyTags.Add(new BiologyTag
             { Id = IdGenerator.Generate(), CaveId = cave.CaveId, TagTypeId = tagId });
         await db.SaveChangesAsync();
-        return (await new CaveMutationRepository(db, db.RequestUser,
-                new CavePublishedSnapshotRepository(db, db.RequestUser))
+        return (await new CaveMutationPersistence(db, db.RequestUser,
+                new CavePublishedSnapshotReader(db, db.RequestUser))
             .PublishExistingAsync(cave.CaveId, cave.RevisionId, CaveRevisionSource.ManagerEdit,
                 CaveRevisionOperation.Update, _ => { })).RevisionId!;
     }

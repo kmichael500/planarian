@@ -733,7 +733,7 @@ public sealed class ReferenceRenameRevisionIntegrationTests(PostgresTestServer f
         PostgresTestDatabase database, string accountId, string caveId, string? previousRevisionId)
     {
         await using var db = database.CreateDbContext("publish-current", accountId);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(caveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(caveId);
         var revision = new CaveRevision
         {
             Id = IdGenerator.Generate(),

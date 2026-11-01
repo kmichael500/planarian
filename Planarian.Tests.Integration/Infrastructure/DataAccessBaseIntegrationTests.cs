@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Planarian.Tests;
 
-public sealed class RepositoryBaseIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
+public sealed class DataAccessBaseIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     [Fact]
     public async Task RequestUserConstructionAloneActivatesAccountQueryFilters()
@@ -232,7 +232,7 @@ public sealed class RepositoryBaseIntegrationTests(PostgresTestServer fixture) :
         Kind = CaveImportKind.CaveCsv
     };
 
-    private sealed class TestRepository : RepositoryBase
+    private sealed class TestRepository : DataAccessBase
     {
         public TestRepository(PlanarianDbContext db, RequestUser user) : base(db, user)
         {

@@ -21,7 +21,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         var caveA2 = await CaveTestDataFactory.AddCaveAsync(database, accountA, "legacy002a", "Legacy A2", 2);
         var caveB1 = await CaveTestDataFactory.AddCaveAsync(database, accountB, "legacy001b", "Legacy B1", 1);
 
-        var result = await CaveRevisionRolloutRepository.InitializeAsync(database.ConnectionString);
+        var result = await CaveRevisionRolloutOperation.InitializeAsync(database.ConnectionString);
 
         Assert.False(result.AlreadyComplete);
         Assert.Equal(3, result.InitializedCaveCount);
@@ -58,7 +58,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         Assert.Equal("Legacy A2", names[caveA2.CaveId]);
         Assert.Equal("Legacy B1", names[caveB1.CaveId]);
 
-        var rerun = await CaveRevisionRolloutRepository.InitializeAsync(database.ConnectionString);
+        var rerun = await CaveRevisionRolloutOperation.InitializeAsync(database.ConnectionString);
         Assert.True(rerun.AlreadyComplete);
         Assert.Equal(0, rerun.InitializedCaveCount);
         Assert.Equal(0, rerun.BatchCount);
@@ -81,8 +81,8 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         await using var firstDb = database.CreateDbContext("rollout-a", tenant.AccountId);
         await using var secondDb = database.CreateDbContext("rollout-b", tenant.AccountId);
         var results = await Task.WhenAll(
-            new CaveRevisionRolloutRepository(firstDb).InitializeAsync(),
-            new CaveRevisionRolloutRepository(secondDb).InitializeAsync());
+            new CaveRevisionRolloutOperation(firstDb).InitializeAsync(),
+            new CaveRevisionRolloutOperation(secondDb).InitializeAsync());
 
         Assert.Equal(3, results.Sum(result => result.InitializedCaveCount));
         Assert.Single(results.Where(result => !result.AlreadyComplete));
@@ -108,7 +108,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
 
         await using (var seed = database.CreateDbContext("partial-rollout", tenant.AccountId))
         {
-            var snapshot = await new CavePublishedSnapshotRepository(seed, seed.RequestUser).BuildAsync(first.CaveId);
+            var snapshot = await new CavePublishedSnapshotReader(seed, seed.RequestUser).BuildAsync(first.CaveId);
             var revision = new CaveRevision
             {
                 Id = "rollbase01",
@@ -131,7 +131,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         }
 
         await using var rolloutDb = database.CreateDbContext("resume", tenant.AccountId);
-        var result = await new CaveRevisionRolloutRepository(rolloutDb).InitializeAsync();
+        var result = await new CaveRevisionRolloutOperation(rolloutDb).InitializeAsync();
 
         Assert.False(result.AlreadyComplete);
         Assert.Equal(1, result.InitializedCaveCount);
@@ -160,7 +160,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         string currentRevisionId;
         await using (var rolloutDb = database.CreateDbContext("rollout", tenant.AccountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rolloutDb).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rolloutDb).InitializeAsync();
             Assert.Equal(1, result.InitializedCaveCount);
             currentRevisionId = (await rolloutDb.Caves.IgnoreQueryFilters().AsNoTracking()
                 .SingleAsync(cave => cave.Id == existing.CaveId)).CurrentRevisionId!;
@@ -168,8 +168,8 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
 
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var snapshots = new CavePublishedSnapshotRepository(manager, manager.RequestUser);
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser, snapshots);
+            var snapshots = new CavePublishedSnapshotReader(manager, manager.RequestUser);
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser, snapshots);
             var update = await mutations.PublishExistingAsync(existing.CaveId, currentRevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Name = "Edited after rollout");
             Assert.True(update.CreatedRevision);
@@ -181,7 +181,7 @@ public sealed class CaveRevisionRolloutIntegrationTests(PostgresTestServer fixtu
         await using (var rerunDb = database.CreateDbContext("rerun", tenant.AccountId))
         {
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new CaveRevisionRolloutRepository(rerunDb).InitializeAsync());
+                new CaveRevisionRolloutOperation(rerunDb).InitializeAsync());
             Assert.Contains("history is already active", error.Message, StringComparison.Ordinal);
         }
 

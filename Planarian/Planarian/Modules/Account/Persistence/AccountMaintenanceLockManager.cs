@@ -1,7 +1,7 @@
 using Npgsql;
 using Planarian.Library.Options;
 
-namespace Planarian.Modules.Account.Repositories;
+namespace Planarian.Modules.Account.Persistence;
 
 /// <summary>
 /// PostgreSQL session advisory leases coordinate account maintenance across API instances.
@@ -11,7 +11,7 @@ namespace Planarian.Modules.Account.Repositories;
 /// archive runs per account across replicas without consuming a second long-lived pool slot.
 /// A lost connection releases all of its locks.
 /// </summary>
-public sealed class AccountMaintenanceLockRepository(ServerOptions options)
+public sealed class AccountMaintenanceLockManager(ServerOptions options)
 {
     private const int MaintenanceLockNamespace = 1885434480;
     private const int ArchiveJobLockNamespace = 1885434481;

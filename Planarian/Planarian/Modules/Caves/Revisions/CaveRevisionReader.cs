@@ -13,10 +13,10 @@ public sealed record CaveRevisionQueryRow(
     string? ChangeRequestSubmitterName,
     string? ChangeRequestReviewerName);
 
-public sealed class CaveRevisionQueryRepository : AccountScopedRepositoryBase
+public sealed class CaveRevisionReader : AccountScopedDataAccessBase
 {
 
-    public CaveRevisionQueryRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
+    public CaveRevisionReader(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
     }
 

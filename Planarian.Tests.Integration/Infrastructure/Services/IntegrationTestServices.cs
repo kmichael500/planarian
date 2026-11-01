@@ -32,18 +32,21 @@ using Planarian.Shared.Repositories;
 using Planarian.Shared.Services;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests.Integration.Infrastructure.Services;
 
 /// <summary>Production service graph used by database integration tests.</summary>
 internal sealed class IntegrationTestServices
 {
     private readonly PlanarianDbContext _db;
-    private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly TagReferenceLockRepository _tagLocks;
+    private readonly CavePublishedSnapshotReader _snapshots;
+    private readonly TagReferenceLocker _tagLocks;
     private AccountService? _account;
     private readonly Lazy<ImportService> _imports;
     private readonly ArchiveJobCoordinator _archiveCoordinator;
-    private readonly AccountMaintenanceLockRepository _maintenance;
+    private readonly AccountMaintenanceLockManager _maintenance;
     private readonly AzureBlobTransportService _blobTransport;
     private readonly StorageCleanupService _storageCleanup;
 
@@ -52,7 +55,7 @@ internal sealed class IntegrationTestServices
         string? fileConnectionString = null)
     {
         _db = db;
-        _maintenance = new AccountMaintenanceLockRepository(new ServerOptions
+        _maintenance = new AccountMaintenanceLockManager(new ServerOptions
         { SqlConnectionString = maintenanceConnectionString ?? db.Database.GetDbConnection().ConnectionString });
         _archiveCoordinator = archiveCoordinator ??
             new ArchiveJobCoordinator(new ServiceCollection().BuildServiceProvider()
@@ -62,21 +65,21 @@ internal sealed class IntegrationTestServices
         var tags = new TagRepository(db, user);
         var settings = new SettingsRepository(db, user);
         var fileRepository = new FileRepository(db, user);
-        var snapshots = new CavePublishedSnapshotRepository(db, user);
-        var mutations = new CaveMutationCoordinator(new CaveMutationRepository(db, user, snapshots));
-        var tagLocks = new TagReferenceLockRepository(db, user);
-        var countyLocks = new CountyReferenceLockRepository(db, user);
+        var snapshots = new CavePublishedSnapshotReader(db, user);
+        var mutations = new CaveMutationCoordinator(new CaveMutationPersistence(db, user, snapshots));
+        var tagLocks = new TagReferenceLocker(db, user);
+        var countyLocks = new CountyReferenceLocker(db, user);
         var fileOptions = new FileOptions
             { ConnectionString = fileConnectionString ?? "UseDevelopmentStorage=true" };
         _blobTransport = new IntegrationTestAzureBlobTransportService(fileOptions, blobs);
         _storageCleanup = new StorageCleanupService(
-            new StorageCleanupRepository(db, user),
+            new StorageCleanupStore(db, user),
             user,
             blobs,
             NullLogger<StorageCleanupService>.Instance);
         var files = new FileService(
             fileRepository, user, tags, settings, caves, CreateThrottle(db), mutations, tagLocks,
-            blobs, new AuthoringFileRepository(db, user, TimeProvider.System),
+            blobs, new AuthoringFileStore(db, user, TimeProvider.System),
             _storageCleanup, _blobTransport, TimeProvider.System);
         var notifications = new NotificationService(new NoOpNotificationHubContext());
 
@@ -84,12 +87,12 @@ internal sealed class IntegrationTestServices
         Caves = new CaveService(caves, user, files, _storageCleanup, new FeatureSettingRepository(db, user),
             new ClientUrlBuilder(new FixedClientRequestOrigin()), mutations, tagLocks, countyLocks);
         CaveChangeRequests = new CaveChangeRequestService(new CaveChangeRequestRepository(db, user), caves, Caves,
-            new CaveRevisionQueryRepository(db, user), mutations, files, _storageCleanup, user);
+            new CaveRevisionReader(db, user), mutations, files, _storageCleanup, user);
         _imports = new Lazy<ImportService>(() =>
         {
-            var bulkRevisions = new CaveBulkRevisionRepository(db, user);
+            var bulkRevisions = new CaveBulkRevisionPublisher(db, user);
             var importSources = new ImportSourceService(
-                new ImportSourceRepository(db, user),
+                new ImportSourceStore(db, user),
                 _storageCleanup,
                 user,
                 blobs,
@@ -108,12 +111,12 @@ internal sealed class IntegrationTestServices
                 new ChunkedUploadService(user, _blobTransport, new RequestThrottleOptions()),
                 new CaveImportCsvParser(),
                 new EntranceImportCsvParser(),
-                new CaveImportPlanningRepository(db, user),
-                new EntranceImportPlanningRepository(db, user),
+                new CaveImportPlanningReader(db, user),
+                new EntranceImportPlanningReader(db, user),
                 new CaveImportPlanner(),
                 new EntranceImportPlanner(),
-                new CaveImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks, countyLocks),
-                new EntranceImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks));
+                new CaveImportPersistence(db, user, snapshots, bulkRevisions, tagLocks, countyLocks),
+                new EntranceImportPersistence(db, user, snapshots, bulkRevisions, tagLocks));
         });
         _snapshots = snapshots;
         _tagLocks = tagLocks;
@@ -155,10 +158,10 @@ internal sealed class IntegrationTestServices
         return new AccountService(new AccountRepository(_db, user), user, _blobTransport, _storageCleanup,
             new NotificationService(new NoOpNotificationHubContext()), new FeatureSettingRepository(_db, user),
             _archiveCoordinator, CreateThrottle(_db),
-            new TagTypeAdministrationRepository(_db, user, _tagLocks, _snapshots,
-                new CaveBulkRevisionRepository(_db, user)),
-            new CountyAdministrationRepository(_db, user, new CountyReferenceLockRepository(_db, user), _snapshots,
-                new CaveBulkRevisionRepository(_db, user)),
+            new TagTypeAdministrationPersistence(_db, user, _tagLocks, _snapshots,
+                new CaveBulkRevisionPublisher(_db, user)),
+            new CountyAdministrationPersistence(_db, user, new CountyReferenceLocker(_db, user), _snapshots,
+                new CaveBulkRevisionPublisher(_db, user)),
             NullLogger<AccountService>.Instance, _maintenance);
     }
 

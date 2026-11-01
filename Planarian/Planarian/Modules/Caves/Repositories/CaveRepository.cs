@@ -25,15 +25,18 @@ using Planarian.Shared.Services;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Modules.Caves.Repositories;
 
 public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
     private readonly TimeProvider _timeProvider;
-    private AuthoringFileRepository<TDbContext>? _authoringFiles;
+    private AuthoringFileStore<TDbContext>? _authoringFileStore;
 
-    private AuthoringFileRepository<TDbContext> AuthoringFiles =>
-        _authoringFiles ??= new AuthoringFileRepository<TDbContext>(DbContext, RequestUser, _timeProvider);
+    // CaveRepository also serves read paths that are valid without an active account. Keep the account-bound
+    // authoring store lazy so ordinary reads do not acquire an authoring/account-scope requirement.
+    private AuthoringFileStore<TDbContext> AuthoringFiles =>
+        _authoringFileStore ??= new AuthoringFileStore<TDbContext>(DbContext, RequestUser, _timeProvider);
 
     public CaveRepository(TDbContext dbContext, RequestUser requestUser, TimeProvider? timeProvider = null)
         : base(dbContext, requestUser)
@@ -1264,7 +1267,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             addresses.Add(new StorageCleanupAddress(file.BlobContainer, file.BlobKey));
         }
 
-        return await StorageCleanupRepository.QueueAsync(
+        return await StorageCleanupStore.QueueAsync(
             DbContext,
             accountId,
             RequestUser.Id,

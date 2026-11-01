@@ -61,13 +61,13 @@ sequenceDiagram
 
 Open CaveChangeRequests block hard deletion.
 
-The “Cave mutation boundary” above is `CaveMutationCoordinator` delegating transaction/history work to `CaveMutationRepository`. The delete revision preserves the final semantic Cave snapshot even after the live Cave row is gone.
+The “Cave mutation boundary” above is `CaveMutationCoordinator` delegating transaction/history work to `CaveMutationPersistence`. The delete revision preserves the final semantic Cave snapshot even after the live Cave row is gone.
 
 ## Sync-import delete
 
 Cave import with sync enabled can also delete Caves.
 
-The execution repository performs equivalent safety checks in a set-oriented way:
+The Cave import persistence component performs equivalent safety checks in a set-oriented way:
 
 - verify current account;
 - reject open proposal conflicts;

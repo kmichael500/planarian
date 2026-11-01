@@ -8,6 +8,8 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests;
 
 public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
@@ -76,11 +78,11 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
             "Replacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,\n");
         var plan = await planner.PlanAsync(csv, true);
         Assert.Contains(plan.Deletions, x => x.CaveId == t.CaveId);
-        var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        var result = await new CaveImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveBulkRevisionRepository(db, db.RequestUser),
-            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
-            new CountyReferenceLockRepository(db, db.RequestUser))
+        var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
+        var result = await new CaveImportPersistence(db, db.RequestUser, reader,
+            new CaveBulkRevisionPublisher(db, db.RequestUser),
+            new Planarian.Modules.Tags.Persistence.TagReferenceLocker(db, db.RequestUser),
+            new CountyReferenceLocker(db, db.RequestUser))
             .ExecuteAsync(plan, "delete.csv");
         Assert.False(await db.Caves.IgnoreQueryFilters().AnyAsync(c => c.Id == t.CaveId));
         var cleanup = Assert.Single(await db.StorageCleanupTargets.AsNoTracking()
@@ -127,15 +129,15 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
             ImportDryRunIntegrationTests.CaveHeader + "\n" +
             "Replacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,\n");
         var plan = await planner.PlanAsync(csv, true);
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        var executor = new CaveImportExecutionRepository(
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        var persistence = new CaveImportPersistence(
             db, db.RequestUser, snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser),
-            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
-            new CountyReferenceLockRepository(db, db.RequestUser));
+            new CaveBulkRevisionPublisher(db, db.RequestUser),
+            new Planarian.Modules.Tags.Persistence.TagReferenceLocker(db, db.RequestUser),
+            new CountyReferenceLocker(db, db.RequestUser));
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            executor.ExecuteAsync(plan, "delete-partial-address.csv"));
+            persistence.ExecuteAsync(plan, "delete-partial-address.csv"));
         Assert.Contains("incomplete object-storage address", failure.Message, StringComparison.Ordinal);
 
         db.ChangeTracker.Clear();

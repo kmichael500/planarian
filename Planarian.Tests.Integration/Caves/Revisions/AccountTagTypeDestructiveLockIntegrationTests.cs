@@ -12,6 +12,8 @@ using Planarian.Tests.Integration.Infrastructure.Actors;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestServer fixture)
@@ -53,7 +55,7 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
 
         await using var referenceDb = database.CreateDbContext("writer", cave.AccountId);
         await using var referenceTransaction = await referenceDb.Database.BeginTransactionAsync();
-        Assert.Single(await new TagReferenceLockRepository(referenceDb, referenceDb.RequestUser)
+        Assert.Single(await new TagReferenceLocker(referenceDb, referenceDb.RequestUser)
             .LockForReferenceAsync([tag.Id]));
 
         await using var deleteDb = database.CreateDbContext("manager", cave.AccountId);
@@ -141,13 +143,13 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == cave.CaveId));
     }
 
-    private static TagTypeAdministrationRepository TagAdministration(
+    private static TagTypeAdministrationPersistence TagAdministration(
         Planarian.Model.Database.PlanarianDbContext db)
     {
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeAdministrationRepository(db, db.RequestUser,
-            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser));
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        return new TagTypeAdministrationPersistence(db, db.RequestUser,
+            new TagReferenceLocker(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(db, db.RequestUser));
     }
 
     private static async Task<string> AttachBiologyAndPublishAsync(PostgresTestDatabase database,
@@ -157,8 +159,8 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         db.BiologyTags.Add(new BiologyTag
             { Id = IdGenerator.Generate(), CaveId = cave.CaveId, TagTypeId = tagId });
         await db.SaveChangesAsync();
-        var mutation = await new CaveMutationRepository(db, db.RequestUser,
-                new CavePublishedSnapshotRepository(db, db.RequestUser))
+        var mutation = await new CaveMutationPersistence(db, db.RequestUser,
+                new CavePublishedSnapshotReader(db, db.RequestUser))
             .PublishExistingAsync(cave.CaveId, cave.RevisionId, CaveRevisionSource.ManagerEdit,
                 CaveRevisionOperation.Update, _ => { });
         return mutation.RevisionId!;

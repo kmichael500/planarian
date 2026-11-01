@@ -25,8 +25,8 @@ The server does not treat these as independent publications. A File-only or line
 - CaveController — HTTP boundary;
 - CaveService — authorization, normalization, aggregate orchestration;
 - CaveMutationCoordinator — thin publication boundary;
-- CaveMutationRepository — transaction, baseline/revision conflict, semantic revision publication;
-- CavePublishedSnapshotRepository — canonical semantic snapshot;
+- CaveMutationPersistence — transaction, baseline/revision conflict, semantic revision publication;
+- CavePublishedSnapshotReader — canonical semantic snapshot;
 - CaveRevisionDiffService — semantic comparison;
 - CaveRepository — current aggregate persistence and locking helpers.
 
@@ -39,9 +39,9 @@ sequenceDiagram
     participant API as CaveController
     participant Service as CaveService
     participant Coord as CaveMutationCoordinator
-    participant Mutation as CaveMutationRepository
+    participant Mutation as CaveMutationPersistence
     participant Current as CaveRepository
-    participant Snapshot as CavePublishedSnapshotRepository
+    participant Snapshot as CavePublishedSnapshotReader
     participant DB as PostgreSQL
 
     User->>UI: Edit Cave loaded at revision R10
@@ -100,7 +100,7 @@ sequenceDiagram
 
 Every Cave that already exists when revision history is enabled receives exactly one system-generated rollout revision before the new API serves requests. That revision uses `Source = SystemBaseline` and `Operation = Baseline`; its canonical snapshot records the Cave exactly as it existed at the rollout boundary. It does **not** mean the Cave was created at that time or that no earlier changes occurred.
 
-The rollout runs as a deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. The coordinated deployment keeps the API stopped until the operation completes and verifies that no live Cave has `CurrentRevisionId = null`; normal web startup contains no deployment/rollout command path.
+The rollout runs as a deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotReader` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. The coordinated deployment keeps the API stopped until the operation completes and verifies that no live Cave has `CurrentRevisionId = null`; normal web startup contains no deployment/rollout command path.
 
 After rollout, an existing Cave without `CurrentRevisionId` is an integrity/deployment error. Ordinary reads, authoring-context reads, interactive writes, and bulk writes never manufacture a late baseline. A Cave created after rollout instead receives its ordinary `Create` revision atomically with creation.
 
@@ -123,7 +123,7 @@ ConnectionStrings__default="<scoped database connection>" \
   dotnet Planarian.Operations.dll initialize-cave-revision-history
 ```
 
-`Planarian.Operations` is a small console host, not the web application. Its `Program.cs` is generic and only dispatches registered operation names. The temporary Cave operation and its `CaveRevisionRolloutRepository` live entirely in the Operations project; that repository owns the EF/Npgsql setup and rollout mechanics and uses the permanent shared snapshot repository only for canonical snapshot construction. It does not start Kestrel or load Azure App Configuration. A successful rerun is a no-op and reports the existing history boundary.
+`Planarian.Operations` is a small console host, not the web application. Its `Program.cs` is generic and only dispatches registered operation names. The temporary Cave operation and its `CaveRevisionRolloutOperation` live entirely in the Operations project; that operation owns the EF/Npgsql setup and rollout mechanics and uses the permanent shared snapshot reader only for canonical snapshot construction. It does not start Kestrel or load Azure App Configuration. A successful rerun is a no-op and reports the existing history boundary.
 
 The API runtime has no rollout command, readiness check, or deployment-history knowledge. The coordinated deployment owns the safety boundary: it keeps the old API quiesced, requires the Operations command to complete successfully, and only then deploys/starts the new API.
 
@@ -146,7 +146,7 @@ It excludes:
 - full line-plot GeoJSON;
 - transient editor/UI state.
 
-CavePublishedSnapshotRepository builds snapshots using bounded projection groups instead of loading a massive tracked graph. The same snapshot shape is used by interactive and bulk publication, and both engines use `CaveRevisionDiffService` to decide semantic equality against the appropriate published baseline.
+CavePublishedSnapshotReader builds snapshots using bounded projection groups instead of loading a massive tracked graph. The same snapshot shape is used by interactive and bulk publication, and both engines use `CaveRevisionDiffService` to decide semantic equality against the appropriate published baseline.
 
 ## Files during publication
 
@@ -189,7 +189,7 @@ The final revision is a tombstone/history event and does not require the Cave ro
 
 ## Other single-Cave workflows
 
-The aggregate editor is the supported normal interactive authoring surface, but `CaveMutationRepository` is also used by other one-Cave workflows:
+The aggregate editor is the supported normal interactive authoring surface, but `CaveMutationPersistence` is also used by other one-Cave workflows:
 
 - Cave archive/unarchive uses `PublishExistingAsync`;
 - hard delete uses prepare + `PublishPreparedDeleteAsync`;

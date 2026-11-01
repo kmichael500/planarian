@@ -6,7 +6,7 @@ using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Shared.Base;
 
-namespace Planarian.Shared.Email.Services;
+namespace Planarian.Shared.Email.Repositories;
 
 public enum MessageLogEventRecordResult
 {

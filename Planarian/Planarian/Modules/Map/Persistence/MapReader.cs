@@ -8,13 +8,13 @@ using Planarian.Modules.Map.Models;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Map.Controllers;
+namespace Planarian.Modules.Map.Persistence;
 
-public class MapRepository : RepositoryBase
+public class MapReader : DataAccessBase
 {
     private readonly CaveRepository _caveRepository;
 
-    public MapRepository(
+    public MapReader(
         PlanarianDbContext dbContext,
         RequestUser requestUser,
         CaveRepository caveRepository) : base(dbContext, requestUser)
@@ -218,12 +218,12 @@ public class MapRepository : RepositoryBase
         await conn.OpenAsync(cancellationToken);
 
         await using var cmd = new Npgsql.NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("west",       west);
-        cmd.Parameters.AddWithValue("south",      south);
-        cmd.Parameters.AddWithValue("east",       east);
-        cmd.Parameters.AddWithValue("north",      north);
-        cmd.Parameters.AddWithValue("accountId",  RequestUser.AccountId);
-        cmd.Parameters.AddWithValue("userId",     RequestUser.Id);
+        cmd.Parameters.AddWithValue("west", west);
+        cmd.Parameters.AddWithValue("south", south);
+        cmd.Parameters.AddWithValue("east", east);
+        cmd.Parameters.AddWithValue("north", north);
+        cmd.Parameters.AddWithValue("accountId", RequestUser.AccountId);
+        cmd.Parameters.AddWithValue("userId", RequestUser.Id);
 
         var ids = new List<string>();
         await using var rdr = await cmd.ExecuteReaderAsync(cancellationToken);
@@ -258,5 +258,5 @@ public class MapRepository : RepositoryBase
             .Parse(record.GeoJson)
             .RootElement;
     }
-    
+
 }

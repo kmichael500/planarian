@@ -18,6 +18,7 @@ using Planarian.Shared.Base;
 using Planarian.Shared.Models;
 using Planarian.Shared.Services;
 
+using Planarian.Modules.Account.Persistence;
 namespace Planarian.Modules.Account.Services;
 
 [Authorize(Policy = PermissionPolicyKey.Admin)]
@@ -29,17 +30,17 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ArchiveJobCoordinator _archiveJobCoordinator;
     private readonly RequestThrottleService _requestThrottleService;
-    private readonly TagTypeAdministrationRepository _tagTypes;
-    private readonly CountyAdministrationRepository _counties;
+    private readonly TagTypeAdministrationPersistence _tagTypes;
+    private readonly CountyAdministrationPersistence _counties;
     private readonly ILogger<AccountService> _logger;
-    private readonly AccountMaintenanceLockRepository _maintenance;
+    private readonly AccountMaintenanceLockManager _maintenance;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, AzureBlobTransportService blobStorage,
         StorageCleanupService storageCleanup,
         NotificationService notificationService, FeatureSettingRepository featureSettingRepository,
         ArchiveJobCoordinator archiveJobCoordinator, RequestThrottleService requestThrottleService,
-        TagTypeAdministrationRepository tagTypes, CountyAdministrationRepository counties,
-        ILogger<AccountService> logger, AccountMaintenanceLockRepository maintenance) : base(repository, requestUser)
+        TagTypeAdministrationPersistence tagTypes, CountyAdministrationPersistence counties,
+        ILogger<AccountService> logger, AccountMaintenanceLockManager maintenance) : base(repository, requestUser)
     {
         _blobStorage = blobStorage;
         _storageCleanup = storageCleanup;

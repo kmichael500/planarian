@@ -19,7 +19,7 @@ public partial class ImportService
         await using (var stream = await _importSourceService.OpenReadAsync(temporaryFileId, cancellationToken))
         {
             var records = await _entranceParser.ParseAsync(stream, cancellationToken);
-            var state = await _entrancePlanningRepository.LoadAsync(records, cancellationToken);
+            var state = await _entrancePlanningReader.LoadAsync(records, cancellationToken);
             plan = _entrancePlanner.Plan(records, state, syncExisting, cancellationToken);
         }
 
@@ -30,7 +30,7 @@ public partial class ImportService
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying entrance import");
-        await _entranceExecutor.ExecuteUploadedAsync(plan, temporaryFileId, cancellationToken);
+        await _entrancePersistence.ExecuteUploadedAsync(plan, temporaryFileId, cancellationToken);
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished entrance import");
         return preview;

@@ -13,12 +13,12 @@ namespace Planarian.Modules.Caves.Revisions;
 /// Uses the same canonical snapshot and semantic-diff contract as interactive publication while keeping
 /// the persistence path set-oriented. Existing Caves must already have rollout revision history initialized.
 /// </summary>
-public sealed class CaveBulkRevisionRepository : AccountScopedRepositoryBase
+public sealed class CaveBulkRevisionPublisher : AccountScopedDataAccessBase
 {
     private const int BatchSize = 1000;
     private readonly CaveRevisionDiffService _diff = new();
 
-    public CaveBulkRevisionRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
+    public CaveBulkRevisionPublisher(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
     }
 

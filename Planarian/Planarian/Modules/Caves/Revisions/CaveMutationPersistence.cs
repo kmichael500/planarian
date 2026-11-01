@@ -20,14 +20,14 @@ public sealed record CaveMutationPreparation(
     CavePublishedSnapshotV1 PreviousRevisionSnapshot,
     CavePublishedSnapshotV1 LiveSnapshotBeforeMutation);
 
-public sealed class CaveMutationRepository : AccountScopedRepositoryBase
+public sealed class CaveMutationPersistence : AccountScopedDataAccessBase
 {
-    private readonly CavePublishedSnapshotRepository _snapshots;
+    private readonly CavePublishedSnapshotReader _snapshotReader;
     private readonly CaveRevisionDiffService _diff = new();
 
-    public CaveMutationRepository(PlanarianDbContext db, RequestUser requestUser, CavePublishedSnapshotRepository snapshots) : base(db, requestUser)
+    public CaveMutationPersistence(PlanarianDbContext db, RequestUser requestUser, CavePublishedSnapshotReader snapshotReader) : base(db, requestUser)
     {
-        _snapshots = snapshots;
+        _snapshotReader = snapshotReader;
     }
 
     /// <summary>Joins the current transaction when present; otherwise owns begin/commit/rollback.</summary>
@@ -78,7 +78,7 @@ public sealed class CaveMutationRepository : AccountScopedRepositoryBase
             throw new CaveRevisionConflictException(caveId, expectedRevisionId, cave.CurrentRevisionId);
 
         var previous = await GetCurrentRevisionAsync(cave, cancellationToken);
-        var live = await _snapshots.BuildAsync(caveId, cancellationToken);
+        var live = await _snapshotReader.BuildAsync(caveId, cancellationToken);
         return new CaveMutationPreparation(caveId, previous.Revision, previous.Snapshot, live);
     }
 
@@ -96,7 +96,7 @@ public sealed class CaveMutationRepository : AccountScopedRepositoryBase
             throw new CaveRevisionConflictException(preparation.CaveId, preparation.PreviousRevision.Id,
                 cave.CurrentRevisionId);
 
-        var current = await _snapshots.BuildAsync(preparation.CaveId, cancellationToken);
+        var current = await _snapshotReader.BuildAsync(preparation.CaveId, cancellationToken);
         if (_diff.IsSemanticEqual(preparation.PreviousRevisionSnapshot, current))
             return new CaveMutationResult(preparation.CaveId, cave.CurrentRevisionId, false);
 
@@ -118,7 +118,7 @@ public sealed class CaveMutationRepository : AccountScopedRepositoryBase
         if (cave.CurrentRevisionId is not null)
             throw new CaveRevisionConflictException(caveId, null, cave.CurrentRevisionId);
 
-        var snapshot = await _snapshots.BuildAsync(cave.Id, cancellationToken);
+        var snapshot = await _snapshotReader.BuildAsync(cave.Id, cancellationToken);
         var revision = NewRevision(cave.AccountId, cave.Id, null, snapshot, source, operation, changeRequestId,
             importBatchId);
         DbContext.CaveRevisions.Add(revision);

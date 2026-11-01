@@ -17,6 +17,8 @@ using Xunit;
 
 using Planarian.Tests;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Import.Golden;
 
 public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixture)
@@ -220,11 +222,11 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         var actualPreview = GoldenPreview.From(plan);
         AssertGoldenEqual(item.TargetPreview, actualPreview, $"{item.Area}/{item.Behavior} preview");
 
-        var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        await new CaveImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveBulkRevisionRepository(db, db.RequestUser),
-            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
-            new CountyReferenceLockRepository(db, db.RequestUser))
+        var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
+        await new CaveImportPersistence(db, db.RequestUser, reader,
+            new CaveBulkRevisionPublisher(db, db.RequestUser),
+            new Planarian.Modules.Tags.Persistence.TagReferenceLocker(db, db.RequestUser),
+            new CountyReferenceLocker(db, db.RequestUser))
             .ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 
@@ -256,10 +258,10 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         var actualPreview = GoldenPreview.From(plan);
         AssertGoldenEqual(item.TargetPreview, actualPreview, $"{item.Area}/{item.Behavior} preview");
 
-        var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        await new EntranceImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveBulkRevisionRepository(db, db.RequestUser),
-            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser))
+        var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
+        await new EntranceImportPersistence(db, db.RequestUser, reader,
+            new CaveBulkRevisionPublisher(db, db.RequestUser),
+            new Planarian.Modules.Tags.Persistence.TagReferenceLocker(db, db.RequestUser))
             .ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 

@@ -47,8 +47,8 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
         string currentRevisionId;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             currentRevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
                 cave => cave.Narrative = "Independent publication")).RevisionId!;
@@ -212,7 +212,7 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
         var published = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
         Assert.Equal("Approved Cave", published.Name);
         Assert.Single(published.Entrances);
-        var normalized = await new CavePublishedSnapshotRepository(verify, verify.RequestUser)
+        var normalized = await new CavePublishedSnapshotReader(verify, verify.RequestUser)
             .BuildAsync(tenant.CaveId);
         Assert.Equal(CaveSnapshotJson.Serialize(normalized), CaveSnapshotJson.Serialize(published));
         Assert.Equal("Approved Cave", (await verify.Caves.IgnoreQueryFilters()
@@ -240,8 +240,8 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
         }
         await using (var baseline = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutation = await new CaveMutationRepository(baseline, baseline.RequestUser,
-                    new CavePublishedSnapshotRepository(baseline, baseline.RequestUser))
+            var mutation = await new CaveMutationPersistence(baseline, baseline.RequestUser,
+                    new CavePublishedSnapshotReader(baseline, baseline.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, cave => cave.Narrative = "Baseline with entrance tags");
             tenant = tenant with { RevisionId = mutation.RevisionId! };

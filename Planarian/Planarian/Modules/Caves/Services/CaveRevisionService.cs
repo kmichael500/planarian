@@ -9,10 +9,10 @@ namespace Planarian.Modules.Caves.Services;
 public sealed class CaveRevisionService
 {
     private readonly CaveRepository _caves;
-    private readonly CaveRevisionQueryRepository _revisions;
+    private readonly CaveRevisionReader _revisions;
     private readonly CaveRevisionDiffService _diff = new();
 
-    public CaveRevisionService(CaveRepository caves, CaveRevisionQueryRepository revisions)
+    public CaveRevisionService(CaveRepository caves, CaveRevisionReader revisions)
     {
         _caves = caves;
         _revisions = revisions;

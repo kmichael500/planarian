@@ -7,19 +7,23 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Revisions;
 
-public sealed class CavePublishedSnapshotRepository
+public sealed class CavePublishedSnapshotReader
 {
     internal const int ProjectionChunkSize = 2500;
     private readonly PlanarianDbContext _db;
     private readonly string _accountId;
 
-    public CavePublishedSnapshotRepository(PlanarianDbContext db, RequestUser requestUser)
+    public CavePublishedSnapshotReader(PlanarianDbContext db, RequestUser requestUser)
     {
+        if (!ReferenceEquals(db.RequestUser, requestUser))
+            throw new InvalidOperationException(
+                "A snapshot reader RequestUser must be bound to the same DbContext instance.");
+
         _db = db;
         _accountId = AccountExecutionScope.Require(requestUser).AccountId;
     }
 
-    private CavePublishedSnapshotRepository(PlanarianDbContext db, string trustedAccountId)
+    private CavePublishedSnapshotReader(PlanarianDbContext db, string trustedAccountId)
     {
         _db = db;
         _accountId = string.IsNullOrWhiteSpace(trustedAccountId)
@@ -31,7 +35,7 @@ public sealed class CavePublishedSnapshotRepository
     /// Trusted non-request entry point for explicitly account-scoped system work.
     /// Normal request paths must derive tenant scope from RequestUser.
     /// </summary>
-    internal static CavePublishedSnapshotRepository ForTrustedAccountScope(PlanarianDbContext db, string accountId) =>
+    internal static CavePublishedSnapshotReader ForTrustedAccountScope(PlanarianDbContext db, string accountId) =>
         new(db, accountId);
 
     public async Task<CavePublishedSnapshotV1> BuildAsync(string caveId, CancellationToken cancellationToken = default)

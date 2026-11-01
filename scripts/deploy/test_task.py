@@ -12,7 +12,7 @@ TASK = REPO_ROOT / "scripts/deploy/tasks/cave-revision-history.sh"
 MIGRATION = "Planarian/Planarian.Migrations/Migrations/20261029194500_CaveRevisionsCompletion.cs"
 MANIFEST = "scripts/deploy/tasks/cave-revision-history.json"
 OPERATIONS = "Planarian/Planarian.Operations/CaveRevisionHistory/InitializeCaveRevisionHistoryOperation.cs"
-CAVE_REVISIONS = "Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutRepository.cs"
+ROLLOUT_OPERATION = "Planarian/Planarian.Operations/CaveRevisionHistory/CaveRevisionRolloutOperation.cs"
 
 
 class CaveRevisionHistoryTaskTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class CaveRevisionHistoryTaskTests(unittest.TestCase):
             [MANIFEST],
             [TASK.relative_to(REPO_ROOT).as_posix()],
             [OPERATIONS],
-            [CAVE_REVISIONS],
+            [ROLLOUT_OPERATION],
         ):
             selected = select_release_tasks(changed, first_release=False, root=REPO_ROOT)
             self.assertEqual(["cave-revision-history"], [task.task_id for task in selected])

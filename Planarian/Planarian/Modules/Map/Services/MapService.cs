@@ -3,26 +3,28 @@ using System.Text.Json;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Map.Models;
-using Planarian.Modules.Map.Services;
 using Planarian.Modules.Map.Services.Hydrology;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Map.Controllers;
+using Planarian.Modules.Map.Persistence;
+namespace Planarian.Modules.Map.Services;
 
-public class MapService : ServiceBase<MapRepository>
+public class MapService : ServiceBase
 {
+    private readonly MapReader _mapReader;
     private readonly GeologicMapHttpClient _geologicMapHttpClient;
     private readonly IReadOnlyCollection<IHydrologyProvider> _hydrologyProviders;
     private readonly UsgsWaterDataClient _usgsWaterDataClient;
 
     public MapService(
-        MapRepository repository,
+        MapReader mapReader,
         RequestUser requestUser,
         GeologicMapHttpClient geologicMapHttpClient,
         IEnumerable<IHydrologyProvider> hydrologyProviders,
-        UsgsWaterDataClient usgsWaterDataClient) : base(repository, requestUser)
+        UsgsWaterDataClient usgsWaterDataClient) : base(requestUser)
     {
+        _mapReader = mapReader;
         _geologicMapHttpClient = geologicMapHttpClient;
         _hydrologyProviders = hydrologyProviders.ToList();
         _usgsWaterDataClient = usgsWaterDataClient;
@@ -30,11 +32,11 @@ public class MapService : ServiceBase<MapRepository>
 
     public Task<IEnumerable<object>> GetMapData(
         double north, double south, double east, double west, int zoom, CancellationToken cancellationToken) =>
-        Repository.GetMapData(north, south, east, west, zoom, cancellationToken);
+        _mapReader.GetMapData(north, south, east, west, zoom, cancellationToken);
 
     public async Task<CoordinateDto> GetMapCenter()
     {
-        var result = await Repository.GetMapCenter();
+        var result = await _mapReader.GetMapCenter();
 
         return result;
     }
@@ -48,17 +50,17 @@ public class MapService : ServiceBase<MapRepository>
     {
         filterQuery ??= new FilterQuery();
 
-        var result = await Repository.GetEntrancesMVTAsync(z, x, y, filterQuery, cancellationToken);
+        var result = await _mapReader.GetEntrancesMVTAsync(z, x, y, filterQuery, cancellationToken);
         return result;
     }
-    
+
     public Task<List<string>> GetLinePlotIds(
         double north, double south, double east, double west, double zoom, CancellationToken ct) =>
-        Repository.GetLinePlotIds(north, south, east, west, zoom, ct);
+        _mapReader.GetLinePlotIds(north, south, east, west, zoom, ct);
 
     public Task<System.Text.Json.JsonElement?> GetLinePlotGeoJson(
         string plotId, CancellationToken ct) =>
-        Repository.GetLinePlotGeoJson(plotId, ct);
+        _mapReader.GetLinePlotGeoJson(plotId, ct);
 
     public Task<IReadOnlyList<NearbyStreamGage>> GetNearbyStreamGages(
         StreamGageRequest request,

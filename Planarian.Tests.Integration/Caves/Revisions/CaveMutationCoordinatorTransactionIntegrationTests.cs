@@ -22,8 +22,8 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
-            var coordinator = new CaveMutationRepository(db, db.RequestUser,
-                new CavePublishedSnapshotRepository(db, db.RequestUser));
+            var coordinator = new CaveMutationPersistence(db, db.RequestUser,
+                new CavePublishedSnapshotReader(db, db.RequestUser));
             var preparation = await coordinator.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId);
             var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == tenant.CaveId);
             cave.Name = "Manager updated";
@@ -58,8 +58,8 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
-            var coordinator = new CaveMutationRepository(db, db.RequestUser,
-                new CavePublishedSnapshotRepository(db, db.RequestUser));
+            var coordinator = new CaveMutationPersistence(db, db.RequestUser,
+                new CavePublishedSnapshotReader(db, db.RequestUser));
             var preparation = await coordinator.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId);
             var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == tenant.CaveId);
             db.Caves.Remove(cave);
@@ -91,8 +91,8 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
-            var coordinator = new CaveMutationRepository(db, db.RequestUser,
-                new CavePublishedSnapshotRepository(db, db.RequestUser));
+            var coordinator = new CaveMutationPersistence(db, db.RequestUser,
+                new CavePublishedSnapshotReader(db, db.RequestUser));
             var preparation = await coordinator.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId);
             var result = await coordinator.PublishPreparedAsync(
                 preparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update);

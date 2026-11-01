@@ -9,7 +9,7 @@ using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
-namespace Planarian.Modules.Files.Repositories;
+namespace Planarian.Modules.Files.Persistence;
 
 public sealed record AuthoringFileAccess(
     string Id,
@@ -29,12 +29,12 @@ public sealed record AuthoringStagedObject(
 /// Cave publication. Proposal claims protect a staged File from expiration; unclaimed
 /// Files remain creator-owned and deadline-bound.
 /// </summary>
-public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<TDbContext>
+public class AuthoringFileStore<TDbContext> : AccountScopedDataAccessBase<TDbContext>
     where TDbContext : PlanarianDbContextBase
 {
     private readonly TimeProvider _timeProvider;
 
-    public AuthoringFileRepository(
+    public AuthoringFileStore(
         TDbContext dbContext,
         RequestUser requestUser,
         TimeProvider? timeProvider = null) : base(dbContext, requestUser)
@@ -373,7 +373,7 @@ public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<T
                 .AnyAsync(staged => staged.AccountId == AccountId && staged.FileId == id, token);
             if (claimed) return [];
 
-            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+            var cleanupTargets = await StorageCleanupStore.QueueAsync(
                 DbContext,
                 AccountId,
                 UserId,
@@ -442,7 +442,7 @@ public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<T
                 .ToList();
             if (deletable.Count == 0) return [];
 
-            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+            var cleanupTargets = await StorageCleanupStore.QueueAsync(
                 DbContext,
                 AccountId,
                 UserId,
@@ -503,7 +503,7 @@ public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<T
                                staged.AccountId == AccountId && staged.FileId == file.Id))
             .ToListAsync(cancellationToken);
 
-        var targets = await StorageCleanupRepository.QueueAsync(
+        var targets = await StorageCleanupStore.QueueAsync(
             DbContext,
             AccountId,
             UserId,
@@ -531,9 +531,9 @@ public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<T
         .FirstOrDefaultAsync(cancellationToken);
 }
 
-public sealed class AuthoringFileRepository : AuthoringFileRepository<PlanarianDbContext>
+public sealed class AuthoringFileStore : AuthoringFileStore<PlanarianDbContext>
 {
-    public AuthoringFileRepository(
+    public AuthoringFileStore(
         PlanarianDbContext dbContext,
         RequestUser requestUser,
         TimeProvider timeProvider)

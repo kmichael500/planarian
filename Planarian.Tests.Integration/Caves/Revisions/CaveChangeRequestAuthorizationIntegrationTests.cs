@@ -61,7 +61,7 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 service.OpenStagedFileAsync(requestId, file.FileId, default));
             var revisions = new CaveRevisionService(new CaveRepository(revoked.Db, revoked.Db.RequestUser),
-                new CaveRevisionQueryRepository(revoked.Db, revoked.Db.RequestUser));
+                new CaveRevisionReader(revoked.Db, revoked.Db.RequestUser));
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 revisions.ListAsync(tenant.CaveId, default));
         }

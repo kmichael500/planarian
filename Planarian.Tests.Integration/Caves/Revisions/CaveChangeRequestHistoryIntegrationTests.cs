@@ -62,7 +62,7 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
         var requestService = IntegrationTestServices.For(reviewerDb).CaveChangeRequests;
         await requestService.ApproveAsync(requestId, await CurrentVersionAsync(reviewerDb, requestId), null, default);
         var history = await new CaveRevisionService(new CaveRepository(reviewerDb, reviewerDb.RequestUser),
-            new CaveRevisionQueryRepository(reviewerDb, reviewerDb.RequestUser)).ListAsync(tenant.CaveId, default);
+            new CaveRevisionReader(reviewerDb, reviewerDb.RequestUser)).ListAsync(tenant.CaveId, default);
 
         var approved = Assert.Single(history.Revisions, revision => revision.ChangeRequestId == requestId);
         Assert.Equal(contributorId, approved.ChangeRequestSubmitterUserId);
@@ -269,8 +269,8 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
         string revisionB;
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             revisionB = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave =>
                 {
@@ -393,7 +393,7 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
             approvedRevisionId = (await requestService.ApproveAsync(requestId,
                 await CurrentVersionAsync(reviewer, requestId), null, default)).PublishedRevisionId!;
             var history = await new CaveRevisionService(new CaveRepository(reviewer, reviewer.RequestUser),
-                new CaveRevisionQueryRepository(reviewer, reviewer.RequestUser))
+                new CaveRevisionReader(reviewer, reviewer.RequestUser))
                 .CompareAsync(tagged.Cave.CaveId, approvedRevisionId, default);
             Assert.Contains(history.Diff!.RemovedTags,
                 tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
@@ -438,7 +438,7 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
             revisionId = (await manager.Caves.IgnoreQueryFilters().SingleAsync(caveRow =>
                 caveRow.Id == tagged.Cave.CaveId)).CurrentRevisionId!;
             var history = await new CaveRevisionService(new CaveRepository(manager, manager.RequestUser),
-                new CaveRevisionQueryRepository(manager, manager.RequestUser))
+                new CaveRevisionReader(manager, manager.RequestUser))
                 .CompareAsync(tagged.Cave.CaveId, revisionId, default);
             Assert.Contains(tagged.EntranceId, history.Diff!.ChangedEntrances);
             var entrance = Assert.Single(history.Diff.EntranceChanges,

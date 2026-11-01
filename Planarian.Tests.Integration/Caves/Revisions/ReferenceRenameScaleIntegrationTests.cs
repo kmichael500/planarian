@@ -30,7 +30,7 @@ public sealed class ReferenceRenameScaleIntegrationTests(PostgresTestServer fixt
 
         await using (var rollout = database.CreateDbContext("rollout-scale", AccountId))
         {
-            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            var result = await new CaveRevisionRolloutOperation(rollout).InitializeAsync();
             Assert.Equal(CaveCount, result.InitializedCaveCount);
         }
 

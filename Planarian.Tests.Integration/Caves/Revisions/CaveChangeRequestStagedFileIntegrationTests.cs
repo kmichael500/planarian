@@ -16,6 +16,7 @@ using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
+using Planarian.Modules.Files.Persistence;
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
@@ -238,7 +239,7 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(file => file.ExpiresOn, DateTime.UtcNow.AddDays(-1)));
 
-            var cleanupTargets = await new AuthoringFileRepository(
+            var cleanupTargets = await new AuthoringFileStore(
                     contributor.Db, contributor.Db.RequestUser, TimeProvider.System)
                 .RemoveExpiredAsync(16, default);
             contributor.Db.ChangeTracker.Clear();
@@ -513,7 +514,7 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
         await using var cleanupDb = database.CreateDbContext("cleanup", cave.AccountId);
         await cleanupDb.Database.OpenConnectionAsync();
         var cleanupPid = await PostgresLockAssertions.BackendPidAsync(cleanupDb);
-        var cleanupTask = new AuthoringFileRepository(cleanupDb, cleanupDb.RequestUser, TimeProvider.System)
+        var cleanupTask = new AuthoringFileStore(cleanupDb, cleanupDb.RequestUser, TimeProvider.System)
             .RemoveExpiredAsync(16, default);
         await PostgresLockAssertions.AssertBlockedAsync(database, cave.AccountId, cleanupPid, cleanupTask);
 
@@ -666,7 +667,7 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
             var claimTask = Task.Run(async () =>
             {
                 await using var transaction = await claimDb.Database.BeginTransactionAsync();
-                await new AuthoringFileRepository(claimDb, claimDb.RequestUser, TimeProvider.System)
+                await new AuthoringFileStore(claimDb, claimDb.RequestUser, TimeProvider.System)
                     .ClaimAsync(otherRequestId, [fileId], default);
                 await claimDb.SaveChangesAsync();
                 await transaction.CommitAsync();

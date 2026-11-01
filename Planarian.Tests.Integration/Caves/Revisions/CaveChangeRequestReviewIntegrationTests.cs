@@ -218,8 +218,8 @@ public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer f
 
         await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
-                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            var mutations = new CaveMutationPersistence(manager, manager.RequestUser,
+                new CavePublishedSnapshotReader(manager, manager.RequestUser));
             await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
                 CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Name = "Newer state");
         }
@@ -227,8 +227,8 @@ public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer f
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {
             await using var transaction = await reviewer.Database.BeginTransactionAsync();
-            var mutations = new CaveMutationRepository(reviewer, reviewer.RequestUser,
-                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser));
+            var mutations = new CaveMutationPersistence(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotReader(reviewer, reviewer.RequestUser));
             await Assert.ThrowsAsync<CaveRevisionConflictException>(() =>
                 mutations.PrepareExistingAsync(tenant.CaveId, tenant.RevisionId));
             await transaction.RollbackAsync();

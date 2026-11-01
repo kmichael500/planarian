@@ -28,7 +28,7 @@ Imports use four distinct phases:
 1. **Parse** source into typed records with no database access.
 2. **Load planning state** using account-scoped read repositories.
 3. **Plan** using pure planners that produce immutable CaveImportPlan / EntranceImportPlan objects.
-4. **Execute** accepted plans using set-oriented execution repositories.
+4. **Execute** accepted plans using set-oriented import persistence components.
 
 Dry run stops after planning.
 
@@ -38,7 +38,7 @@ Commit execution:
 - locks/revalidates referenced Counties/TagTypes/Caves in durable order;
 - applies set-oriented changes in bounded batches;
 - captures before/after semantic snapshots;
-- uses CaveBulkRevisionRepository to create revisions and advance current pointers;
+- uses CaveBulkRevisionPublisher to create revisions and advance current pointers;
 - commits relational state and revision history atomically;
 - performs destructive external object cleanup after commit.
 

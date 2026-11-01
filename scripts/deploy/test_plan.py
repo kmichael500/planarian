@@ -172,7 +172,7 @@ class PlanTests(unittest.TestCase):
 
     def test_shared_cave_revision_library_change_deploys_api_without_rerunning_completed_rollout(self):
         plan = release_plan([
-            "Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotRepository.cs"
+            "Planarian/Planarian.Library/Caves/Revisions/CavePublishedSnapshotReader.cs"
         ])
         self.assertTrue(plan["api"])
         self.assertFalse(plan["web"])

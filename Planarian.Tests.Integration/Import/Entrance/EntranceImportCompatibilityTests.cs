@@ -35,7 +35,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         Assert.Equal((quality.Id, "Survey Grade"),
             (planned.LocationQualityTagId, planned.LocationQualityName));
         Assert.Equal(status.Id, Assert.Single(planned.Tags).TagTypeId);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var entrance = Assert.Single(snapshot.Entrances);
         Assert.Equal((quality.Id, "Survey Grade"),
             (entrance.LocationQualityTagId, entrance.LocationQualityNameAtRevision));
@@ -98,7 +98,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
         var planned = Assert.Single(plan.Entrances);
         await import.ExecuteAsync(plan, "full.csv");
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
 
         var entrance = Assert.Single(snapshot.Entrances);
         Assert.Equal((planned.Id, "Main", true), (entrance.Id, entrance.Name, entrance.IsPrimary));
@@ -137,7 +137,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         db.ChangeTracker.Clear();
 
         Assert.Equal(0, Assert.Single(plan.CreatePreview()).EntranceCountChange);
-        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(tenant.CaveId);
+        var snapshot = await new CavePublishedSnapshotReader(db, db.RequestUser).BuildAsync(tenant.CaveId);
         var entrance = Assert.Single(snapshot.Entrances);
         Assert.Equal(planned.Id, entrance.Id);
         Assert.DoesNotContain(snapshot.Entrances, row => row.Id == "existing00");
@@ -183,7 +183,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
             await seed.SaveChangesAsync();
         }
         await using var db = database.CreateDbContext("a", tenant.AccountId);
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
         var before = await snapshots.BuildAsync(unrelated.CaveId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
 

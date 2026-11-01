@@ -10,25 +10,25 @@ using Planarian.Modules.Account.Model;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Account.Repositories;
+namespace Planarian.Modules.Account.Persistence;
 
 public sealed record CountyMutationResult(string Id, string Name, string DisplayId);
 
 /// <summary>Owns County mutation persistence, locking, and transaction details.</summary>
-public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
+public sealed class CountyAdministrationPersistence : AccountScopedDataAccessBase
 {
     private const int BatchSize = 500;
-    private readonly CountyReferenceLockRepository _countyLocks;
-    private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveBulkRevisionRepository _revisions;
+    private readonly CountyReferenceLocker _countyReferenceLocker;
+    private readonly CavePublishedSnapshotReader _snapshotReader;
+    private readonly CaveBulkRevisionPublisher _revisionPublisher;
 
-    public CountyAdministrationRepository(PlanarianDbContext db, RequestUser requestUser,
-        CountyReferenceLockRepository countyLocks, CavePublishedSnapshotRepository snapshots,
-        CaveBulkRevisionRepository revisions) : base(db, requestUser)
+    public CountyAdministrationPersistence(PlanarianDbContext db, RequestUser requestUser,
+        CountyReferenceLocker countyReferenceLocker, CavePublishedSnapshotReader snapshotReader,
+        CaveBulkRevisionPublisher revisionPublisher) : base(db, requestUser)
     {
-        _countyLocks = countyLocks;
-        _snapshots = snapshots;
-        _revisions = revisions;
+        _countyReferenceLocker = countyReferenceLocker;
+        _snapshotReader = snapshotReader;
+        _revisionPublisher = revisionPublisher;
     }
 
     public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
@@ -83,7 +83,7 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
         {
             var requestedIds = sourceIds.Append(destinationCountyId).Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal).ToList();
-            var lockedCounties = await _countyLocks.LockForMutationAsync(requestedIds, cancellationToken);
+            var lockedCounties = await _countyReferenceLocker.LockForMutationAsync(requestedIds, cancellationToken);
             if (lockedCounties.Count != requestedIds.Count)
                 throw ApiExceptionDictionary.BadRequest(
                     "One or more source or destination Counties do not exist in the current account.");
@@ -122,7 +122,7 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
                 StringComparer.Ordinal);
             var before = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                : (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
 
             var updated = affectedIds.Count == 0 ? 0 : await DbContext.Caves.IgnoreQueryFilters()
@@ -136,11 +136,11 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
 
             var after = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                : (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
             var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                 StringComparer.Ordinal);
-            await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
+            await _revisionPublisher.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
                 cancellationToken: cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -176,7 +176,7 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
-            await _countyLocks.LockAdministrationNamespaceAsync(cancellationToken);
+            await _countyReferenceLocker.LockAdministrationNamespaceAsync(cancellationToken);
             await ValidateTargetAsync(stateId, displayId, null, cancellationToken);
             var county = new County
             {
@@ -203,8 +203,8 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
-            await _countyLocks.LockAdministrationNamespaceAsync(cancellationToken);
-            var locked = await _countyLocks.LockForMutationAsync([countyId], cancellationToken);
+            await _countyReferenceLocker.LockAdministrationNamespaceAsync(cancellationToken);
+            var locked = await _countyReferenceLocker.LockForMutationAsync([countyId], cancellationToken);
             if (locked.Count != 1) throw ApiExceptionDictionary.NotFound("County Id");
 
             var county = await DbContext.Counties.IgnoreQueryFilters()
@@ -235,7 +235,7 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
                         StringComparer.Ordinal, cancellationToken)
                 : new Dictionary<string, string?>(StringComparer.Ordinal);
             var before = labelChanged && affectedIds.Count > 0
-                ? (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                ? (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal)
                 : new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal);
 
@@ -246,11 +246,11 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
 
             if (labelChanged && affectedIds.Count > 0)
             {
-                var after = (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                var after = (await _snapshotReader.BuildManyAsync(affectedIds, cancellationToken))
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
                 var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                     StringComparer.Ordinal);
-                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
+                await _revisionPublisher.PublishAsync(before, after, expected, operations, CaveRevisionSource.AdministrativeChange,
                     cancellationToken: cancellationToken);
             }
 
@@ -279,7 +279,7 @@ public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
-            var locked = await _countyLocks.LockForMutationAsync(ids, cancellationToken);
+            var locked = await _countyReferenceLocker.LockForMutationAsync(ids, cancellationToken);
             if (locked.Count != ids.Count) throw ApiExceptionDictionary.NotFound("County Id");
 
             var deleted = 0;

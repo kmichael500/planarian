@@ -3,6 +3,9 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Shared.Base;
 
+/// <summary>
+/// Semantic base for repositories whose entire contract requires an authenticated account scope.
+/// </summary>
 public abstract class AccountScopedRepositoryBase : AccountScopedRepositoryBase<PlanarianDbContext>
 {
     protected AccountScopedRepositoryBase(PlanarianDbContext dbContext, RequestUser requestUser)

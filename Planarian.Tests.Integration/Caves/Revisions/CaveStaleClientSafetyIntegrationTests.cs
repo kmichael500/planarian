@@ -40,7 +40,7 @@ public sealed class CaveStaleClientSafetyIntegrationTests(PostgresTestServer fix
         var repository = new CaveRepository(actor.Db, actor.Db.RequestUser);
         var controller = new CaveController(actor.Db.RequestUser, new TokenService(new AuthOptions()),
             actor.Services.Caves,
-            new CaveRevisionService(repository, new CaveRevisionQueryRepository(actor.Db, actor.Db.RequestUser)));
+            new CaveRevisionService(repository, new CaveRevisionReader(actor.Db, actor.Db.RequestUser)));
         var before = await CaveDurableStateFingerprint.CaptureAsync(verify);
 
         var oldClientRequest = PublishableValues(cave, quality.Id, "Old browser editor");

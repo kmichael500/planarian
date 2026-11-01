@@ -13,6 +13,8 @@ using Planarian.Modules.Tags.Repositories;
 using Planarian.Tests;
 using Xunit;
 
+using Planarian.Modules.Account.Persistence;
+using Planarian.Modules.Tags.Persistence;
 namespace Planarian.Tests.Integration.Infrastructure.Postgres;
 
 public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestServer fixture)
@@ -82,13 +84,13 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
         await using var db = database.CreateDbContext("lock-contract", tenant.AccountId, interceptor);
         await using (var transaction = await db.Database.BeginTransactionAsync())
         {
-            var tagLocks = new TagReferenceLockRepository(db, db.RequestUser);
+            var tagLocks = new TagReferenceLocker(db, db.RequestUser);
             await AssertNextLockAsync(interceptor, "TagTypes", "for key share", async () =>
                 await tagLocks.LockForReferenceAsync([secondTag.Id, firstTag.Id]));
             await AssertNextLockAsync(interceptor, "TagTypes", "for update", async () =>
                 await tagLocks.LockForDestructiveMutationAsync([secondTag.Id, firstTag.Id]));
 
-            var countyLocks = new CountyReferenceLockRepository(db, db.RequestUser);
+            var countyLocks = new CountyReferenceLocker(db, db.RequestUser);
             var countyIds = new[] { "Acounty000", tenant.CountyId };
             await AssertNextLockAsync(interceptor, "Counties", "for key share", async () =>
                 await countyLocks.LockForReferenceAsync(countyIds));
@@ -110,14 +112,14 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
         var caveIds = currentCaves.Keys.Order(StringComparer.Ordinal).ToList();
         var rawCommandObserver = new RawNpgsqlLockCommandObserver(database.ConnectionString);
         await using var rawDb = database.CreateDbContext("raw-lock-contract", tenant.AccountId, rawCommandObserver);
-        var snapshots = new CavePublishedSnapshotRepository(rawDb, rawDb.RequestUser);
-        var revisions = new CaveBulkRevisionRepository(rawDb, rawDb.RequestUser);
-        var tagReferenceLocks = new TagReferenceLockRepository(rawDb, rawDb.RequestUser);
+        var snapshots = new CavePublishedSnapshotReader(rawDb, rawDb.RequestUser);
+        var revisions = new CaveBulkRevisionPublisher(rawDb, rawDb.RequestUser);
+        var tagReferenceLocks = new TagReferenceLocker(rawDb, rawDb.RequestUser);
 
         await using var rawCommandTransaction = await rawDb.Database.BeginTransactionAsync();
-        var mergeRepository = new TagTypeAdministrationRepository(rawDb, rawDb.RequestUser, tagReferenceLocks,
+        var tagAdministration = new TagTypeAdministrationPersistence(rawDb, rawDb.RequestUser, tagReferenceLocks,
             snapshots, revisions);
-        await InvokePrivateLockMethodAsync(mergeRepository, "LockCavesAsync", caveIds, CancellationToken.None);
+        await InvokePrivateLockMethodAsync(tagAdministration, "LockCavesAsync", caveIds, CancellationToken.None);
         var mergeLockCommand = await rawCommandObserver.ReadLastCommandAsync(rawDb);
         MultiRowLockOrderingCommandInterceptor.AssertContract(mergeLockCommand, "for update");
 
@@ -126,9 +128,9 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
             cave.CountyNumber, cave.Name), StringComparer.Ordinal);
         var cavePlan = new CaveImportPlan(tenant.AccountId, false, [], [], [], [], [],
             new Dictionary<string, string>(StringComparer.Ordinal), caveTargets);
-        var caveImportRepository = new CaveImportExecutionRepository(rawDb, rawDb.RequestUser, snapshots, revisions,
-            tagReferenceLocks, new CountyReferenceLockRepository(rawDb, rawDb.RequestUser));
-        await InvokePrivateLockMethodAsync(caveImportRepository, "LockAndVerifyExistingCavesAsync", cavePlan,
+        var caveImportPersistence = new CaveImportPersistence(rawDb, rawDb.RequestUser, snapshots, revisions,
+            tagReferenceLocks, new CountyReferenceLocker(rawDb, rawDb.RequestUser));
+        await InvokePrivateLockMethodAsync(caveImportPersistence, "LockAndVerifyExistingCavesAsync", cavePlan,
             CancellationToken.None);
 
         var entranceTargets = currentCaves.Values.ToDictionary(cave => cave.Id,
@@ -136,9 +138,9 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
                 cave.Version, cave.CurrentRevisionId, 0, 0), StringComparer.Ordinal);
         var entrancePlan = new EntranceImportPlan(tenant.AccountId, false, [], [],
             new Dictionary<string, string>(StringComparer.Ordinal), entranceTargets);
-        var entranceImportRepository = new EntranceImportExecutionRepository(rawDb, rawDb.RequestUser, snapshots,
+        var entranceImportPersistence = new EntranceImportPersistence(rawDb, rawDb.RequestUser, snapshots,
             revisions, tagReferenceLocks);
-        await InvokePrivateLockMethodAsync(entranceImportRepository, "LockAndVerifyTargetsAsync", entrancePlan,
+        await InvokePrivateLockMethodAsync(entranceImportPersistence, "LockAndVerifyTargetsAsync", entrancePlan,
             CancellationToken.None);
         await rawCommandTransaction.RollbackAsync();
 
@@ -147,13 +149,13 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
             MultiRowLockOrderingCommandInterceptor.AssertContract(commandText, "for update");
     }
 
-    private static TagTypeAdministrationRepository TagAdministration(
+    private static TagTypeAdministrationPersistence TagAdministration(
         Planarian.Model.Database.PlanarianDbContext db)
     {
-        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeAdministrationRepository(db, db.RequestUser,
-            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
-            new CaveBulkRevisionRepository(db, db.RequestUser));
+        var snapshots = new CavePublishedSnapshotReader(db, db.RequestUser);
+        return new TagTypeAdministrationPersistence(db, db.RequestUser,
+            new TagReferenceLocker(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionPublisher(db, db.RequestUser));
     }
 
     private static async Task AssertNextLockAsync(MultiRowLockOrderingCommandInterceptor interceptor,
