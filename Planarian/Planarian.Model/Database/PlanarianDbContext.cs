@@ -15,7 +15,7 @@ namespace Planarian.Model.Database;
 public partial class PlanarianDbContextBase : DbContext
 {
     protected readonly SaveChangesInterceptor ChangesInterceptor = new();
-    public RequestUser RequestUser = null!;
+    public RequestUser RequestUser { get; internal set; } = null!;
 
     public PlanarianDbContextBase(DbContextOptions contextOptions) : base(contextOptions)
     {

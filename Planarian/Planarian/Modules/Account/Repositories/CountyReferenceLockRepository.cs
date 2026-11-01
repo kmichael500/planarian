@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Account.Repositories;
 
@@ -11,17 +12,12 @@ public sealed record LockedCounty(string Id, string AccountId, string StateId, s
 /// Coordinates County reference writers with administrative County mutations.
 /// The caller owns the transaction; locks remain held until that transaction completes.
 /// </summary>
-public sealed class CountyReferenceLockRepository
+public sealed class CountyReferenceLockRepository : AccountScopedRepositoryBase
 {
     private const int BatchSize = 500;
-    private readonly PlanarianDbContext _db;
-    private readonly string _accountId;
 
-    public CountyReferenceLockRepository(PlanarianDbContext db, RequestUser requestUser)
+    public CountyReferenceLockRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
-        _db = db;
-        _accountId = requestUser.AccountId
-            ?? throw new InvalidOperationException("A current account is required for County locking.");
     }
 
     /// <summary>
@@ -33,9 +29,9 @@ public sealed class CountyReferenceLockRepository
     public async Task LockAdministrationNamespaceAsync(CancellationToken cancellationToken = default)
     {
         RequireTransaction();
-        await _db.Database.ExecuteSqlRawAsync(
+        await DbContext.Database.ExecuteSqlRawAsync(
             "select pg_advisory_xact_lock(1885434478, hashtext(@account_id))",
-            [new NpgsqlParameter<string>("account_id", _accountId)], cancellationToken);
+            [new NpgsqlParameter<string>("account_id", AccountId)], cancellationToken);
     }
 
     public Task<IReadOnlyList<LockedCounty>> LockForReferenceAsync(IEnumerable<string> countyIds,
@@ -55,14 +51,14 @@ public sealed class CountyReferenceLockRepository
         var result = new List<LockedCounty>(ids.Count);
         foreach (var chunk in ids.Chunk(BatchSize))
         {
-            var rows = await _db.Counties.FromSqlRaw("""
+            var rows = await DbContext.Counties.FromSqlRaw("""
                     select *
                     from "Counties"
                     where "AccountId" = @account_id and "Id" = any(@county_ids)
                     order by "Id" collate "C"
                     for key share
                     """,
-                    new NpgsqlParameter<string>("account_id", _accountId),
+                    new NpgsqlParameter<string>("account_id", AccountId),
                     new NpgsqlParameter<string[]>("county_ids", chunk))
                 .IgnoreQueryFilters().AsNoTracking().ToListAsync(cancellationToken);
             result.AddRange(rows.Select(ToLockedCounty));
@@ -80,14 +76,14 @@ public sealed class CountyReferenceLockRepository
         var result = new List<LockedCounty>(ids.Count);
         foreach (var chunk in ids.Chunk(BatchSize))
         {
-            var rows = await _db.Counties.FromSqlRaw("""
+            var rows = await DbContext.Counties.FromSqlRaw("""
                     select *
                     from "Counties"
                     where "AccountId" = @account_id and "Id" = any(@county_ids)
                     order by "Id" collate "C"
                     for update
                     """,
-                    new NpgsqlParameter<string>("account_id", _accountId),
+                    new NpgsqlParameter<string>("account_id", AccountId),
                     new NpgsqlParameter<string[]>("county_ids", chunk))
                 .IgnoreQueryFilters().AsNoTracking().ToListAsync(cancellationToken);
             result.AddRange(rows.Select(ToLockedCounty));
@@ -98,7 +94,7 @@ public sealed class CountyReferenceLockRepository
 
     private void RequireTransaction()
     {
-        if (_db.Database.CurrentTransaction is null)
+        if (DbContext.Database.CurrentTransaction is null)
             throw new InvalidOperationException("County locks require an active PostgreSQL transaction.");
     }
 

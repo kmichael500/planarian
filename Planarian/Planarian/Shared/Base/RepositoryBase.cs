@@ -1,8 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Planarian.Library.Exceptions;
-using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -23,19 +21,91 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
 
     protected RepositoryBase(TDbContext dbContext, RequestUser requestUser)
     {
+        if (!ReferenceEquals(dbContext.RequestUser, requestUser))
+            throw new InvalidOperationException(
+                "A repository RequestUser must be bound to the same DbContext instance.");
+
         DbContext = dbContext;
         RequestUser = requestUser;
-        DbContext.RequestUser = requestUser;
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var result = await DbContext.SaveChangesAsync(cancellationToken);
+        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+    public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        DbContext.Database.BeginTransactionAsync(cancellationToken);
+
+    public void Add(EntityBase entity) => DbContext.Add(entity);
+
+    public void Delete(EntityBase entity) => DbContext.Remove(entity);
+
+    public void DeleteRange(IEnumerable<EntityBase> entities) => DbContext.RemoveRange(entities);
+
+    protected async Task RunInTransactionAsync(Func<CancellationToken, Task> work,
+        CancellationToken cancellationToken = default)
     {
-        return await DbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (DbContext.Database.CurrentTransaction is not null)
+        {
+            await work(cancellationToken);
+            return;
+        }
+
+        await RunInOwnedTransactionAsync(work, cancellationToken);
+    }
+
+    protected async Task<T> RunInTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        if (DbContext.Database.CurrentTransaction is not null)
+            return await work(cancellationToken);
+
+        return await RunInOwnedTransactionAsync(work, cancellationToken);
+    }
+
+    protected Task RunInOwnedTransactionAsync(Func<CancellationToken, Task> work,
+        CancellationToken cancellationToken = default) =>
+        RunInOwnedTransactionAsync(async token =>
+        {
+            await work(token);
+            return true;
+        }, cancellationToken);
+
+    protected async Task<T> RunInOwnedTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        if (DbContext.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("This repository operation requires ownership of its database transaction and cannot join an existing transaction.");
+
+        await using var transaction = await BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var result = await work(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
+    protected async Task AddRangeBatchedAndClearAsync<TEntity>(IEnumerable<TEntity> entities, int batchSize,
+        CancellationToken cancellationToken = default) where TEntity : EntityBase
+    {
+        if (batchSize <= 0) throw new ArgumentOutOfRangeException(nameof(batchSize));
+        if (DbContext.ChangeTracker.Entries().Any())
+            throw new InvalidOperationException(
+                "Batched inserts that clear tracking require an empty change tracker so unrelated tracked state cannot be discarded.");
+
+        foreach (var batch in entities.Chunk(batchSize))
+        {
+            DbContext.AddRange(batch);
+            await SaveChangesAsync(cancellationToken);
+            DbContext.ChangeTracker.Clear();
+        }
     }
 
     protected async Task<int> DeleteBatchAsync<TEntity>(IQueryable<TEntity> query, int batchSize,
@@ -52,28 +122,11 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public void Add(EntityBase entity)
-    {
-        DbContext.Add(entity);
-    }
-
-    public void Delete(EntityBase entity)
-    {
-        DbContext.Remove(entity);
-    }
-
-    public void DeleteRange(IEnumerable<EntityBase> entities)
-    {
-        DbContext.RemoveRange(entities);
-    }
-
     public void SetPropertiesModified<TEntity>(TEntity entity, params Expression<Func<TEntity, object>>[] properties)
         where TEntity : class
     {
         var entry = DbContext.Entry(entity);
         foreach (var property in properties)
-        {
             entry.Property(property).IsModified = true;
-        }
     }
 }

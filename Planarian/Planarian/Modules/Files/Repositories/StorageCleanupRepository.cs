@@ -20,7 +20,7 @@ public sealed record StorageCleanupAddress(string StoragePartition, string Stora
 /// Queueing is idempotent at the PostgreSQL unique constraint rather than through
 /// caller-specific check-then-insert logic.
 /// </summary>
-public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
+public class StorageCleanupRepository<TDbContext> : AccountScopedRepositoryBase<TDbContext>
     where TDbContext : PlanarianDbContextBase
 {
     private const int LookupBatchSize = 500;
@@ -104,9 +104,7 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
         IEnumerable<StorageCleanupAddress> addresses,
         CancellationToken cancellationToken)
     {
-        var accountId = RequestUser.AccountId
-            ?? throw new InvalidOperationException("An active account is required for storage cleanup.");
-        return QueueAsync(DbContext, accountId, RequestUser.Id, purpose, addresses, cancellationToken);
+        return QueueAsync(DbContext, AccountId, UserId, purpose, addresses, cancellationToken);
     }
 
     public void ForgetTrackedChanges() => DbContext.ChangeTracker.Clear();
@@ -123,7 +121,7 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
         if (ids is { Length: 0 }) return Task.FromResult(new List<StorageCleanupTarget>());
 
         var query = DbContext.StorageCleanupTargets.AsNoTracking()
-            .Where(row => row.AccountId == RequestUser.AccountId && purposeValues.Contains(row.Purpose));
+            .Where(row => row.AccountId == AccountId && purposeValues.Contains(row.Purpose));
         if (ids is not null) query = query.Where(row => ids.Contains(row.Id));
         return query.OrderBy(row => row.ModifiedOn ?? row.CreatedOn).ThenBy(row => row.Id)
             .Take(maxCount).ToListAsync(cancellationToken);
@@ -145,7 +143,7 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
         var attemptedOn = DateTime.UtcNow;
 
         return DbContext.StorageCleanupTargets
-            .Where(row => row.AccountId == RequestUser.AccountId &&
+            .Where(row => row.AccountId == AccountId &&
                           purposeValues.Contains(row.Purpose) && ids.Contains(row.Id))
             .ExecuteUpdateAsync(setters => setters.SetProperty(
                 row => row.ModifiedOn, attemptedOn), cancellationToken);
@@ -161,7 +159,7 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
         if (purposeValues.Length == 0 || ids.Length == 0) return 0;
 
         var deleted = await DbContext.StorageCleanupTargets
-            .Where(row => row.AccountId == RequestUser.AccountId &&
+            .Where(row => row.AccountId == AccountId &&
                           purposeValues.Contains(row.Purpose) && ids.Contains(row.Id))
             .ExecuteDeleteAsync(cancellationToken);
 
@@ -172,7 +170,7 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
         var idSet = ids.ToHashSet(StringComparer.Ordinal);
         foreach (var entry in DbContext.ChangeTracker.Entries<StorageCleanupTarget>()
                      .Where(entry => entry.State != EntityState.Added &&
-                                     entry.Entity.AccountId == RequestUser.AccountId &&
+                                     entry.Entity.AccountId == AccountId &&
                                      purposeSet.Contains(entry.Entity.Purpose) &&
                                      idSet.Contains(entry.Entity.Id))
                      .ToList())
@@ -198,6 +196,8 @@ public class StorageCleanupRepository<TDbContext> : RepositoryBase<TDbContext>
                     .Distinct(StringComparer.Ordinal).ToArray();
                 var normalizedPartition = partition.Key.ToLowerInvariant();
 
+                // External deletion safety is intentionally global by storage address: a live reference in
+                // any account must prevent deletion, even when stale or migrated data shares an address.
                 var fileKeys = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
                     .Where(file => file.BlobContainer != null &&
                                    file.BlobContainer.ToLower() == normalizedPartition &&

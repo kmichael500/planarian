@@ -13,7 +13,11 @@ public class RequestUser
 
     public RequestUser(PlanarianDbContext dbContext)
     {
+        if (dbContext.RequestUser is not null)
+            throw new InvalidOperationException("A DbContext can only be bound to one RequestUser instance.");
+
         _dbContext = dbContext;
+        dbContext.RequestUser = this;
     }
 
     public string Id { get; set; } = null!;

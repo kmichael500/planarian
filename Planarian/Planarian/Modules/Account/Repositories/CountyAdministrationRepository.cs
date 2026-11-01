@@ -15,10 +15,9 @@ namespace Planarian.Modules.Account.Repositories;
 public sealed record CountyMutationResult(string Id, string Name, string DisplayId);
 
 /// <summary>Owns County mutation persistence, locking, and transaction details.</summary>
-public sealed class CountyAdministrationRepository : RepositoryBase
+public sealed class CountyAdministrationRepository : AccountScopedRepositoryBase
 {
     private const int BatchSize = 500;
-    private readonly AccountExecutionScope _scope;
     private readonly CountyReferenceLockRepository _countyLocks;
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly CaveBulkRevisionRepository _revisions;
@@ -27,7 +26,6 @@ public sealed class CountyAdministrationRepository : RepositoryBase
         CountyReferenceLockRepository countyLocks, CavePublishedSnapshotRepository snapshots,
         CaveBulkRevisionRepository revisions) : base(db, requestUser)
     {
-        _scope = AccountExecutionScope.Require(requestUser);
         _countyLocks = countyLocks;
         _snapshots = snapshots;
         _revisions = revisions;
@@ -37,12 +35,12 @@ public sealed class CountyAdministrationRepository : RepositoryBase
         CancellationToken cancellationToken)
     {
         var counties = await DbContext.Counties.AsNoTracking()
-            .Where(county => county.AccountId == _scope.AccountId && county.StateId == stateId)
+            .Where(county => county.AccountId == Scope.AccountId && county.StateId == stateId)
             .Select(county => new { county.Id, county.DisplayId, county.Name })
             .OrderBy(county => county.Name)
             .ToListAsync(cancellationToken);
         var occurrences = await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-            .Where(cave => cave.AccountId == _scope.AccountId && cave.StateId == stateId)
+            .Where(cave => cave.AccountId == Scope.AccountId && cave.StateId == stateId)
             .GroupBy(cave => cave.CountyId)
             .Select(group => new { CountyId = group.Key, Count = group.Count() })
             .ToDictionaryAsync(group => group.CountyId, group => group.Count, StringComparer.Ordinal,
@@ -77,9 +75,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             .ToList();
         if (sourceIds.Count == 0)
             throw ApiExceptionDictionary.BadRequest("At least one source County is required.");
-        var actorUserId = !string.IsNullOrWhiteSpace(RequestUser.Id)
-            ? RequestUser.Id
-            : throw new InvalidOperationException("A current actor is required for County merge.");
+        var actorUserId = UserId;
         var mutationTimestamp = DateTime.UtcNow;
 
         await using var transaction = await BeginTransactionAsync(cancellationToken);
@@ -98,14 +94,14 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                     "All source and destination Counties must belong to the selected State.");
 
             var affectedIds = await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-                .Where(cave => cave.AccountId == _scope.AccountId && sourceIds.Contains(cave.CountyId))
+                .Where(cave => cave.AccountId == Scope.AccountId && sourceIds.Contains(cave.CountyId))
                 .OrderBy(cave => cave.Id).Select(cave => cave.Id).ToListAsync(cancellationToken);
             await LockCavesAsync(affectedIds, cancellationToken);
 
             var affected = affectedIds.Count == 0
                 ? []
                 : await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-                    .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id))
+                    .Where(cave => cave.AccountId == Scope.AccountId && affectedIds.Contains(cave.Id))
                     .Select(cave => new CountyMergeCave(cave.Id, cave.CountyId, cave.StateId, cave.CountyNumber,
                         cave.CurrentRevisionId))
                     .ToListAsync(cancellationToken);
@@ -114,7 +110,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                 throw CountyAdministrationConcurrencyConflict();
 
             var destinationNumbers = (await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-                    .Where(cave => cave.AccountId == _scope.AccountId && cave.CountyId == destinationCountyId)
+                    .Where(cave => cave.AccountId == Scope.AccountId && cave.CountyId == destinationCountyId)
                     .Select(cave => cave.CountyNumber).ToListAsync(cancellationToken))
                 .ToHashSet();
             var collisionNumber = affected.GroupBy(cave => cave.CountyNumber)
@@ -130,7 +126,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                     .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
 
             var updated = affectedIds.Count == 0 ? 0 : await DbContext.Caves.IgnoreQueryFilters()
-                .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id) &&
+                .Where(cave => cave.AccountId == Scope.AccountId && affectedIds.Contains(cave.Id) &&
                                sourceIds.Contains(cave.CountyId))
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(cave => cave.CountyId, destinationCountyId)
@@ -184,7 +180,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             await ValidateTargetAsync(stateId, displayId, null, cancellationToken);
             var county = new County
             {
-                AccountId = _scope.AccountId,
+                AccountId = Scope.AccountId,
                 StateId = stateId,
                 Name = name,
                 DisplayId = displayId
@@ -212,7 +208,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             if (locked.Count != 1) throw ApiExceptionDictionary.NotFound("County Id");
 
             var county = await DbContext.Counties.IgnoreQueryFilters()
-                .SingleOrDefaultAsync(row => row.AccountId == _scope.AccountId && row.Id == countyId,
+                .SingleOrDefaultAsync(row => row.AccountId == Scope.AccountId && row.Id == countyId,
                     cancellationToken)
                 ?? throw ApiExceptionDictionary.NotFound("County Id");
 
@@ -223,7 +219,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                                !string.Equals(county.DisplayId, displayId, StringComparison.Ordinal);
             var affectedIds = stateChanged || labelChanged
                 ? await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-                    .Where(cave => cave.AccountId == _scope.AccountId && cave.CountyId == county.Id)
+                    .Where(cave => cave.AccountId == Scope.AccountId && cave.CountyId == county.Id)
                     .OrderBy(cave => cave.Id).Select(cave => cave.Id).ToListAsync(cancellationToken)
                 : [];
 
@@ -234,7 +230,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             if (labelChanged) await LockCavesAsync(affectedIds, cancellationToken);
             var expected = labelChanged && affectedIds.Count > 0
                 ? await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
-                    .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id))
+                    .Where(cave => cave.AccountId == Scope.AccountId && affectedIds.Contains(cave.Id))
                     .ToDictionaryAsync(cave => cave.Id, cave => cave.CurrentRevisionId,
                         StringComparer.Ordinal, cancellationToken)
                 : new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -291,7 +287,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             {
                 foreach (var chunk in ids.Chunk(BatchSize))
                     deleted += await DbContext.Counties.IgnoreQueryFilters()
-                        .Where(county => county.AccountId == _scope.AccountId && chunk.Contains(county.Id))
+                        .Where(county => county.AccountId == Scope.AccountId && chunk.Contains(county.Id))
                         .ExecuteDeleteAsync(cancellationToken);
             }
             catch (Npgsql.PostgresException exception)
@@ -317,7 +313,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             throw ApiExceptionDictionary.BadRequest("The selected State does not exist.");
 
         var duplicate = await DbContext.Counties.IgnoreQueryFilters().AsNoTracking().AnyAsync(county =>
-            county.AccountId == _scope.AccountId && county.StateId == stateId && county.Id != excludedCountyId &&
+            county.AccountId == Scope.AccountId && county.StateId == stateId && county.Id != excludedCountyId &&
             EF.Functions.ILike(county.DisplayId, displayId) && county.DisplayId.Length == displayId.Length,
             cancellationToken);
         if (duplicate) throw DuplicateCountyCode(displayId);
@@ -357,7 +353,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                 where "AccountId" = @account_id and "Id" = any(@cave_ids)
                 order by "Id" collate "C" for update
                 """;
-            command.Parameters.AddWithValue("account_id", _scope.AccountId);
+            command.Parameters.AddWithValue("account_id", Scope.AccountId);
             command.Parameters.AddWithValue("cave_ids", chunk);
             var count = 0;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);

@@ -46,7 +46,7 @@ flowchart LR
     Executor -->|"build before/after"| Snapshots
     Executor -->|"snapshots + expected revisions"| Bulk
     Bulk -->|"revisions + current pointers"| DB
-    Executor -->|"return deferred delete addresses after commit"| Service
+    Executor -->|"return durable cleanup-target IDs after commit"| Service
     Service -->|"best-effort external delete"| Cleanup
 ~~~
 

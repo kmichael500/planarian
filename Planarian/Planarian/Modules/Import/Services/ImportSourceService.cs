@@ -6,6 +6,7 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Data;
 using Planarian.Modules.Import.Models;
+using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Import.Services;
@@ -14,14 +15,13 @@ namespace Planarian.Modules.Import.Services;
 /// Cave/Entrance CSV source upload and read workflow. Import sources are provenance,
 /// not Cave File assets, and deliberately have no FileType or Cave lifecycle.
 /// </summary>
-public sealed class ImportSourceService
+public sealed class ImportSourceService : AccountServiceBase
 {
     private const int OpportunisticCleanupBatchSize = 16;
     private static readonly TimeSpan UploadLifetime = TimeSpan.FromDays(10);
 
     private readonly ImportSourceRepository _repository;
     private readonly StorageCleanupService _cleanup;
-    private readonly RequestUser _requestUser;
     private readonly IObjectStorage _objectStorage;
     private readonly TimeProvider _timeProvider;
 
@@ -30,11 +30,10 @@ public sealed class ImportSourceService
         StorageCleanupService cleanup,
         RequestUser requestUser,
         IObjectStorage objectStorage,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider) : base(requestUser)
     {
         _repository = repository;
         _cleanup = cleanup;
-        _requestUser = requestUser;
         _objectStorage = objectStorage;
         _timeProvider = timeProvider;
     }
@@ -45,8 +44,7 @@ public sealed class ImportSourceService
         string? uuid,
         CancellationToken cancellationToken)
     {
-        var accountId = _requestUser.AccountId
-            ?? throw new BadHttpRequestException("Account Id is null");
+        var accountId = AccountId;
         var parsed = FileNamePolicy.Parse(fileName);
 
         await _cleanup.CleanupImportSourceTargetsAsync(cancellationToken: CancellationToken.None);
@@ -64,7 +62,7 @@ public sealed class ImportSourceService
             ExpiresOn = _timeProvider.GetUtcNow().UtcDateTime.Add(UploadLifetime)
         };
         var address = new StorageObjectAddress(
-            _requestUser.AccountContainerName,
+            RequestUser.BuildAccountContainerName(AccountId),
             ImportSourceStoragePath.BuildCaveEntranceCsvKey(source.Id));
 
         var createAttempted = false;
@@ -159,7 +157,7 @@ public sealed class ImportSourceService
 
     private void RequireActiveImportStorage(ImportSourceAccessInfo source)
     {
-        if (!string.Equals(source.BlobContainer, _requestUser.AccountContainerName,
+        if (!string.Equals(source.BlobContainer, RequestUser.BuildAccountContainerName(AccountId),
                 StringComparison.OrdinalIgnoreCase) ||
             !ImportSourceStoragePath.IsCaveEntranceCsvKey(source.BlobKey))
             throw ApiExceptionDictionary.BadRequest(

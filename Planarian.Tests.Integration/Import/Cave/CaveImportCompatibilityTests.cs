@@ -269,7 +269,7 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
             .AddInterceptors(sql)
             .Options;
         var db = new PlanarianDbContext(options);
-        db.RequestUser = new RequestUser(db)
+        _ = new RequestUser(db)
         {
             Id = "a",
             AccountId = tenant.AccountId,

@@ -12,27 +12,24 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Import.Data;
 
-public sealed class EntranceImportExecutionRepository
+public sealed class EntranceImportExecutionRepository : AccountScopedRepositoryBase
 {
     private const int CaveBatchSize = 500;
     private const int EntranceBatchSize = 1500;
     private const int AssociationBatchSize = 4000;
 
-    private readonly PlanarianDbContext _db;
-    private readonly AccountExecutionScope _scope;
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly CaveBulkRevisionRepository _revisionPublisher;
     private readonly TagReferenceLockRepository _tagReferenceLocks;
 
     public EntranceImportExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
         CavePublishedSnapshotRepository snapshots, CaveBulkRevisionRepository revisionPublisher,
-        TagReferenceLockRepository tagReferenceLocks)
+        TagReferenceLockRepository tagReferenceLocks) : base(db, requestUser)
     {
-        _db = db;
-        _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
         _revisionPublisher = revisionPublisher;
         _tagReferenceLocks = tagReferenceLocks;
@@ -46,33 +43,32 @@ public sealed class EntranceImportExecutionRepository
         CancellationToken cancellationToken = default) =>
         ExecuteCoreAsync(plan, sourceFileName: null, sourceFileId, cancellationToken);
 
-    private async Task<string> ExecuteCoreAsync(EntranceImportPlan plan, string? sourceFileName,
+    private Task<string> ExecuteCoreAsync(EntranceImportPlan plan, string? sourceFileName,
         string? sourceFileId, CancellationToken cancellationToken)
     {
-        if (plan.AccountId != _scope.AccountId)
+        if (plan.AccountId != Scope.AccountId)
             throw new InvalidOperationException("Entrance import plan belongs to another account.");
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        try
+        return RunInOwnedTransactionAsync(async token =>
         {
-            await VerifyTagsAsync(plan, cancellationToken);
-            await LockAndVerifyTargetsAsync(plan, cancellationToken);
+            await VerifyTagsAsync(plan, token);
+            await LockAndVerifyTargetsAsync(plan, token);
 
             PersistedImportSource? persistedSource = null;
             if (sourceFileId is not null)
                 persistedSource = await ImportSourceRepository.PromoteAsync(
-                    _db, _scope.AccountId, _scope.UserId, sourceFileId, cancellationToken);
+                    DbContext, Scope.AccountId, Scope.UserId, sourceFileId, token);
 
             var targetIds = plan.Targets.Keys.Order(StringComparer.Ordinal).ToList();
             var before = targetIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(targetIds, cancellationToken))
+                : (await _snapshots.BuildManyAsync(targetIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
 
             var batch = new CaveImportBatch
             {
                 Id = IdGenerator.Generate(),
-                AccountId = _scope.AccountId,
+                AccountId = Scope.AccountId,
                 SourceFileId = persistedSource?.Id,
                 SourceFileName = persistedSource?.FileName ?? sourceFileName,
                 SyncExisting = plan.SyncExisting,
@@ -83,19 +79,19 @@ public sealed class EntranceImportExecutionRepository
                 DeletedCount = plan.SyncExisting ? plan.Targets.Values.Sum(t => t.ExistingEntranceCount) : 0,
                 NoChangeCount = 0
             };
-            _db.CaveImportBatches.Add(batch);
-            await _db.SaveChangesAsync(cancellationToken);
+            DbContext.CaveImportBatches.Add(batch);
+            await SaveChangesAsync(token);
             var batchId = batch.Id;
-            _db.ChangeTracker.Clear();
+            DbContext.ChangeTracker.Clear();
 
-            await PersistTagCreationsAsync(plan, cancellationToken);
-            if (plan.SyncExisting) await DeleteExistingEntrancesAsync(targetIds, cancellationToken);
-            await InsertEntrancesAsync(plan.Entrances, cancellationToken);
-            await InsertTagsAsync(plan.Entrances.SelectMany(e => e.Tags).ToList(), cancellationToken);
+            await PersistTagCreationsAsync(plan, token);
+            if (plan.SyncExisting) await DeleteExistingEntrancesAsync(targetIds, token);
+            await InsertEntrancesAsync(plan.Entrances, token);
+            await InsertTagsAsync(plan.Entrances.SelectMany(e => e.Tags).ToList(), token);
 
             var after = targetIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
-                : (await _snapshots.BuildManyAsync(targetIds, cancellationToken))
+                : (await _snapshots.BuildManyAsync(targetIds, token))
                     .ToDictionary(s => s.CaveId, StringComparer.Ordinal);
             var expected = plan.Targets.ToDictionary(pair => pair.Key, pair => pair.Value.CurrentRevisionId,
                 StringComparer.Ordinal);
@@ -103,24 +99,18 @@ public sealed class EntranceImportExecutionRepository
                 StringComparer.Ordinal);
             await _revisionPublisher.PublishAsync(before, after, expected, operations,
                 CaveRevisionSource.Import, batchId,
-                cancellationToken);
+                token);
 
-            await transaction.CommitAsync(cancellationToken);
             return batchId;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     private async Task LockAndVerifyTargetsAsync(EntranceImportPlan plan, CancellationToken cancellationToken)
     {
         if (plan.Targets.Count == 0) return;
-        var connection = (NpgsqlConnection)_db.Database.GetDbConnection();
+        var connection = (NpgsqlConnection)DbContext.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(cancellationToken);
-        var dbTransaction = _db.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
+        var dbTransaction = DbContext.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
                             ?? throw new InvalidOperationException("Entrance import transaction is not active.");
 
         foreach (var chunk in plan.Targets.Keys.Order(StringComparer.Ordinal).Chunk(CaveBatchSize))
@@ -133,7 +123,7 @@ public sealed class EntranceImportExecutionRepository
                     where "AccountId" = @account_id and "Id" = any(@cave_ids)
                     order by "Id" collate "C" for update
                     """;
-                command.Parameters.AddWithValue("account_id", _scope.AccountId);
+                command.Parameters.AddWithValue("account_id", Scope.AccountId);
                 command.Parameters.AddWithValue("cave_ids", chunk);
                 var locked = new HashSet<string>(StringComparer.Ordinal);
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -142,8 +132,8 @@ public sealed class EntranceImportExecutionRepository
                     throw new ImportPlanConcurrencyException("One or more Entrance target Caves no longer belong to the current account.");
             }
 
-            var caves = await _db.Caves.IgnoreQueryFilters()
-                .Where(c => c.AccountId == _scope.AccountId && chunk.Contains(c.Id))
+            var caves = await DbContext.Caves.IgnoreQueryFilters()
+                .Where(c => c.AccountId == Scope.AccountId && chunk.Contains(c.Id))
                 .AsNoTracking().Select(c => new { c.Id, c.Version, c.CurrentRevisionId })
                 .ToListAsync(cancellationToken);
             foreach (var cave in caves)
@@ -153,8 +143,8 @@ public sealed class EntranceImportExecutionRepository
                     throw new CaveRevisionConflictException(cave.Id, expected.CurrentRevisionId, cave.CurrentRevisionId);
             }
 
-            var counts = await _db.Entrances.IgnoreQueryFilters()
-                .Where(e => chunk.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
+            var counts = await DbContext.Entrances.IgnoreQueryFilters()
+                .Where(e => chunk.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == Scope.AccountId)
                 .AsNoTracking().GroupBy(e => e.CaveId)
                 .Select(g => new { CaveId = g.Key, Count = g.Count(), Primary = g.Count(e => e.IsPrimary) })
                 .ToListAsync(cancellationToken);
@@ -186,17 +176,12 @@ public sealed class EntranceImportExecutionRepository
 
     private async Task PersistTagCreationsAsync(EntranceImportPlan plan, CancellationToken cancellationToken)
     {
-        foreach (var chunk in plan.TagCreations.Chunk(CaveBatchSize))
+        await AddRangeBatchedAndClearAsync(plan.TagCreations.Select(tag => new TagType(tag.Name, tag.Key)
         {
-            _db.TagTypes.AddRange(chunk.Select(tag => new TagType(tag.Name, tag.Key)
-            {
-                Id = tag.Id,
-                AccountId = _scope.AccountId,
-                IsDefault = false
-            }));
-            await _db.SaveChangesAsync(cancellationToken);
-            _db.ChangeTracker.Clear();
-        }
+            Id = tag.Id,
+            AccountId = Scope.AccountId,
+            IsDefault = false
+        }), CaveBatchSize, cancellationToken);
     }
 
     private async Task DeleteExistingEntrancesAsync(IReadOnlyList<string> caveIds,
@@ -204,18 +189,18 @@ public sealed class EntranceImportExecutionRepository
     {
         foreach (var caveChunk in caveIds.Chunk(CaveBatchSize))
         {
-            var entranceIds = await _db.Entrances.IgnoreQueryFilters()
-                .Where(e => caveChunk.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
+            var entranceIds = await DbContext.Entrances.IgnoreQueryFilters()
+                .Where(e => caveChunk.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == Scope.AccountId)
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))
             {
-                await _db.EntranceStatusTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceHydrologyTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
-                await _db.FieldIndicationTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceReportedByNameTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceOtherTag.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
-                await _db.Entrances.IgnoreQueryFilters()
-                    .Where(e => entranceChunk.Contains(e.Id) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
+                await DbContext.EntranceStatusTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == Scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await DbContext.EntranceHydrologyTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == Scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await DbContext.FieldIndicationTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == Scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await DbContext.EntranceReportedByNameTags.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == Scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await DbContext.EntranceOtherTag.IgnoreQueryFilters().Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == Scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await DbContext.Entrances.IgnoreQueryFilters()
+                    .Where(e => entranceChunk.Contains(e.Id) && e.Cave != null && e.Cave.AccountId == Scope.AccountId)
                     .ExecuteDeleteAsync(cancellationToken);
             }
         }
@@ -224,34 +209,24 @@ public sealed class EntranceImportExecutionRepository
     private async Task InsertEntrancesAsync(IReadOnlyList<PlannedEntrance> entrances,
         CancellationToken cancellationToken)
     {
-        foreach (var chunk in entrances.Chunk(EntranceBatchSize))
+        await AddRangeBatchedAndClearAsync(entrances.Select(row => new Entrance
         {
-            _db.Entrances.AddRange(chunk.Select(row => new Entrance
-            {
-                Id = row.Id,
-                CaveId = row.CaveId,
-                LocationQualityTagId = row.LocationQualityTagId,
-                Name = row.Name,
-                IsPrimary = row.IsPrimary,
-                Description = row.Description,
-                Location = new Point(new CoordinateZ(row.Longitude, row.Latitude, row.Elevation)) { SRID = 4326 },
-                ReportedOn = row.ReportedOn,
-                PitDepthFeet = row.PitDepthFeet
-            }));
-            await _db.SaveChangesAsync(cancellationToken);
-            _db.ChangeTracker.Clear();
-        }
+            Id = row.Id,
+            CaveId = row.CaveId,
+            LocationQualityTagId = row.LocationQualityTagId,
+            Name = row.Name,
+            IsPrimary = row.IsPrimary,
+            Description = row.Description,
+            Location = new Point(new CoordinateZ(row.Longitude, row.Latitude, row.Elevation)) { SRID = 4326 },
+            ReportedOn = row.ReportedOn,
+            PitDepthFeet = row.PitDepthFeet
+        }), EntranceBatchSize, cancellationToken);
     }
 
     private async Task InsertTagsAsync(IReadOnlyList<PlannedEntranceTag> tags,
         CancellationToken cancellationToken)
     {
-        foreach (var chunk in tags.Chunk(AssociationBatchSize))
-        {
-            _db.AddRange(chunk.Select(CreateAssociation));
-            await _db.SaveChangesAsync(cancellationToken);
-            _db.ChangeTracker.Clear();
-        }
+        await AddRangeBatchedAndClearAsync(tags.Select(CreateAssociation), AssociationBatchSize, cancellationToken);
     }
 
     private static EntityBase CreateAssociation(PlannedEntranceTag tag) => tag.Role switch

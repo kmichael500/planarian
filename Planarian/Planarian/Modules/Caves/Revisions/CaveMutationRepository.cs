@@ -4,6 +4,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Caves.Revisions;
 
@@ -19,77 +20,42 @@ public sealed record CaveMutationPreparation(
     CavePublishedSnapshotV1 PreviousRevisionSnapshot,
     CavePublishedSnapshotV1 LiveSnapshotBeforeMutation);
 
-public sealed class CaveMutationRepository
+public sealed class CaveMutationRepository : AccountScopedRepositoryBase
 {
-    private readonly PlanarianDbContext _db;
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly CaveRevisionDiffService _diff = new();
-    private readonly AccountExecutionScope _scope;
 
-    public CaveMutationRepository(PlanarianDbContext db, RequestUser requestUser, CavePublishedSnapshotRepository snapshots)
+    public CaveMutationRepository(PlanarianDbContext db, RequestUser requestUser, CavePublishedSnapshotRepository snapshots) : base(db, requestUser)
     {
-        _db = db;
-        _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
     }
 
     /// <summary>Joins the current transaction when present; otherwise owns begin/commit/rollback.</summary>
-    public async Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
-        CancellationToken cancellationToken = default)
-    {
-        if (_db.Database.CurrentTransaction is not null)
-            return await work(cancellationToken);
-        return await ExecuteOwnedTransactionAsync(work, cancellationToken);
-    }
+    public Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default) =>
+        RunInTransactionAsync(work, cancellationToken);
 
     /// <summary>Requires transaction ownership and fails if the DbContext already has a transaction.</summary>
     public Task ExecuteOwnedTransactionAsync(Func<CancellationToken, Task> work,
         CancellationToken cancellationToken = default) =>
-        ExecuteOwnedTransactionAsync(async token => { await work(token); return true; }, cancellationToken);
+        RunInOwnedTransactionAsync(work, cancellationToken);
 
     /// <summary>Requires transaction ownership and fails if the DbContext already has a transaction.</summary>
-    public async Task<T> ExecuteOwnedTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
-        CancellationToken cancellationToken = default)
-    {
-        if (_db.Database.CurrentTransaction is not null)
-            throw new InvalidOperationException("This Cave workflow requires ownership of its database transaction.");
+    public Task<T> ExecuteOwnedTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default) =>
+        RunInOwnedTransactionAsync(work, cancellationToken);
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var result = await work(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
-    }
-
-    public async Task<CaveMutationResult> PublishExistingAsync(string caveId, string? expectedRevisionId,
+    public Task<CaveMutationResult> PublishExistingAsync(string caveId, string? expectedRevisionId,
         CaveRevisionSource source, CaveRevisionOperation operation, Action<Cave> write,
-        string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default)
-    {
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        try
+        string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default) =>
+        RunInOwnedTransactionAsync(async token =>
         {
-            var preparation = await PrepareExistingAsync(caveId, expectedRevisionId, cancellationToken);
-            var cave = await GetOwnedCaveAsync(caveId, cancellationToken);
+            var preparation = await PrepareExistingAsync(caveId, expectedRevisionId, token);
+            var cave = await GetOwnedCaveAsync(caveId, token);
             write(cave);
-            await _db.SaveChangesAsync(cancellationToken);
-            var result = await PublishPreparedAsync(preparation, source, operation, changeRequestId, importBatchId,
-                cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
-    }
+            await SaveChangesAsync(token);
+            return await PublishPreparedAsync(preparation, source, operation, changeRequestId, importBatchId, token);
+        }, cancellationToken);
 
     /// <summary>
     /// Captures the accepted revision and live snapshot for an existing Cave inside
@@ -99,8 +65,8 @@ public sealed class CaveMutationRepository
         CancellationToken cancellationToken = default)
     {
         RequireCallerTransaction();
-        var tracked = _db.ChangeTracker.Entries<Cave>()
-            .SingleOrDefault(entry => entry.Entity.Id == caveId && entry.Entity.AccountId == _scope.AccountId);
+        var tracked = DbContext.ChangeTracker.Entries<Cave>()
+            .SingleOrDefault(entry => entry.Entity.Id == caveId && entry.Entity.AccountId == Scope.AccountId);
         var cave = await GetOwnedCaveAsync(caveId, cancellationToken);
         if (tracked is not null)
         {
@@ -136,10 +102,10 @@ public sealed class CaveMutationRepository
 
         var revision = NewRevision(cave.AccountId, cave.Id, preparation.PreviousRevision, current, source, operation,
             changeRequestId, importBatchId);
-        _db.CaveRevisions.Add(revision);
-        await _db.SaveChangesAsync(cancellationToken);
+        DbContext.CaveRevisions.Add(revision);
+        await SaveChangesAsync(cancellationToken);
         cave.CurrentRevisionId = revision.Id;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveChangesAsync(cancellationToken);
         return new CaveMutationResult(cave.Id, revision.Id, true);
     }
 
@@ -155,10 +121,10 @@ public sealed class CaveMutationRepository
         var snapshot = await _snapshots.BuildAsync(cave.Id, cancellationToken);
         var revision = NewRevision(cave.AccountId, cave.Id, null, snapshot, source, operation, changeRequestId,
             importBatchId);
-        _db.CaveRevisions.Add(revision);
-        await _db.SaveChangesAsync(cancellationToken);
+        DbContext.CaveRevisions.Add(revision);
+        await SaveChangesAsync(cancellationToken);
         cave.CurrentRevisionId = revision.Id;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveChangesAsync(cancellationToken);
         return new CaveMutationResult(cave.Id, revision.Id, true);
     }
 
@@ -170,22 +136,22 @@ public sealed class CaveMutationRepository
         CancellationToken cancellationToken = default)
     {
         RequireCallerTransaction();
-        var stillExists = await _db.Caves.IgnoreQueryFilters()
-            .AnyAsync(c => c.Id == preparation.CaveId && c.AccountId == _scope.AccountId, cancellationToken);
+        var stillExists = await DbContext.Caves.IgnoreQueryFilters()
+            .AnyAsync(c => c.Id == preparation.CaveId && c.AccountId == Scope.AccountId, cancellationToken);
         if (stillExists)
             throw new InvalidOperationException("Cave must be removed before publishing its delete revision.");
 
-        var revision = NewRevision(_scope.AccountId, preparation.CaveId, preparation.PreviousRevision,
+        var revision = NewRevision(Scope.AccountId, preparation.CaveId, preparation.PreviousRevision,
             preparation.LiveSnapshotBeforeMutation, source, CaveRevisionOperation.Delete, changeRequestId,
             importBatchId);
-        _db.CaveRevisions.Add(revision);
-        await _db.SaveChangesAsync(cancellationToken);
+        DbContext.CaveRevisions.Add(revision);
+        await SaveChangesAsync(cancellationToken);
         return new CaveMutationResult(preparation.CaveId, revision.Id, true);
     }
 
     private async Task<Cave> GetOwnedCaveAsync(string caveId, CancellationToken cancellationToken) =>
-        await _db.Caves.IgnoreQueryFilters()
-            .SingleOrDefaultAsync(c => c.Id == caveId && c.AccountId == _scope.AccountId, cancellationToken)
+        await DbContext.Caves.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(c => c.Id == caveId && c.AccountId == Scope.AccountId, cancellationToken)
         ?? throw new InvalidOperationException("Cave is not owned by the current account.");
 
     private async Task<(CaveRevision Revision, CavePublishedSnapshotV1 Snapshot)> GetCurrentRevisionAsync(
@@ -195,14 +161,14 @@ public sealed class CaveMutationRepository
             throw new InvalidOperationException(
                 $"Cave '{cave.Id}' has no current revision. Revision history rollout must complete before Cave mutations are served.");
 
-        var revision = await _db.CaveRevisions
-            .SingleAsync(r => r.Id == cave.CurrentRevisionId && r.AccountId == _scope.AccountId, cancellationToken);
+        var revision = await DbContext.CaveRevisions
+            .SingleAsync(r => r.Id == cave.CurrentRevisionId && r.AccountId == Scope.AccountId, cancellationToken);
         return (revision, CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion));
     }
 
     private void RequireCallerTransaction()
     {
-        if (_db.Database.CurrentTransaction is null)
+        if (DbContext.Database.CurrentTransaction is null)
             throw new InvalidOperationException("This Cave revision operation requires an active database transaction.");
     }
 

@@ -16,7 +16,7 @@ using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Import.Services;
 
-public partial class ImportService : ServiceBase
+public partial class ImportService : AccountServiceBase
 {
     private readonly FileService _fileService;
     private readonly ImportSourceService _importSourceService;

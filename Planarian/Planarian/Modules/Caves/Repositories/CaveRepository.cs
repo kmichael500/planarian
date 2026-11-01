@@ -29,13 +29,16 @@ namespace Planarian.Modules.Caves.Repositories;
 
 public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    private readonly AuthoringFileRepository<TDbContext> _authoringFiles;
+    private readonly TimeProvider _timeProvider;
+    private AuthoringFileRepository<TDbContext>? _authoringFiles;
+
+    private AuthoringFileRepository<TDbContext> AuthoringFiles =>
+        _authoringFiles ??= new AuthoringFileRepository<TDbContext>(DbContext, RequestUser, _timeProvider);
 
     public CaveRepository(TDbContext dbContext, RequestUser requestUser, TimeProvider? timeProvider = null)
         : base(dbContext, requestUser)
     {
-        _authoringFiles = new AuthoringFileRepository<TDbContext>(
-            dbContext, requestUser, timeProvider ?? TimeProvider.System);
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public IQueryable<string> GetCaveIds(FilterQuery filterQuery, string? permissionKey = null)
@@ -1232,7 +1235,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public Task<IReadOnlyList<Planarian.Model.Database.Entities.RidgeWalker.File>>
         AttachAuthoringStagedFilesAsync(string caveId, IEnumerable<string> fileIds,
             CancellationToken cancellationToken = default) =>
-        _authoringFiles.AttachUnclaimedToCaveAsync(caveId, fileIds, cancellationToken);
+        AuthoringFiles.AttachUnclaimedToCaveAsync(caveId, fileIds, cancellationToken);
 
     public async Task<StorageCleanupTarget?> QueuePublishedFileObjectCleanupAsync(
         Planarian.Model.Database.Entities.RidgeWalker.File file, string caveId,
@@ -1359,7 +1362,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public Task<List<Planarian.Model.Database.Entities.RidgeWalker.File>> AttachStagedFilesAsync(
         string changeRequestId, string caveId, IReadOnlyList<StagedCaveFilePublication> publications,
         CancellationToken cancellationToken = default) =>
-        _authoringFiles.AttachRequestFilesToCaveAsync(
+        AuthoringFiles.AttachRequestFilesToCaveAsync(
             changeRequestId, caveId, publications, cancellationToken);
 
     public async Task<IReadOnlyList<GeoJsonUploadVm>> GetCaveLinePlotsAsync(string caveId,

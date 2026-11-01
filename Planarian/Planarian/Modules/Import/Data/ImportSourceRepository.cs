@@ -22,7 +22,7 @@ public sealed record PersistedImportSource(string Id, string FileName);
 /// Database lifecycle for Cave/Entrance CSV import provenance.
 /// Row locking serializes promotion and expiration cleanup on the source itself.
 /// </summary>
-public sealed class ImportSourceRepository : RepositoryBase
+public sealed class ImportSourceRepository : AccountScopedRepositoryBase
 {
     public ImportSourceRepository(PlanarianDbContext dbContext, RequestUser requestUser)
         : base(dbContext, requestUser)
@@ -32,7 +32,7 @@ public sealed class ImportSourceRepository : RepositoryBase
     public Task<ImportSourceAccessInfo?> GetAsync(string id, CancellationToken cancellationToken)
     {
         return DbContext.CaveImportSources.AsNoTracking()
-            .Where(source => source.Id == id && source.AccountId == RequestUser.AccountId)
+            .Where(source => source.Id == id && source.AccountId == AccountId)
             .Select(source => new ImportSourceAccessInfo(
                 source.Id,
                 source.FileName,
@@ -46,9 +46,7 @@ public sealed class ImportSourceRepository : RepositoryBase
         string sourceId,
         CancellationToken cancellationToken)
     {
-        var accountId = RequestUser.AccountId
-            ?? throw new InvalidOperationException("An active account is required for import-source promotion.");
-        return PromoteAsync(DbContext, accountId, RequestUser.Id, sourceId, cancellationToken);
+        return PromoteAsync(DbContext, AccountId, UserId, sourceId, cancellationToken);
     }
 
     public static async Task<PersistedImportSource> PromoteAsync(
@@ -101,52 +99,48 @@ public sealed class ImportSourceRepository : RepositoryBase
         return new PersistedImportSource(source.Id, source.FileName);
     }
 
-    public async Task<IReadOnlyList<string>> RemoveExpiredAsync(
+    public Task<IReadOnlyList<string>> RemoveExpiredAsync(
         int maxCount,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
-        var accountId = RequestUser.AccountId
-            ?? throw new InvalidOperationException("An active account is required for import-source cleanup.");
+        var accountId = AccountId;
 
-        await using var transaction = await BeginTransactionAsync(cancellationToken);
-        var expired = await DbContext.CaveImportSources
-            .FromSqlInterpolated($"""
-                SELECT source.*
-                FROM "CaveImportSources" AS source
-                WHERE source."AccountId" = {accountId}
-                  AND source."ExpiresOn" IS NOT NULL
-                  AND source."ExpiresOn" < clock_timestamp()
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM "CaveImportBatches" AS batch
-                      WHERE batch."AccountId" = source."AccountId"
-                        AND batch."SourceFileId" = source."Id"
-                  )
-                ORDER BY source."Id" COLLATE "C"
-                LIMIT {maxCount}
-                FOR UPDATE OF source
-                """)
-            .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
-
-        if (expired.Count == 0)
+        return RunInOwnedTransactionAsync<IReadOnlyList<string>>(async token =>
         {
-            await transaction.CommitAsync(cancellationToken);
-            return [];
-        }
+            var expired = await DbContext.CaveImportSources
+                .FromSqlInterpolated($"""
+                    SELECT source.*
+                    FROM "CaveImportSources" AS source
+                    WHERE source."AccountId" = {accountId}
+                      AND source."ExpiresOn" IS NOT NULL
+                      AND source."ExpiresOn" < clock_timestamp()
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM "CaveImportBatches" AS batch
+                          WHERE batch."AccountId" = source."AccountId"
+                            AND batch."SourceFileId" = source."Id"
+                      )
+                    ORDER BY source."Id" COLLATE "C"
+                    LIMIT {maxCount}
+                    FOR UPDATE OF source
+                    """)
+                .IgnoreQueryFilters()
+                .ToListAsync(token);
 
-        var cleanupTargets = await StorageCleanupRepository.QueueAsync(
-            DbContext,
-            accountId,
-            RequestUser.Id,
-            StorageCleanupPurpose.ImportSourceRemoval,
-            expired.Select(source => new StorageCleanupAddress(source.BlobContainer, source.BlobKey)),
-            cancellationToken);
+            if (expired.Count == 0) return [];
 
-        DbContext.CaveImportSources.RemoveRange(expired);
-        await DbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
+            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+                DbContext,
+                accountId,
+                UserId,
+                StorageCleanupPurpose.ImportSourceRemoval,
+                expired.Select(source => new StorageCleanupAddress(source.BlobContainer, source.BlobKey)),
+                token);
+
+            DbContext.CaveImportSources.RemoveRange(expired);
+            await SaveChangesAsync(token);
+            return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
+        }, cancellationToken);
     }
 }

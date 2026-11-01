@@ -1,6 +1,7 @@
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Repositories;
+using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Files.Services;
@@ -9,7 +10,7 @@ namespace Planarian.Modules.Files.Services;
 /// Executes durable post-commit object cleanup. Relational mutations queue targets;
 /// this service performs the external deletion only after those mutations commit.
 /// </summary>
-public sealed class StorageCleanupService
+public sealed class StorageCleanupService : AccountServiceBase
 {
     private const int OpportunisticBatchSize = 16;
     private const int ExplicitBatchSize = 500;
@@ -25,7 +26,6 @@ public sealed class StorageCleanupService
          StorageCleanupPurpose.ImportSourceRemoval];
 
     private readonly StorageCleanupRepository _repository;
-    private readonly RequestUser _requestUser;
     private readonly IObjectStorage _objectStorage;
     private readonly ILogger<StorageCleanupService> _logger;
 
@@ -33,10 +33,9 @@ public sealed class StorageCleanupService
         StorageCleanupRepository repository,
         RequestUser requestUser,
         IObjectStorage objectStorage,
-        ILogger<StorageCleanupService> logger)
+        ILogger<StorageCleanupService> logger) : base(requestUser)
     {
         _repository = repository;
-        _requestUser = requestUser;
         _objectStorage = objectStorage;
         _logger = logger;
     }
@@ -74,7 +73,7 @@ public sealed class StorageCleanupService
         {
             _logger.LogWarning(exception,
                 "Unable to reconcile uncertain object creation for account {AccountId} at {StorageKey}",
-                _requestUser.AccountId, address.Key);
+                AccountId, address.Key);
         }
     }
 
@@ -124,7 +123,7 @@ public sealed class StorageCleanupService
         {
             _logger.LogWarning(exception,
                 "Unable to load object cleanup debt for account {AccountId}; cleanup will retry later",
-                _requestUser.AccountId);
+                AccountId);
             return;
         }
 
@@ -138,7 +137,7 @@ public sealed class StorageCleanupService
         {
             _logger.LogWarning(exception,
                 "Unable to validate live object references for {CleanupCount} cleanup targets in account {AccountId}; cleanup will retry later",
-                pending.Count, _requestUser.AccountId);
+                pending.Count, AccountId);
             return;
         }
 
@@ -155,7 +154,7 @@ public sealed class StorageCleanupService
                 {
                     _logger.LogWarning(
                         "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} is live again; clearing stale debt without deleting the object",
-                        target.Id, target.Purpose, _requestUser.AccountId);
+                        target.Id, target.Purpose, AccountId);
                     completed.Add(target.Id);
                     continue;
                 }
@@ -168,7 +167,7 @@ public sealed class StorageCleanupService
                     failed.Add(target.Id);
                     _logger.LogWarning(
                         "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} remains pending after object deletion failed",
-                        target.Id, target.Purpose, _requestUser.AccountId);
+                        target.Id, target.Purpose, AccountId);
                 }
             }
             catch (Exception exception)
@@ -176,7 +175,7 @@ public sealed class StorageCleanupService
                 failed.Add(target.Id);
                 _logger.LogWarning(exception,
                     "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} could not be processed and remains pending",
-                    target.Id, target.Purpose, _requestUser.AccountId);
+                    target.Id, target.Purpose, AccountId);
             }
         }
 
@@ -190,7 +189,7 @@ public sealed class StorageCleanupService
             {
                 _logger.LogWarning(exception,
                     "Unable to defer {CleanupCount} failed cleanup targets for account {AccountId}; they remain durable",
-                    failed.Count, _requestUser.AccountId);
+                    failed.Count, AccountId);
             }
         }
 
@@ -203,7 +202,7 @@ public sealed class StorageCleanupService
         {
             _logger.LogWarning(exception,
                 "Unable to acknowledge {CleanupCount} completed storage cleanup targets for account {AccountId}; idempotent cleanup will retry later",
-                completed.Count, _requestUser.AccountId);
+                completed.Count, AccountId);
         }
     }
 }

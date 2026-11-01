@@ -9,7 +9,6 @@ public partial class ImportService
     public async Task<List<EntranceDryRun>> ImportEntrancesFileProcess(string temporaryFileId, bool isDryRun,
         bool syncExisting, CancellationToken cancellationToken)
     {
-        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
         if (string.IsNullOrWhiteSpace(temporaryFileId))
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
 

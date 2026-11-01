@@ -4,6 +4,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Caves.Revisions;
 
@@ -12,17 +13,13 @@ namespace Planarian.Modules.Caves.Revisions;
 /// Uses the same canonical snapshot and semantic-diff contract as interactive publication while keeping
 /// the persistence path set-oriented. Existing Caves must already have rollout revision history initialized.
 /// </summary>
-public sealed class CaveBulkRevisionRepository
+public sealed class CaveBulkRevisionRepository : AccountScopedRepositoryBase
 {
     private const int BatchSize = 1000;
-    private readonly PlanarianDbContext _db;
     private readonly CaveRevisionDiffService _diff = new();
-    private readonly AccountExecutionScope _scope;
 
-    public CaveBulkRevisionRepository(PlanarianDbContext db, RequestUser requestUser)
+    public CaveBulkRevisionRepository(PlanarianDbContext db, RequestUser requestUser) : base(db, requestUser)
     {
-        _db = db;
-        _scope = AccountExecutionScope.Require(requestUser);
     }
 
     public async Task PublishAsync(
@@ -54,8 +51,8 @@ public sealed class CaveBulkRevisionRepository
             .ToList();
         var expectedRevisions = expectedRevisionIds.Count == 0
             ? new Dictionary<string, ExpectedRevisionSnapshot>(StringComparer.Ordinal)
-            : await _db.CaveRevisions.AsNoTracking()
-                .Where(revision => revision.AccountId == _scope.AccountId &&
+            : await DbContext.CaveRevisions.AsNoTracking()
+                .Where(revision => revision.AccountId == Scope.AccountId &&
                                    expectedRevisionIds.Contains(revision.Id))
                 .Select(revision => new ExpectedRevisionSnapshot(revision.Id, revision.CaveId,
                     revision.SnapshotSchemaVersion, revision.SnapshotJson))
@@ -66,8 +63,8 @@ public sealed class CaveBulkRevisionRepository
             var liveIds = chunk.Where(after.ContainsKey).ToList();
             var liveCaves = liveIds.Count == 0
                 ? new Dictionary<string, Cave>(StringComparer.Ordinal)
-                : await _db.Caves.IgnoreQueryFilters()
-                    .Where(c => c.AccountId == _scope.AccountId && liveIds.Contains(c.Id))
+                : await DbContext.Caves.IgnoreQueryFilters()
+                    .Where(c => c.AccountId == Scope.AccountId && liveIds.Contains(c.Id))
                     .ToDictionaryAsync(c => c.Id, StringComparer.Ordinal, cancellationToken);
 
             foreach (var caveId in chunk)
@@ -110,12 +107,12 @@ public sealed class CaveBulkRevisionRepository
                     : currentSnapshot ?? throw new InvalidOperationException($"Published Cave '{caveId}' has no after snapshot.");
                 var revision = new CaveRevision
                 {
-                    Id = IdGenerator.Generate(), AccountId = _scope.AccountId, CaveId = caveId,
+                    Id = IdGenerator.Generate(), AccountId = Scope.AccountId, CaveId = caveId,
                     PreviousRevisionId = previousRevisionId, Source = source, Operation = operation,
                     ImportBatchId = importBatchId, SnapshotSchemaVersion = 1,
                     SnapshotJson = CaveSnapshotJson.Serialize(acceptedSnapshot)
                 };
-                _db.CaveRevisions.Add(revision);
+                DbContext.CaveRevisions.Add(revision);
 
                 if (operation == CaveRevisionOperation.Delete) continue;
                 if (!liveCaves.TryGetValue(caveId, out var cave))
@@ -125,8 +122,8 @@ public sealed class CaveBulkRevisionRepository
                 cave.CurrentRevisionId = revision.Id;
             }
 
-            await _db.SaveChangesAsync(cancellationToken);
-            _db.ChangeTracker.Clear();
+            await SaveChangesAsync(cancellationToken);
+            DbContext.ChangeTracker.Clear();
         }
     }
 

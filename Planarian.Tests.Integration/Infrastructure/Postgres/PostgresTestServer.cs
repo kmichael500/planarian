@@ -293,7 +293,7 @@ public sealed class PostgresTestServer : IAsyncLifetime
             .AddInterceptors(interceptors)
             .Options;
         var db = new PlanarianDbContext(options);
-        db.RequestUser = new RequestUser(db)
+        _ = new RequestUser(db)
         {
             Id = userId,
             AccountId = accountId,

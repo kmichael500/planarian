@@ -29,7 +29,7 @@ public sealed record AuthoringStagedObject(
 /// Cave publication. Proposal claims protect a staged File from expiration; unclaimed
 /// Files remain creator-owned and deadline-bound.
 /// </summary>
-public class AuthoringFileRepository<TDbContext> : RepositoryBase<TDbContext>
+public class AuthoringFileRepository<TDbContext> : AccountScopedRepositoryBase<TDbContext>
     where TDbContext : PlanarianDbContextBase
 {
     private readonly TimeProvider _timeProvider;
@@ -41,12 +41,6 @@ public class AuthoringFileRepository<TDbContext> : RepositoryBase<TDbContext>
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
-
-    private string AccountId => RequestUser.AccountId
-        ?? throw new InvalidOperationException("An active account is required for File authoring.");
-
-    private string UserId => RequestUser.Id
-        ?? throw new InvalidOperationException("An active user is required for File authoring.");
 
     private string AccountContainer => RequestUser.BuildAccountContainerName(AccountId);
 
@@ -351,134 +345,118 @@ public class AuthoringFileRepository<TDbContext> : RepositoryBase<TDbContext>
         return files;
     }
 
-    public async Task<IReadOnlyList<string>> RemoveUnclaimedAsync(
+    public Task<IReadOnlyList<string>> RemoveUnclaimedAsync(
         string id,
-        CancellationToken cancellationToken)
-    {
-        await using var transaction = await BeginTransactionAsync(cancellationToken);
-        var expectedKey = AuthoringFileStoragePath.BuildKey(id);
-        var file = await DbContext.Files.FromSqlInterpolated($"""
-                SELECT *
-                FROM "Files"
-                WHERE "AccountId" = {AccountId}
-                  AND "Id" = {id}
-                  AND "CreatedByUserId" = {UserId}
-                  AND "CaveId" IS NULL
-                  AND "ExpiresOn" IS NOT NULL
-                  AND "BlobContainer" = {AccountContainer}
-                  AND "BlobKey" = {expectedKey}
-                FOR UPDATE
-                """)
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (file is null)
+        CancellationToken cancellationToken) =>
+        RunInOwnedTransactionAsync<IReadOnlyList<string>>(async token =>
         {
-            await transaction.CommitAsync(cancellationToken);
-            return [];
-        }
+            var expectedKey = AuthoringFileStoragePath.BuildKey(id);
+            var file = await DbContext.Files.FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "Files"
+                    WHERE "AccountId" = {AccountId}
+                      AND "Id" = {id}
+                      AND "CreatedByUserId" = {UserId}
+                      AND "CaveId" IS NULL
+                      AND "ExpiresOn" IS NOT NULL
+                      AND "BlobContainer" = {AccountContainer}
+                      AND "BlobKey" = {expectedKey}
+                    FOR UPDATE
+                    """)
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(token);
 
-        var claimed = await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
-            .AnyAsync(staged => staged.AccountId == AccountId && staged.FileId == id, cancellationToken);
-        if (claimed)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return [];
-        }
+            if (file is null) return [];
 
-        var cleanupTargets = await StorageCleanupRepository.QueueAsync(
-            DbContext,
-            AccountId,
-            UserId,
-            StorageCleanupPurpose.UnpublishedFileRemoval,
-            [new StorageCleanupAddress(file.BlobContainer!, file.BlobKey!)],
-            cancellationToken);
+            var claimed = await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+                .AnyAsync(staged => staged.AccountId == AccountId && staged.FileId == id, token);
+            if (claimed) return [];
 
-        var deleted = await DbContext.Files.IgnoreQueryFilters()
-            .Where(row => row.AccountId == AccountId &&
-                          row.Id == id &&
-                          row.CaveId == null &&
-                          row.ExpiresOn != null)
-            .ExecuteDeleteAsync(cancellationToken);
-        if (deleted != 1)
-            throw new InvalidOperationException("The locked staged File could not be deleted.");
+            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+                DbContext,
+                AccountId,
+                UserId,
+                StorageCleanupPurpose.UnpublishedFileRemoval,
+                [new StorageCleanupAddress(file.BlobContainer!, file.BlobKey!)],
+                token);
 
-        await DbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return cleanupTargets.Select(target => target.Id)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-    }
+            var deleted = await DbContext.Files.IgnoreQueryFilters()
+                .Where(row => row.AccountId == AccountId &&
+                              row.Id == id &&
+                              row.CaveId == null &&
+                              row.ExpiresOn != null)
+                .ExecuteDeleteAsync(token);
+            if (deleted != 1)
+                throw new InvalidOperationException("The locked staged File could not be deleted.");
 
-    public async Task<IReadOnlyList<string>> RemoveExpiredAsync(
+            await SaveChangesAsync(token);
+            return cleanupTargets.Select(target => target.Id)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }, cancellationToken);
+
+    public Task<IReadOnlyList<string>> RemoveExpiredAsync(
         int maxCount,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
 
-        await using var transaction = await BeginTransactionAsync(cancellationToken);
-        var expiredFiles = await DbContext.Files.FromSqlInterpolated($"""
-                SELECT file.*
-                FROM "Files" AS file
-                WHERE file."AccountId" = {AccountId}
-                  AND file."CaveId" IS NULL
-                  AND file."ExpiresOn" < clock_timestamp()
-                  AND file."BlobContainer" = {AccountContainer}
-                  AND file."BlobKey" = 'objects/files/' || file."Id"
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM "CaveChangeRequestStagedFiles" AS staged
-                      WHERE staged."AccountId" = file."AccountId"
-                        AND staged."FileId" = file."Id"
-                  )
-                ORDER BY file."Id" COLLATE "C"
-                LIMIT {maxCount}
-                FOR UPDATE OF file
-                """)
-            .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
-
-        if (expiredFiles.Count == 0)
+        return RunInOwnedTransactionAsync<IReadOnlyList<string>>(async token =>
         {
-            await transaction.CommitAsync(cancellationToken);
-            return [];
-        }
+            var expiredFiles = await DbContext.Files.FromSqlInterpolated($"""
+                    SELECT file.*
+                    FROM "Files" AS file
+                    WHERE file."AccountId" = {AccountId}
+                      AND file."CaveId" IS NULL
+                      AND file."ExpiresOn" < clock_timestamp()
+                      AND file."BlobContainer" = {AccountContainer}
+                      AND file."BlobKey" = 'objects/files/' || file."Id"
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM "CaveChangeRequestStagedFiles" AS staged
+                          WHERE staged."AccountId" = file."AccountId"
+                            AND staged."FileId" = file."Id"
+                      )
+                    ORDER BY file."Id" COLLATE "C"
+                    LIMIT {maxCount}
+                    FOR UPDATE OF file
+                    """)
+                .IgnoreQueryFilters()
+                .ToListAsync(token);
 
-        // A claim may commit while the SELECT above waits for a File lock without
-        // modifying the File tuple. Re-read after all locks so READ COMMITTED sees it.
-        var candidateIds = expiredFiles.Select(file => file.Id).ToArray();
-        var protectedIds = (await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AsNoTracking()
-                .Where(staged => staged.AccountId == AccountId &&
-                                 candidateIds.Contains(staged.FileId))
-                .Select(staged => staged.FileId)
-                .ToListAsync(cancellationToken))
-            .ToHashSet(StringComparer.Ordinal);
+            if (expiredFiles.Count == 0) return [];
 
-        var deletable = expiredFiles
-            .Where(file => !protectedIds.Contains(file.Id))
-            .ToList();
-        if (deletable.Count == 0)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return [];
-        }
+            // A claim may commit while the SELECT above waits for a File lock without
+            // modifying the File tuple. Re-read after all locks so READ COMMITTED sees it.
+            var candidateIds = expiredFiles.Select(file => file.Id).ToArray();
+            var protectedIds = (await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AsNoTracking()
+                    .Where(staged => staged.AccountId == AccountId &&
+                                     candidateIds.Contains(staged.FileId))
+                    .Select(staged => staged.FileId)
+                    .ToListAsync(token))
+                .ToHashSet(StringComparer.Ordinal);
 
-        var cleanupTargets = await StorageCleanupRepository.QueueAsync(
-            DbContext,
-            AccountId,
-            UserId,
-            StorageCleanupPurpose.UnpublishedFileRemoval,
-            deletable.Select(file => new StorageCleanupAddress(file.BlobContainer!, file.BlobKey!)),
-            cancellationToken);
+            var deletable = expiredFiles
+                .Where(file => !protectedIds.Contains(file.Id))
+                .ToList();
+            if (deletable.Count == 0) return [];
 
-        DbContext.Files.RemoveRange(deletable);
-        await DbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            var cleanupTargets = await StorageCleanupRepository.QueueAsync(
+                DbContext,
+                AccountId,
+                UserId,
+                StorageCleanupPurpose.UnpublishedFileRemoval,
+                deletable.Select(file => new StorageCleanupAddress(file.BlobContainer!, file.BlobKey!)),
+                token);
 
-        return cleanupTargets.Select(target => target.Id)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+            DbContext.Files.RemoveRange(deletable);
+            await SaveChangesAsync(token);
+
+            return cleanupTargets.Select(target => target.Id)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<StorageCleanupTarget>> RemoveRequestClaimsAndUnreferencedAsync(

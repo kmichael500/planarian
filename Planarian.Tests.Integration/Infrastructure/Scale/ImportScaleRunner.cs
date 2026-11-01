@@ -124,7 +124,7 @@ internal sealed class ImportScaleRunner(PostgresTestDatabase database, string ac
             .AddInterceptors(sql, saves)
             .Options;
         var db = new PlanarianDbContext(options);
-        db.RequestUser = new RequestUser(db)
+        _ = new RequestUser(db)
         {
             Id = "bench",
             AccountId = accountId,

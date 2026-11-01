@@ -167,7 +167,6 @@ static async Task<string> CreateAccountThroughService(
         await using var transaction = await db.Database.BeginTransactionAsync();
 
         var requestUser = new RequestUser(db);
-        db.RequestUser = requestUser;
         await requestUser.Initialize(null, dataset.AdminUserId);
         if (!requestUser.IsAuthenticated)
             throw new InvalidOperationException("Seeded development admin could not be initialized for account creation.");

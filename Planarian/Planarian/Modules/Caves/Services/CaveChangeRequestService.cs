@@ -13,11 +13,12 @@ using Planarian.Modules.Files.Models;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Tags;
+using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Caves.Services;
 
-public sealed class CaveChangeRequestService
+public sealed class CaveChangeRequestService : AccountServiceBase
 {
     private readonly CaveChangeRequestRepository _requests;
     private readonly CaveRepository _caves;
@@ -26,12 +27,11 @@ public sealed class CaveChangeRequestService
     private readonly CaveMutationCoordinator _mutations;
     private readonly FileService _files;
     private readonly StorageCleanupService _storageCleanup;
-    private readonly RequestUser _user;
     private readonly CaveRevisionDiffService _diff = new();
 
     public CaveChangeRequestService(CaveChangeRequestRepository requests, CaveRepository caves,
         CaveService caveService, CaveRevisionQueryRepository revisions, CaveMutationCoordinator mutations,
-        FileService files, StorageCleanupService storageCleanup, RequestUser user)
+        FileService files, StorageCleanupService storageCleanup, RequestUser user) : base(user)
     {
         _requests = requests;
         _caves = caves;
@@ -40,7 +40,6 @@ public sealed class CaveChangeRequestService
         _mutations = mutations;
         _files = files;
         _storageCleanup = storageCleanup;
-        _user = user;
     }
 
     public async Task<CaveProposalAuthoringContextVm> GetAuthoringContextAsync(string caveId,
@@ -93,8 +92,8 @@ public sealed class CaveChangeRequestService
         string? baseRevisionId;
         if (isCreation)
         {
-            if (row.Request.CreatedByUserId != _user.Id)
-                await _user.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
+            if (row.Request.CreatedByUserId != UserId)
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
             await RequireNewCaveCountyNumberAuthorityAsync(values);
             baseSnapshot = EmptyCreateBase(previous);
             baseRevisionId = null;
@@ -139,7 +138,7 @@ public sealed class CaveChangeRequestService
     public async Task<CaveChangePreviewVm> PreviewNewAsync(AddCaveVm values,
         CancellationToken cancellationToken)
     {
-        await _user.HasCavePermission(PermissionPolicyKey.View);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.View);
         await RequireNewCaveCountyNumberAuthorityAsync(values);
         var caveId = IdGenerator.Generate();
         var proposal = await BuildProposalAsync(values, caveId, cancellationToken,
@@ -157,7 +156,7 @@ public sealed class CaveChangeRequestService
 
     public async Task<string> CreateNewAsync(AddCaveVm values, CancellationToken cancellationToken)
     {
-        await _user.HasCavePermission(PermissionPolicyKey.View);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.View);
         await RequireNewCaveCountyNumberAuthorityAsync(values);
         var caveId = IdGenerator.Generate();
         return await _requests.CreateNewAsync(caveId,
@@ -187,8 +186,8 @@ public sealed class CaveChangeRequestService
         CaveProposalSnapshotV1 proposal;
         if (row.Request.BaseRevisionId is null)
         {
-            if (row.Request.CreatedByUserId != _user.Id)
-                await _user.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
+            if (row.Request.CreatedByUserId != UserId)
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
             await RequireNewCaveCountyNumberAuthorityAsync(values);
             proposal = await BuildValidatedCreateProposalAsync(values, row.Request.CaveId,
                 stagedIds, previousEntranceIds, previousLinePlotIds, row.Request.Id, semanticPrevious,
@@ -438,7 +437,7 @@ public sealed class CaveChangeRequestService
         string expectedProposalVersionId, CancellationToken cancellationToken)
     {
         var row = await RequireReadableAsync(requestId, cancellationToken);
-        if (row.Request.CreatedByUserId != _user.Id)
+        if (row.Request.CreatedByUserId != UserId)
             throw ApiExceptionDictionary.Forbidden("Only the submitter can resubmit requested changes.");
         await _requests.ResubmitAsync(requestId, expectedProposalVersionId, cancellationToken);
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Resubmitted, requestId, null,
@@ -477,16 +476,16 @@ public sealed class CaveChangeRequestService
     {
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
-        if (row.Request.CreatedByUserId != _user.Id && !row.CurrentCanReview)
+        if (row.Request.CreatedByUserId != UserId && !row.CurrentCanReview)
             throw ApiExceptionDictionary.NotFound("Change request");
         return row;
     }
 
     private Task<bool> CanReviewAsync(CaveChangeRequestReadRow row, bool throwIfDenied) =>
         row.Request.BaseRevisionId is null && !row.CaveExists
-            ? _user.HasCavePermission(PermissionPolicyKey.Manager, null,
+            ? RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null,
                 row.Request.ProposedCountyId, row.Request.ProposedStateId, throwIfDenied)
-            : _user.HasCavePermission(PermissionPolicyKey.Manager, row.Request.CaveId,
+            : RequestUser.HasCavePermission(PermissionPolicyKey.Manager, row.Request.CaveId,
                 null, null, throwIfDenied);
 
     private async Task RequireNewCaveCountyNumberAuthorityAsync(AddCaveVm values)
@@ -494,7 +493,7 @@ public sealed class CaveChangeRequestService
         if (values.IsCountyNumberManuallySet && values.CountyNumber is not > 0)
             throw ApiExceptionDictionary.BadRequest("Enter a county number greater than 0.");
         if (!values.IsCountyNumberManuallySet && !values.UseFirstAvailableCountyNumber) return;
-        if (!await _user.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId,
+        if (!await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId,
                 @throw: false))
             throw ApiExceptionDictionary.Forbidden(
                 "Only a Manager for the selected County may choose County Cave Number allocation options.");
@@ -556,10 +555,10 @@ public sealed class CaveChangeRequestService
     private void RequireCanRevise(CaveChangeRequestReadRow row, bool canReview)
     {
         if (CaveChangeRequestStatePolicy.IsAwaitingAuthor(row.Request.Status) &&
-            row.Request.CreatedByUserId != _user.Id)
+            row.Request.CreatedByUserId != UserId)
             throw ApiExceptionDictionary.Forbidden("Only the submitter can revise a request while changes are requested.");
         if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status) &&
-            row.Request.CreatedByUserId != _user.Id && !canReview)
+            row.Request.CreatedByUserId != UserId && !canReview)
             throw ApiExceptionDictionary.Forbidden("You cannot revise this request.");
     }
 
@@ -683,7 +682,7 @@ public sealed class CaveChangeRequestService
         {
             if (!string.IsNullOrWhiteSpace(values.Id) && values.Id != caveId)
                 throw ApiExceptionDictionary.BadRequest("The proposed Cave identity does not match this request.");
-            current = EmptyCreateBase(caveId, _user.AccountId!);
+            current = EmptyCreateBase(caveId, AccountId);
         }
         else
         {
@@ -723,16 +722,16 @@ public sealed class CaveChangeRequestService
             ? []
             : await _requests.GetEligiblePeopleCandidatesAsync(cancellationToken);
         var resolvedCaveTags = CaveTagReferencePolicy.Resolve(caveGroups, idCandidates, peopleNameCandidates,
-            _user.AccountId!);
+            AccountId);
         var resolvedEntranceTags = entranceGroups.Select(item => (item.Entrance,
             Resolved: CaveTagReferencePolicy.Resolve(item.Groups, idCandidates, peopleNameCandidates,
-                _user.AccountId!))).ToList();
+                AccountId))).ToList();
         foreach (var entrance in values.Entrances)
             CaveTagReferencePolicy.RequireTypedReference(entrance.LocationQualityTagId,
-                TagTypeKeyConstant.LocationQuality, candidatesById, _user.AccountId!, "Location Quality");
+                TagTypeKeyConstant.LocationQuality, candidatesById, AccountId, "Location Quality");
         foreach (var file in values.Files ?? [])
             CaveTagReferencePolicy.RequireTypedReference(file.FileTypeTagId!, TagTypeKeyConstant.File,
-                candidatesById, _user.AccountId!, "file type");
+                candidatesById, AccountId, "file type");
         var locationLabels = await _requests.GetLocationLabelsAsync(values.StateId, values.CountyId,
             cancellationToken);
         string Name(string id) => candidatesById.TryGetValue(id, out var candidate) ? candidate.Name : id;
@@ -787,7 +786,7 @@ public sealed class CaveChangeRequestService
         return new CaveProposalSnapshotV1
         {
             CaveId = caveId,
-            AccountId = _user.AccountId!,
+            AccountId = AccountId,
             Name = values.Name.Trim(),
             AlternateNames = CaveAlternateNameNormalizer.Normalize(values.AlternateNames),
             StateId = values.StateId,
@@ -857,7 +856,7 @@ public sealed class CaveChangeRequestService
             cancellationToken)).ToDictionary(candidate => candidate.Id, StringComparer.Ordinal);
         foreach (var id in missingLocationQualityIds)
             CaveTagReferencePolicy.RequireTypedReference(id, TagTypeKeyConstant.LocationQuality,
-                locationQualityCandidates, _user.AccountId!, "Location Quality");
+                locationQualityCandidates, AccountId, "Location Quality");
         var baseFiles = @base.Files.ToDictionary(file => file.Id);
         var stagedFiles = await _requests.GetFileSnapshotsAsync(proposal.Files
             .Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
@@ -1048,7 +1047,7 @@ public sealed class CaveChangeRequestService
             row.Request.ReviewerNotes, row.Request.BaseRevisionId, row.ProposalVersion.BaseRevisionId,
             row.CurrentRevision?.Id, row.Request.CurrentProposalVersionId!, IsStale(row),
             row.Request.ApprovedRevisionId,
-            row.Request.CreatedByUserId == _user.Id &&
+            row.Request.CreatedByUserId == UserId &&
             CaveChangeRequestStatePolicy.CanReceiveProposalVersions(row.Request.Status),
             canReview && CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status),
             CaveProposalChangeScopeSummary.Build(baseSnapshot, proposal));
