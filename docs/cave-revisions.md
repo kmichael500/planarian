@@ -28,7 +28,7 @@ Interactive Cave/File reference mutations key-share-lock the union of current an
 
 County State moves, deletes, and merges use the conflicting County mutation lock. Cave import key-share-locks planned existing Counties so account, State, display code, and name remain stable, then key-share-locks planned existing TagTypes and locks affected Caves `FOR UPDATE`. Entrance import starts at TagType locks because it does not change Cave County membership.
 
-TagType rename/merge/delete uses conflicting TagType update locks; ordinary published reference writers use key-share locks. TagType rename and merge lock affected Caves and publish their resulting semantic changes in the same transaction.
+TagType rename/merge/delete uses conflicting TagType update locks; ordinary published reference writers use key-share locks. TagType rename and merge lock affected Caves and publish their resulting semantic changes in the same transaction. File-type merge also remaps account-owned staged File rows, which have no published Cave state to revise. Existing immutable proposal versions retain their recorded File-type intent.
 
 County rename locks the County and affected Caves while preserving each Cave's stable County ID and County Number. County merge is limited to source/destination Counties in the current account and selected State, preserves existing Cave County Numbers, rejects destination duplicates atomically, and leaves the source County as an unused administrative value.
 

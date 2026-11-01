@@ -1,6 +1,6 @@
 using System.Reflection;
 using Planarian.Modules.Caves.Models;
-using Planarian.Modules.Files.Controllers;
+using Planarian.Modules.Files.Models;
 using Xunit;
 
 namespace Planarian.Tests.Unit.Caves.Revisions;

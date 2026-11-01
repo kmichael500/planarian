@@ -1,36 +1,18 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Planarian.Model.Shared;
-using Planarian.Modules.Authentication.Services;
-using Planarian.Modules.Caves.Repositories;
-using Planarian.Modules.Caves.Revisions;
-using Planarian.Modules.Files.Repositories;
-using Planarian.Modules.Files.Services;
-using Planarian.Modules.Settings.Repositories;
-using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Tests.Integration.Infrastructure.Services;
 
-/// <summary>Keeps production FileService behavior while replacing only its Azure boundary.</summary>
-internal sealed class IntegrationTestFileService(
-    FileRepository repository,
-    RequestUser requestUser,
-    TagRepository tagRepository,
+/// <summary>
+/// Uses the real Azure transport for chunk/archive operations while replacing only
+/// whole-container deletion with the in-memory object boundary used by reset tests.
+/// </summary>
+internal sealed class IntegrationTestAzureBlobTransportService(
     FileOptions fileOptions,
-    SettingsRepository settingsRepository,
-    CaveRepository caveRepository,
-    RequestThrottleService requestThrottleService,
-    CaveMutationCoordinator caveMutationCoordinator,
-    TagReferenceLockRepository tagReferenceLocks,
     TestFileBlobStore blobs)
-    : FileService(repository, requestUser, tagRepository, fileOptions, settingsRepository, caveRepository,
-        requestThrottleService, caveMutationCoordinator, tagReferenceLocks, blobs, NullLogger<FileService>.Instance)
+    : AzureBlobTransportService(fileOptions, blobs)
 {
-    protected override Task AddToBlobStorage(Stream stream, string key, string containerName,
-        CancellationToken cancellationToken) => blobs.WriteAsync(stream, containerName, key, cancellationToken);
-
     public override async Task DeleteContainer(string containerName)
     {
         if (blobs.BeforeContainerDeleteAsync is not null)
@@ -39,6 +21,4 @@ internal sealed class IntegrationTestFileService(
             throw new IOException("The test blob boundary rejected the container delete.");
         blobs.DeleteContainer(containerName);
     }
-
-
 }

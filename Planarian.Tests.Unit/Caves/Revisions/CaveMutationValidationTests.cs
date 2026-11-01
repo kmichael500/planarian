@@ -3,7 +3,7 @@ using Planarian.Model.Shared;
 using Planarian.Library.Exceptions;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Revisions;
-using Planarian.Modules.Files.Controllers;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Tags;
 using Xunit;
 

@@ -3,7 +3,6 @@ using System.Text;
 using Azure.Storage.Blobs.Specialized;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
-using Planarian.Modules.Files.Services;
 using Planarian.Shared.Base;
 using Planarian.Shared.Options;
 
@@ -17,16 +16,16 @@ public class ChunkedUploadService : ServiceBase
     private static readonly object ProcessingAdmissionLock = new();
     private static SemaphoreSlim? ProcessingSemaphore;
 
-    private readonly FileService _fileService;
+    private readonly AzureBlobTransportService _blobStorage;
     private readonly long _maxFileSizeBytes;
     private readonly long _maxChunkSizeBytes;
 
     public ChunkedUploadService(
         RequestUser requestUser,
-        FileService fileService,
+        AzureBlobTransportService blobStorage,
         RequestThrottleOptions requestThrottleOptions) : base(requestUser)
     {
-        _fileService = fileService;
+        _blobStorage = blobStorage;
         _maxFileSizeBytes = Math.Max(1, requestThrottleOptions.ChunkedUploadMaxFileSizeBytes);
         _maxChunkSizeBytes = Math.Max(1, requestThrottleOptions.ChunkedUploadMaxChunkSizeBytes);
         InitializeProcessingAdmission(requestThrottleOptions);
@@ -39,21 +38,38 @@ public class ChunkedUploadService : ServiceBase
 
         foreach (var (sessionId, session) in Sessions)
         {
-            if (session.ExpiresOn > DateTimeOffset.UtcNow)
-            {
+            if (session.ExpiresOn > DateTimeOffset.UtcNow ||
+                session.Status == ChunkedUploadSessionStatus.Finalizing)
                 continue;
-            }
 
-            if (Sessions.TryRemove(sessionId, out var removed))
+            // A chunk upload can refresh ExpiresOn while holding this gate. Recheck
+            // after acquiring it; never delete a session while a chunk/commit is
+            // in flight or after block commitment starts durable publication.
+            await session.Gate.WaitAsync(cancellationToken);
+            try
             {
-                expired.Add(removed);
+                if (session.ExpiresOn > DateTimeOffset.UtcNow ||
+                    session.Status == ChunkedUploadSessionStatus.Finalizing)
+                    continue;
+
+                if (Sessions.TryRemove(sessionId, out var removed))
+                {
+                    // Operations which fetched the session before this sweep must
+                    // fail closed after acquiring Gate instead of writing a removed blob.
+                    removed.Status = ChunkedUploadSessionStatus.Canceled;
+                    expired.Add(removed);
+                }
+            }
+            finally
+            {
+                session.Gate.Release();
             }
         }
 
         foreach (var session in expired)
         {
             ReleaseProcessingSlot(session.SessionId);
-            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+            await _blobStorage.DeleteFile(session.BlobKey, session.ContainerName);
         }
 
         return expired;
@@ -154,7 +170,7 @@ public class ChunkedUploadService : ServiceBase
                 throw ApiExceptionDictionary.Conflict("Chunk order does not match the current upload session state.");
             }
 
-            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
+            var containerClient = await _blobStorage.GetBlobContainerClient(session.ContainerName);
             var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
             var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(chunkIndex.ToString("D8")));
             await using var seekableChunkStream =
@@ -226,7 +242,7 @@ public class ChunkedUploadService : ServiceBase
             session.Status = ChunkedUploadSessionStatus.Finalizing;
             try
             {
-                var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
+                var containerClient = await _blobStorage.GetBlobContainerClient(session.ContainerName);
                 var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
                 await blockBlobClient.CommitBlockListAsync(
                     session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
@@ -241,7 +257,7 @@ public class ChunkedUploadService : ServiceBase
 
                 try
                 {
-                    await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+                    await _blobStorage.DeleteFile(session.BlobKey, session.ContainerName);
                 }
                 catch
                 {
@@ -316,19 +332,22 @@ public class ChunkedUploadService : ServiceBase
             .Where(session =>
                 string.Equals(session.AccountId, RequestUser.AccountId, StringComparison.Ordinal) &&
                 string.Equals(session.UserId, RequestUser.Id, StringComparison.Ordinal) &&
-                session.Status != ChunkedUploadSessionStatus.Completed)
+                session.Status is not (ChunkedUploadSessionStatus.Completed or
+                    ChunkedUploadSessionStatus.Finalizing))
             .ToList();
 
         foreach (var session in activeSessions)
         {
-            await CloseSession(session, cancellationToken);
+            // Eligibility may have changed while waiting for Gate. Cancel-all
+            // skips sessions that started publishing instead of failing the batch.
+            await CloseSession(session, cancellationToken, skipIfFinalizing: true);
         }
     }
 
     public async Task DeleteCommittedSessionBlob(string sessionId)
     {
         var session = GetRequiredSession(sessionId);
-        await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+        await _blobStorage.DeleteFile(session.BlobKey, session.ContainerName);
     }
 
     public ChunkedUploadSessionState GetRequiredSession(string sessionId)
@@ -341,13 +360,11 @@ public class ChunkedUploadService : ServiceBase
             ? found
             : throw ApiExceptionDictionary.NotFound("Upload session");
 
-        if (session.ExpiresOn <= DateTimeOffset.UtcNow)
+        if (session.ExpiresOn <= DateTimeOffset.UtcNow &&
+            session.Status != ChunkedUploadSessionStatus.Finalizing)
         {
-            if (Sessions.TryRemove(sessionId, out _))
-            {
-                ReleaseProcessingSlot(sessionId);
-            }
-
+            // Expiration retirement belongs to CleanupExpiredSessions, which
+            // synchronizes with active chunk uploads through session.Gate.
             throw ApiExceptionDictionary.NotFound("Upload session");
         }
 
@@ -416,15 +433,27 @@ public class ChunkedUploadService : ServiceBase
         ProcessingSemaphore?.Release();
     }
 
-    private async Task CloseSession(ChunkedUploadSessionState session, CancellationToken cancellationToken)
+    private async Task CloseSession(ChunkedUploadSessionState session, CancellationToken cancellationToken,
+        bool skipIfFinalizing = false)
     {
         await session.Gate.WaitAsync(cancellationToken);
         try
         {
+            // Azure block commitment is only the start of publication. Removing
+            // staging while Finalizing would race with the durable File copy.
+            if (session.Status == ChunkedUploadSessionStatus.Finalizing)
+            {
+                if (skipIfFinalizing) return;
+                throw ApiExceptionDictionary.Conflict(
+                    "The upload session is being finalized and cannot be canceled.");
+            }
+            if (session.Status == ChunkedUploadSessionStatus.Completed)
+                return;
+
             session.Status = ChunkedUploadSessionStatus.Canceled;
             Sessions.TryRemove(session.SessionId, out _);
             ReleaseProcessingSlot(session.SessionId);
-            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+            await _blobStorage.DeleteFile(session.BlobKey, session.ContainerName);
         }
         finally
         {

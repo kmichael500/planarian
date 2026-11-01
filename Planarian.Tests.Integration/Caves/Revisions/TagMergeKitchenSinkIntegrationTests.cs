@@ -7,6 +7,7 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Shared.Services;
 using Xunit;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
@@ -115,6 +116,146 @@ public sealed class TagMergeKitchenSinkIntegrationTests(PostgresTestServer fixtu
         Assert.All(files, file => Assert.Equal(destination.Id, file.FileTypeTagId));
         Assert.Equal("source-file", files[0].Name);
         Assert.Equal("destination-file", files[1].Name);
+    }
+
+    [Fact]
+    public async Task FileTypeMergeAlsoRewritesStagedFileReferencesWithoutPublishingARevision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(FileTypeMergeAlsoRewritesStagedFileReferencesWithoutPublishingARevision));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var source = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.File, "Source file", "sourcefl0a");
+        var destination = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.File, "Destination file", "destfile0a");
+        var foreign = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var foreignType = await ReferenceTestData.AddTagAsync(database, foreign.AccountId,
+            TagTypeKeyConstant.File, "Source file", "sourcefl0b");
+
+        const string stagedId = "stagedfl0a";
+        await using (var seed = database.CreateDbContext("file-seed", cave.AccountId))
+        {
+            seed.Files.Add(new File
+            {
+                Id = stagedId,
+                AccountId = cave.AccountId,
+                FileTypeTagId = source.Id,
+                Name = "unclaimed staged file",
+                Extension = ".pdf",
+                ExpiresOn = DateTime.UtcNow.AddDays(7),
+                BlobContainer = RequestUser.BuildAccountContainerName(cave.AccountId),
+                BlobKey = AuthoringFileStoragePath.BuildKey(stagedId)
+            });
+            await seed.SaveChangesAsync();
+        }
+        await using (var foreignSeed = database.CreateDbContext("foreign-file-seed", foreign.AccountId))
+        {
+            foreignSeed.Files.Add(new File
+            {
+                Id = "otherstg0b", AccountId = foreign.AccountId,
+                FileTypeTagId = foreignType.Id, Name = "Foreign staged file", Extension = ".pdf",
+                ExpiresOn = DateTime.UtcNow.AddDays(7),
+                BlobContainer = RequestUser.BuildAccountContainerName(foreign.AccountId),
+                BlobKey = AuthoringFileStoragePath.BuildKey("otherstg0b")
+            });
+            await foreignSeed.SaveChangesAsync();
+        }
+
+        await using (var admin = database.CreateDbContext("manager", cave.AccountId))
+            await Repository(admin).MergeAsync([source.Id], destination.Id);
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var staged = await verify.Files.AsNoTracking().SingleAsync(file => file.Id == stagedId);
+        Assert.Equal(destination.Id, staged.FileTypeTagId);
+        Assert.Null(staged.CaveId);
+        Assert.NotNull(staged.ExpiresOn);
+        Assert.Equal(AuthoringFileStoragePath.BuildKey(stagedId), staged.BlobKey);
+        var otherAccountFile = await verify.Files.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(file => file.AccountId == foreign.AccountId && file.Id == "otherstg0b");
+        Assert.Equal(foreignType.Id, otherAccountFile.FileTypeTagId);
+
+        var types = (await Repository(verify).GetTagsForTable(TagTypeKeyConstant.File, default)).ToList();
+        Assert.Equal(0, types.Single(tag => tag.TagTypeId == source.Id).Occurrences);
+        Assert.Equal(1, types.Single(tag => tag.TagTypeId == destination.Id).Occurrences);
+        Assert.Equal(cave.RevisionId,
+            await verify.Caves.IgnoreQueryFilters()
+                .Where(row => row.AccountId == cave.AccountId && row.Id == cave.CaveId)
+                .Select(row => row.CurrentRevisionId).SingleAsync());
+    }
+
+    [Fact]
+    public async Task StagedFileTypeReferenceIsCountedBeforeOfferingDeletion()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(StagedFileTypeReferenceIsCountedBeforeOfferingDeletion));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var staged = await FileTestDataFactory.AddFileAsync(database, cave, associateWithCave: false);
+        var unused = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.File, "Unused file type", "unusedft0a");
+
+        await using var admin = database.CreateDbContext("manager", cave.AccountId);
+        var tags = (await Repository(admin).GetTagsForTable(TagTypeKeyConstant.File, default)).ToList();
+        var referenced = tags.Single(tag => tag.TagTypeId == staged.FileTypeId);
+        Assert.Equal(1, referenced.Occurrences);
+        Assert.False(referenced.IsUserModifiable);
+
+        var unrelated = tags.Single(tag => tag.TagTypeId == unused.Id);
+        Assert.Equal(0, unrelated.Occurrences);
+        Assert.True(unrelated.IsUserModifiable);
+    }
+
+    [Fact]
+    public async Task FileTypeAdministrationIgnoresImportSourceProvenance()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(FileTypeAdministrationIgnoresImportSourceProvenance));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var unusedFileType = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.File, "Unused file type", "filetag0ra");
+
+        const string sourceId = "impsource1";
+        await using (var seed = database.CreateDbContext("source-seed", cave.AccountId))
+        {
+            seed.CaveImportSources.Add(new CaveImportSource
+            {
+                Id = sourceId,
+                AccountId = cave.AccountId,
+                FileName = "retained-import.csv",
+                BlobContainer = RequestUser.BuildAccountContainerName(cave.AccountId),
+                BlobKey = ImportSourceStoragePath.BuildCaveEntranceCsvKey(sourceId)
+            });
+            seed.CaveImportBatches.Add(new CaveImportBatch
+            {
+                Id = "impbatch01",
+                AccountId = cave.AccountId,
+                SourceFileId = sourceId,
+                SourceFileName = "retained-import.csv",
+                Kind = CaveImportKind.CaveCsv,
+                SourceRecordCount = 1
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        string? revisionBefore;
+        await using (var revisionRead = database.CreateDbContext("revision-read", cave.AccountId))
+            revisionBefore = await CurrentRevisionAsync(revisionRead, cave.CaveId);
+
+        await using (var admin = database.CreateDbContext("manager", cave.AccountId))
+        {
+            var repository = Repository(admin);
+            var tags = (await repository.GetTagsForTable(TagTypeKeyConstant.File, default)).ToList();
+            Assert.Equal(0, tags.Single(tag => tag.TagTypeId == unusedFileType.Id).Occurrences);
+            Assert.Equal(1, await repository.DeleteAsync([unusedFileType.Id]));
+        }
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var retained = await verify.CaveImportSources.AsNoTracking().SingleAsync(source => source.Id == sourceId);
+        Assert.Null(retained.ExpiresOn);
+        Assert.Equal("retained-import.csv", retained.FileName);
+        Assert.True(await verify.CaveImportBatches.AnyAsync(batch =>
+            batch.SourceFileId == sourceId && batch.SourceFileName == "retained-import.csv"));
+        Assert.False(await verify.TagTypes.AnyAsync(tag => tag.Id == unusedFileType.Id));
+        Assert.Equal(revisionBefore, await CurrentRevisionAsync(verify, cave.CaveId));
     }
 
     [Fact]

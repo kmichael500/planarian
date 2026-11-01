@@ -16,6 +16,7 @@ using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Shared.Models;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Archive.Services;
 
@@ -143,7 +144,7 @@ public class ArchiveJobCoordinator
         {
             using var scope = _scopeFactory.CreateScope();
             var accountRepository = scope.ServiceProvider.GetRequiredService<AccountRepository>();
-            var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
+            var blobTransport = scope.ServiceProvider.GetRequiredService<AzureBlobTransportService>();
             var exportService = scope.ServiceProvider.GetRequiredService<ExportService>();
             var notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
 
@@ -156,16 +157,16 @@ public class ArchiveJobCoordinator
 
             var processedCount = 0;
             var totalCount = 0;
-            var accountBlobContainerClient = await fileService.GetBlobContainerClient(
+            var accountBlobContainerClient = await blobTransport.GetBlobContainerClient(
                 jobHandle.AccountContainerName,
                 createIfNotExists: true);
             await CleanupAbandonedTempArchives(
-                fileService,
+                blobTransport,
                 accountBlobContainerClient,
                 jobHandle.AccountContainerName,
                 jobHandle.TempArchiveBlobKey,
                 CancellationToken.None);
-            await using (var outputStream = await fileService.OpenBlobWriteStream(
+            await using (var outputStream = await blobTransport.OpenBlobWriteStream(
                              accountBlobContainerClient,
                              jobHandle.TempArchiveBlobKey,
                              jobHandle.CancellationTokenSource.Token))
@@ -226,7 +227,7 @@ public class ArchiveJobCoordinator
             // retention cleanup must not retroactively turn that successful export into a
             // failed job merely because Azure cleanup is temporarily unavailable.
             if (!await TryDeleteArchiveObjectAsync(
-                    fileService, publishedTempBlobKey, jobHandle.AccountContainerName, CancellationToken.None))
+                    blobTransport, publishedTempBlobKey, jobHandle.AccountContainerName, CancellationToken.None))
             {
                 _logger.LogWarning(
                     "Published archive {ArchiveKey} for account {AccountId}, but temporary archive {TempKey} could not be deleted; a later archive job will retry it",
@@ -235,7 +236,7 @@ public class ArchiveJobCoordinator
             jobHandle.TempArchiveBlobKey = null;
 
             await PruneOldArchivesBestEffort(
-                fileService,
+                blobTransport,
                 accountBlobContainerClient,
                 jobHandle.AccountContainerName,
                 finalArchiveBlobKey,
@@ -295,7 +296,7 @@ public class ArchiveJobCoordinator
     }
 
     private async Task PruneOldArchivesBestEffort(
-        FileService fileService,
+        AzureBlobTransportService blobTransport,
         Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
         string accountContainerName,
         string currentArchiveBlobKey,
@@ -338,7 +339,7 @@ public class ArchiveJobCoordinator
         var archivesToDelete = invalidLegacyCopyArchives
             .Concat(SelectArchivesToPrune(existingArchives));
         var failures = await DeleteArchiveKeysBestEffortAsync(
-            archivesToDelete, key => fileService.DeleteFile(key, accountContainerName));
+            archivesToDelete, key => blobTransport.DeleteFile(key, accountContainerName));
         foreach (var failedKey in failures)
         {
             _logger.LogWarning(
@@ -348,7 +349,7 @@ public class ArchiveJobCoordinator
     }
 
     private async Task CleanupAbandonedTempArchives(
-        FileService fileService,
+        AzureBlobTransportService blobTransport,
         Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
         string accountContainerName,
         string currentTempArchiveBlobKey,
@@ -385,7 +386,7 @@ public class ArchiveJobCoordinator
         }
 
         var failures = await DeleteArchiveKeysBestEffortAsync(
-            safeToDelete, key => fileService.DeleteFile(key, accountContainerName));
+            safeToDelete, key => blobTransport.DeleteFile(key, accountContainerName));
         foreach (var failedKey in failures)
         {
             _logger.LogWarning(
@@ -500,12 +501,12 @@ public class ArchiveJobCoordinator
     }
 
     private static async Task<bool> TryDeleteArchiveObjectAsync(
-        FileService fileService, string blobKey, string accountContainerName,
+        AzureBlobTransportService blobTransport, string blobKey, string accountContainerName,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var failures = await DeleteArchiveKeysBestEffortAsync(
-            [blobKey], key => fileService.DeleteFile(key, accountContainerName));
+            [blobKey], key => blobTransport.DeleteFile(key, accountContainerName));
         return failures.Count == 0;
     }
 
@@ -714,9 +715,9 @@ public class ArchiveJobCoordinator
         }
 
         using var scope = _scopeFactory.CreateScope();
-        var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
+        var blobTransport = scope.ServiceProvider.GetRequiredService<AzureBlobTransportService>();
         if (!await TryDeleteArchiveObjectAsync(
-                fileService, jobHandle.TempArchiveBlobKey, jobHandle.ContainerName, CancellationToken.None))
+                blobTransport, jobHandle.TempArchiveBlobKey, jobHandle.ContainerName, CancellationToken.None))
         {
             _logger.LogWarning(
                 "Partial archive {ArchiveKey} for account {AccountId} could not be deleted; the next archive job will retry it",

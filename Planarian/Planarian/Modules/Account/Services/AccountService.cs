@@ -23,7 +23,8 @@ namespace Planarian.Modules.Account.Services;
 [Authorize(Policy = PermissionPolicyKey.Admin)]
 public class AccountService : ServiceBase<AccountRepository>
 {
-    private readonly FileService _fileService;
+    private readonly AzureBlobTransportService _blobStorage;
+    private readonly StorageCleanupService _storageCleanup;
     private readonly NotificationService _notificationService;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ArchiveJobCoordinator _archiveJobCoordinator;
@@ -33,13 +34,15 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly ILogger<AccountService> _logger;
     private readonly AccountMaintenanceLockRepository _maintenance;
 
-    public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
+    public AccountService(AccountRepository repository, RequestUser requestUser, AzureBlobTransportService blobStorage,
+        StorageCleanupService storageCleanup,
         NotificationService notificationService, FeatureSettingRepository featureSettingRepository,
         ArchiveJobCoordinator archiveJobCoordinator, RequestThrottleService requestThrottleService,
         TagTypeAdministrationRepository tagTypes, CountyAdministrationRepository counties,
         ILogger<AccountService> logger, AccountMaintenanceLockRepository maintenance) : base(repository, requestUser)
     {
-        _fileService = fileService;
+        _blobStorage = blobStorage;
+        _storageCleanup = storageCleanup;
         _notificationService = notificationService;
         _featureSettingRepository = featureSettingRepository;
         _archiveJobCoordinator = archiveJobCoordinator;
@@ -140,7 +143,7 @@ public class AccountService : ServiceBase<AccountRepository>
                     }
                     else
                     {
-                        await _fileService.DeleteContainer(target.StoragePartition);
+                        await _blobStorage.DeleteContainer(target.StoragePartition);
                         successful = true;
                     }
                 }
@@ -150,7 +153,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 }
                 else
                 {
-                    successful = await _fileService.TryDeleteObjectAsync(
+                    successful = await _storageCleanup.TryDeleteObjectAsync(
                         new StorageObjectAddress(target.StoragePartition, target.StorageKey));
                 }
             }
@@ -419,7 +422,7 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(
+        var accountBlobContainerClient = await _blobStorage.GetBlobContainerClient(
             RequestUser.AccountContainerName, createIfNotExists: false);
         var archiveBlobs = new List<(string BlobKey, DateTimeOffset CreatedAt)>();
         var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
@@ -482,7 +485,7 @@ public class AccountService : ServiceBase<AccountRepository>
         await EnsureArchiveIsReady(blobKey, cancellationToken);
         await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, blobKey);
 
-        return await _fileService.CreateBlobResponse(
+        return await _blobStorage.CreateBlobResponse(
             blobKey,
             RequestUser.AccountContainerName,
             Path.GetFileName(blobKey),
@@ -500,12 +503,12 @@ public class AccountService : ServiceBase<AccountRepository>
             ?? throw ApiExceptionDictionary.Conflict("An archive is still running.");
 
         await EnsureArchiveIsReady(blobKey, cancellationToken);
-        await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
+        await _blobStorage.DeleteFile(blobKey, RequestUser.AccountContainerName);
     }
 
     private async Task EnsureArchiveIsReady(string blobKey, CancellationToken cancellationToken)
     {
-        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(
+        var accountBlobContainerClient = await _blobStorage.GetBlobContainerClient(
             RequestUser.AccountContainerName, createIfNotExists: false);
         try
         {

@@ -91,7 +91,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stgtype00a");
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("typed staged bytes"));
+        blobs.Seed(file.BlobContainer, file.BlobKey, System.Text.Encoding.UTF8.GetBytes("typed staged bytes"));
         var mapType = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.File, "Map", "filemap00a");
         await using (var seed = database.CreateDbContext("staged-file-type-seed", tenant.AccountId))
@@ -348,7 +348,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var stagedFile = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stageren0a");
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("staged rename bytes"));
+        blobs.Seed(stagedFile.BlobContainer, stagedFile.BlobKey, System.Text.Encoding.UTF8.GetBytes("staged rename bytes"));
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
         await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 
@@ -439,7 +439,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var stagedFile = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stagedmeta");
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("metadata staged bytes"));
+        blobs.Seed(stagedFile.BlobContainer, stagedFile.BlobKey, System.Text.Encoding.UTF8.GetBytes("metadata staged bytes"));
         const string mapTypeId = "maptype00a";
         await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File, "Map", mapTypeId);
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");

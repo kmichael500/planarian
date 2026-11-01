@@ -62,6 +62,8 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
             await CurrentMainV32DatabaseCensus.CaptureUserCavePermissionsAsync(database));
 
         await AssertExpectedFileMigrationAsync(database);
+        await AssertExpectedImportSourceMigrationAsync(database);
+        await AssertExpectedFileExpirationMigrationAsync(database);
         await AssertExpectedFeatureSettingBackfillAsync(database);
         await AssertExpectedMigrationOwnedCompatibilityRowsAsync(database);
         await AssertLegacyReporterColumnsWereOnlyIntentionallyRemovedAsync(database);
@@ -79,6 +81,204 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
         await using var history = new NpgsqlCommand(
             """select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" desc limit 1""", connection);
         Assert.Equal(database.GetMigrationNames().Last(), (string?)await history.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task LegacyImportSourceExpirationsRoundTripThroughCompletionMigration()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(LegacyImportSourceExpirationsRoundTripThroughCompletionMigration));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await CurrentMainV32CensusSeeder.SeedCompleteDurableDatabaseAsync(database);
+
+        static async Task<IReadOnlyList<(string Id, DateTime? ExpiresOn)>> ReadAsync(
+            PostgresTestDatabase database, bool latest)
+        {
+            await using var connection = new NpgsqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            var sql = latest
+                ? """
+                  select "Id", "ExpiresOn"
+                  from (
+                      select "Id", "ExpiresOn"
+                      from "Files"
+                      where "Id" = 'filealpha3'
+                      union all
+                      select "Id", "ExpiresOn"
+                      from "CaveImportSources"
+                      where "Id" in ('filealpha5', 'filealpha6')
+                  ) rows
+                  order by "Id" collate "C"
+                  """
+                : """
+                  select "Id", "ExpiresOn"
+                  from "Files"
+                  where "Id" in ('filealpha3', 'filealpha5', 'filealpha6')
+                  order by "Id" collate "C"
+                  """;
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync();
+            var rows = new List<(string Id, DateTime? ExpiresOn)>();
+            while (await reader.ReadAsync())
+                rows.Add((
+                    reader.GetString(0),
+                    reader.IsDBNull(1) ? null : reader.GetDateTime(1)));
+            return rows;
+        }
+
+        var before = await ReadAsync(database, latest: false);
+        Assert.Equal(
+        [
+            ("filealpha3", new DateTime(2024, 5, 1, 0, 0, 0, DateTimeKind.Utc)),
+            ("filealpha5", new DateTime(2024, 5, 2, 0, 0, 0, DateTimeKind.Utc)),
+            ("filealpha6", new DateTime(2027, 12, 31, 23, 59, 59, DateTimeKind.Utc))
+        ], before);
+
+        await database.MigrateAsync(null);
+        Assert.Equal(
+        [
+            ("filealpha3", new DateTime(2024, 5, 1, 0, 0, 0, DateTimeKind.Utc)),
+            ("filealpha5", (DateTime?)null),
+            ("filealpha6", (DateTime?)null)
+        ], await ReadAsync(database, latest: true));
+
+        await database.MigrateAsync(baseline);
+        Assert.Equal(before, await ReadAsync(database, latest: false));
+    }
+
+    [Fact]
+    public async Task DowngradeUsesExistingOtherFileTypeWhenLegacyImportTypeWasDeletedAfterUpgrade()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(DowngradeUsesExistingOtherFileTypeWhenLegacyImportTypeWasDeletedAfterUpgrade));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await CurrentMainV32CensusSeeder.SeedCompleteDurableDatabaseAsync(database);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                INSERT INTO "TagTypes"
+                    ("Id", "ProjectId", "AccountId", "Key", "Name", "IsDefault", "CreatedOn")
+                VALUES ('imptype001', NULL, 'acctalpha1', 'File', 'Old Import Type', FALSE, now());
+                UPDATE "Files" SET "FileTypeTagId" = 'imptype001' WHERE "Id" = 'filealpha5';
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var mutate = new NpgsqlCommand("""
+                DELETE FROM "TagTypes" WHERE "Id" = 'imptype001';
+                """, connection);
+            await mutate.ExecuteNonQueryAsync();
+        }
+
+        // No replacement exists yet. Fail closed with a useful error while the
+        // source remains durable, instead of leaking a generic FK failure.
+        var missingType = await Assert.ThrowsAsync<PostgresException>(
+            () => database.MigrateAsync(baseline));
+        Assert.Contains("no compatible Other FileType", missingType.Message);
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using (var stillThere = new NpgsqlCommand("""
+                SELECT COUNT(*) FROM "CaveImportSources" WHERE "Id" = 'filealpha5'
+                """, connection))
+                Assert.Equal(1L, await stillThere.ExecuteScalarAsync());
+            await using var fallback = new NpgsqlCommand("""
+                INSERT INTO "TagTypes"
+                    ("Id", "ProjectId", "AccountId", "Key", "Name", "IsDefault", "CreatedOn")
+                VALUES ('otherfile1', NULL, 'acctalpha1', 'File', 'Other', FALSE, now());
+                """, connection);
+            await fallback.ExecuteNonQueryAsync();
+        }
+
+        // The original type was legitimately unused and removed after import
+        // provenance was separated. Use the still-valid Other type on downgrade.
+        await database.MigrateAsync(baseline);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            SELECT "FileTypeTagId" FROM "Files" WHERE "Id" = 'filealpha5'
+            """, verify);
+        Assert.Equal("otherfile1", await command.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task DowngradeKeepsMigratedLegacySourceDurableAfterPostUpgradeReuse()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(DowngradeKeepsMigratedLegacySourceDurableAfterPostUpgradeReuse));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await CurrentMainV32CensusSeeder.SeedCompleteDurableDatabaseAsync(database);
+        await database.MigrateAsync(null);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "CaveImportBatches"
+                    ("Id","AccountId","SourceFileId","SourceFileName","SyncExisting","Kind",
+                     "SourceRecordCount","InsertedCount","UpdatedCount","DeletedCount","NoChangeCount","CreatedOn")
+                values
+                    ('batchruse1','acctalpha1','filealpha5','legacy-caves.csv',false,'CaveCsv',
+                     1,0,0,0,1,now());
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(baseline);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "ExpiresOn"
+            from "Files"
+            where "Id"='filealpha5'
+            """, verify);
+        var expiresOn = await command.ExecuteScalarAsync();
+
+        Assert.Equal(DBNull.Value, expiresOn);
+    }
+
+    [Fact]
+    public async Task MigratedLegacyImportSourcesAreSeparateFromAuthoringFileCleanup()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(MigratedLegacyImportSourcesAreSeparateFromAuthoringFileCleanup));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await CurrentMainV32CensusSeeder.SeedCompleteDurableDatabaseAsync(database);
+        await database.MigrateAsync(null);
+
+        await using var db = database.CreateDbContext(
+            CurrentMainV32CensusSeeder.UserAlpha, CurrentMainV32CensusSeeder.AccountAlpha);
+        var files = new Planarian.Modules.Files.Repositories.AuthoringFileRepository(db, db.RequestUser, TimeProvider.System);
+
+        var cleanupTargets = await files.RemoveExpiredAsync(16, default);
+        db.ChangeTracker.Clear();
+        Assert.Empty(cleanupTargets);
+        // This v32 staging row is not an authoring-v2 object and is intentionally left alone.
+        Assert.True(await db.Files.IgnoreQueryFilters().AnyAsync(file => file.Id == "filealpha3"));
+        Assert.False(await db.Files.IgnoreQueryFilters().AnyAsync(file =>
+            file.Id == "filealpha5" || file.Id == "filealpha6"));
+        Assert.Equal(2, await db.CaveImportSources.IgnoreQueryFilters().CountAsync(source =>
+            source.Id == "filealpha5" || source.Id == "filealpha6"));
+        Assert.All(await db.CaveImportSources.IgnoreQueryFilters()
+            .Where(source => source.Id == "filealpha5" || source.Id == "filealpha6")
+            .ToListAsync(), source => Assert.Null(source.ExpiresOn));
     }
 
     [Fact]
@@ -161,6 +361,53 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
         ], actual);
     }
 
+    private static async Task AssertExpectedImportSourceMigrationAsync(PostgresTestDatabase database)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "Id", "AccountId", "FileName", "BlobContainer", "BlobKey", "ExpiresOn"
+            from "CaveImportSources"
+            order by "Id" collate "C"
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<(string Id, string AccountId, string FileName,
+            string Container, string Key, DateTime? ExpiresOn)>();
+        while (await reader.ReadAsync())
+            rows.Add((
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetDateTime(5)));
+
+        Assert.Equal(
+        [
+            ("filealpha5", "acctalpha1", "legacy-caves.csv", "account-alpha",
+                "temp/import/caves/filealpha5.csv", (DateTime?)null),
+            ("filealpha6", "acctalpha1", "legacy-entrances.csv", "account-alpha",
+                "temp/import/caves/filealpha6.csv", (DateTime?)null)
+        ], rows);
+    }
+
+    private static async Task AssertExpectedFileExpirationMigrationAsync(PostgresTestDatabase database)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "Id", "ExpiresOn"
+            from "Files"
+            where "Id" = 'filealpha3'
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("filealpha3", reader.GetString(0));
+        Assert.Equal(new DateTime(2024, 5, 1, 0, 0, 0, DateTimeKind.Utc), reader.GetDateTime(1));
+        Assert.False(await reader.ReadAsync());
+    }
+
     private static async Task AssertExpectedFeatureSettingBackfillAsync(PostgresTestDatabase database)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
@@ -219,19 +466,32 @@ public sealed class CurrentMainDatabasePreservationMigrationIntegrationTests(Pos
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            select "FileId", "OriginalFileName", "MigratedName", "MigratedExtension"
-            from "__CaveRevisionsCompletionLegacyFileNames"
+            select "FileId", "OriginalFileName", "MigratedName", "MigratedExtension",
+                   "OriginalFileTypeTagId", "OriginalExpiresOn", "RestoreExpiresOn"
+            from "__CaveRevisionsCompletionLegacyFileState"
             order by "FileId" collate "C"
             """, connection);
         await using var reader = await command.ExecuteReaderAsync();
-        var rows = new List<(string FileId, string Original, string Name, string Extension)>();
+        var rows = new List<(string FileId, string Original, string Name, string Extension,
+            string FileTypeTagId, DateTime? OriginalExpiresOn, bool RestoreExpiresOn)>();
         while (await reader.ReadAsync())
-            rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            rows.Add((
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetDateTime(5),
+                reader.GetBoolean(6)));
 
         Assert.Equal(
         [
-            ("filealpha1", "survey.v1.pdf", "Survey Map", ".pdf"),
-            ("filealpha4", "README", "Field Notes", "")
+            ("filealpha1", "survey.v1.pdf", "Survey Map", ".pdf", "tagfile001", (DateTime?)null, false),
+            ("filealpha4", "README", "Field Notes", "", "tagfile001", (DateTime?)null, false),
+            ("filealpha5", "legacy-caves.csv", "legacy-caves", ".csv", "tagfile001",
+                new DateTime(2024, 5, 2, 0, 0, 0, DateTimeKind.Utc), true),
+            ("filealpha6", "legacy-entrances.csv", "legacy-entrances", ".csv", "tagfile001",
+                new DateTime(2027, 12, 31, 23, 59, 59, DateTimeKind.Utc), true)
         ], rows);
     }
 

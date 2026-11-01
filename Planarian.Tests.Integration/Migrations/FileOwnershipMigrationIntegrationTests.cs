@@ -89,26 +89,30 @@ public sealed class FileOwnershipMigrationIntegrationTests(PostgresTestServer fi
     }
 
     [Fact]
-    public async Task CurrentMainV32AccountOwnedFileWithoutCaveSurvivesOwnershipMigrationUnchanged()
+    public async Task CurrentMainV32AccountOwnedImportSourceMovesToDedicatedProvenanceTable()
     {
         await using var database = await CreateCurrentMainV32DatabaseAsync(
-            fixture, nameof(CurrentMainV32AccountOwnedFileWithoutCaveSurvivesOwnershipMigrationUnchanged));
+            fixture, nameof(CurrentMainV32AccountOwnedImportSourceMovesToDedicatedProvenanceTable));
 
         await database.MigrateAsync(null);
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            select "AccountId", "CaveId", "Name", "Extension", "BlobKey"
-            from "Files" where "Id"='mainfilet1'
+            select "AccountId", "FileName", "BlobKey", "ExpiresOn"
+            from "CaveImportSources" where "Id"='mainfilet1'
             """, connection);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal("mainacct01", reader.GetString(0));
-        Assert.True(reader.IsDBNull(1));
-        Assert.Equal("temporary", reader.GetString(2));
-        Assert.Equal(".csv", reader.GetString(3));
-        Assert.Equal("temp/import/caves/mainfilet1.csv", reader.GetString(4));
+        Assert.Equal("temporary.csv", reader.GetString(1));
+        Assert.Equal("temp/import/caves/mainfilet1.csv", reader.GetString(2));
+        Assert.True(reader.IsDBNull(3));
+
+        await reader.DisposeAsync();
+        await using var oldFile = new NpgsqlCommand(
+            """select count(*) from "Files" where "Id"='mainfilet1'""", connection);
+        Assert.Equal(0L, (long)(await oldFile.ExecuteScalarAsync())!);
     }
 
     [Fact]

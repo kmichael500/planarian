@@ -105,11 +105,17 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 var keys = chunk.Select(t => t.StorageKey).Distinct().ToArray();
                 var foreignFiles = await DbContext.Files.IgnoreQueryFilters()
                     .Where(row => row.AccountId != RequestUser.AccountId &&
-                                  row.BlobContainer != null && row.BlobContainer.ToLower() == partition.Key.ToLower() && row.BlobKey != null &&
-                                  keys.Contains(row.BlobKey))
+                                  row.BlobContainer != null && row.BlobContainer.ToLower() == partition.Key.ToLower() &&
+                                  row.BlobKey != null && keys.Contains(row.BlobKey))
                     .Select(row => row.BlobKey!)
                     .ToListAsync(cancellationToken);
-                var referenced = foreignFiles.ToHashSet();
+                var foreignSources = await DbContext.CaveImportSources.IgnoreQueryFilters()
+                    .Where(row => row.AccountId != RequestUser.AccountId &&
+                                  row.BlobContainer.ToLower() == partition.Key.ToLower() &&
+                                  keys.Contains(row.BlobKey))
+                    .Select(row => row.BlobKey)
+                    .ToListAsync(cancellationToken);
+                var referenced = foreignFiles.Concat(foreignSources).ToHashSet();
                 foreach (var target in chunk)
                     if (referenced.Contains(target.StorageKey)) conflicts.Add(target.Id);
             }
@@ -121,9 +127,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     public async Task<bool> IsContainerReferencedByAnotherAccountAsync(
         string container, CancellationToken cancellationToken)
         => await DbContext.Files.IgnoreQueryFilters()
-            .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
-                             row.BlobContainer != null && row.BlobContainer.ToLower() == container.ToLower(),
-                cancellationToken);
+               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                                row.BlobContainer != null && row.BlobContainer.ToLower() == container.ToLower(),
+                   cancellationToken) ||
+           await DbContext.CaveImportSources.IgnoreQueryFilters()
+               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                                row.BlobContainer.ToLower() == container.ToLower(),
+                   cancellationToken);
 
     private async Task<IReadOnlyList<AccountFileObjectAddress>> GetFileObjectAddressesForResetAsync(
         CancellationToken cancellationToken)
@@ -133,6 +143,10 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         var liveLocators = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
             .Where(file => file.AccountId == RequestUser.AccountId)
             .Select(file => new { file.BlobContainer, file.BlobKey })
+            .ToListAsync(cancellationToken);
+        var liveImportSources = await DbContext.CaveImportSources.IgnoreQueryFilters().AsNoTracking()
+            .Where(source => source.AccountId == RequestUser.AccountId)
+            .Select(source => new AccountFileObjectAddress(source.BlobContainer, source.BlobKey))
             .ToListAsync(cancellationToken);
         if (liveLocators.Any(file =>
                 string.IsNullOrWhiteSpace(file.BlobContainer) !=
@@ -147,12 +161,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         var pendingFileCleanup = await DbContext.StorageCleanupTargets.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.AccountId == RequestUser.AccountId &&
                           (row.Purpose == StorageCleanupPurpose.CaveAssetRemoval ||
-                           row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval) &&
+                           row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval ||
+                           row.Purpose == StorageCleanupPurpose.ImportSourceRemoval) &&
                           !row.IsContainer)
             .Select(row => new AccountFileObjectAddress(row.StoragePartition, row.StorageKey))
             .ToListAsync(cancellationToken);
 
-        var addresses = live.Concat(pendingFileCleanup).Distinct().ToList();
+        var addresses = live.Concat(liveImportSources).Concat(pendingFileCleanup).Distinct().ToList();
 
         // The whole account container includes untracked archives/imports. Even a
         // foreign reference to a key absent from the File table makes deleting
@@ -180,11 +195,16 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 var keys = chunk;
                 var referencedByAnotherFile = await DbContext.Files.IgnoreQueryFilters()
                     .AnyAsync(file => file.AccountId != RequestUser.AccountId &&
-                                      file.BlobContainer != null && file.BlobContainer.ToLower() == partition.Key.ToLower() && file.BlobKey != null &&
-                                      keys.Contains(file.BlobKey), cancellationToken);
-                if (referencedByAnotherFile)
+                                      file.BlobContainer != null &&
+                                      file.BlobContainer.ToLower() == partition.Key.ToLower() &&
+                                      file.BlobKey != null && keys.Contains(file.BlobKey), cancellationToken);
+                var referencedByAnotherImportSource = await DbContext.CaveImportSources.IgnoreQueryFilters()
+                    .AnyAsync(source => source.AccountId != RequestUser.AccountId &&
+                                       source.BlobContainer.ToLower() == partition.Key.ToLower() &&
+                                       keys.Contains(source.BlobKey), cancellationToken);
+                if (referencedByAnotherFile || referencedByAnotherImportSource)
                     throw ApiExceptionDictionary.Conflict(
-                        "Cannot safely reset an account while its stored Files are also referenced by another account.");
+                        "Cannot safely reset an account while its stored objects are also referenced by another account.");
             }
         }
 
@@ -272,7 +292,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             deletedCount = await DeleteBatchAsync(DbContext.StorageCleanupTargets
                 .Where(row => row.AccountId == RequestUser.AccountId &&
                               (row.Purpose == StorageCleanupPurpose.CaveAssetRemoval ||
-                               row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval))
+                               row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval ||
+                               row.Purpose == StorageCleanupPurpose.ImportSourceRemoval))
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
         } while (deletedCount == batchSize);
@@ -435,6 +456,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ExecuteDeleteAsync(cancellationToken);
         await DbContext.CaveImportBatches.IgnoreQueryFilters()
             .Where(b => b.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveImportSources.IgnoreQueryFilters()
+            .Where(source => source.AccountId == accountId)
             .ExecuteDeleteAsync(cancellationToken);
     }
 

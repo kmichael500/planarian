@@ -9,6 +9,8 @@ using Planarian.Modules.Tags.Repositories;
 using Planarian.Modules.Import.Data;
 using Planarian.Modules.Import.Parsing;
 using Planarian.Modules.Import.Planning;
+using Planarian.Modules.Import.Models;
+using Planarian.Modules.Import.Services;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
@@ -17,6 +19,8 @@ namespace Planarian.Modules.Account.Import.Services;
 public partial class ImportService : ServiceBase
 {
     private readonly FileService _fileService;
+    private readonly ImportSourceService _importSourceService;
+    private readonly StorageCleanupService _storageCleanup;
     private readonly TagRepository _tagRepository;
     private readonly SettingsRepository _settingsRepository;
     private readonly NotificationService _notificationService;
@@ -34,6 +38,7 @@ public partial class ImportService : ServiceBase
     private readonly EntranceImportExecutionRepository _entranceExecutor;
 
     public ImportService(RequestUser requestUser, FileService fileService,
+        ImportSourceService importSourceService, StorageCleanupService storageCleanup,
         TagRepository tagRepository,
         SettingsRepository settingsRepository,
         NotificationService notificationService,
@@ -47,6 +52,8 @@ public partial class ImportService : ServiceBase
         EntranceImportExecutionRepository entranceExecutor) : base(requestUser)
     {
         _fileService = fileService;
+        _importSourceService = importSourceService;
+        _storageCleanup = storageCleanup;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
         _notificationService = notificationService;
@@ -64,13 +71,12 @@ public partial class ImportService : ServiceBase
         _entranceExecutor = entranceExecutor;
     }
 
-    public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
-        CancellationToken cancellationToken)
-    {
-        var result = await _fileService.AddTemporaryAccountFile(stream, fileName,
-            FileTypeTagName.Other, cancellationToken, uuid);
+    public Task<(Stream Stream, string FileName)> OpenCsvImportSourceDownloadAsync(
+        string sourceId, CancellationToken cancellationToken) =>
+        _importSourceService.OpenDownloadAsync(sourceId, cancellationToken);
 
-        return result;
-    }
+    public Task<ImportSourceUploadVm> UploadCsvImportSourceAsync(
+        Stream stream, string fileName, string? uuid, CancellationToken cancellationToken) =>
+        _importSourceService.UploadAsync(stream, fileName, uuid, cancellationToken);
 
 }

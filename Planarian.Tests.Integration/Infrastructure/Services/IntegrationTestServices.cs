@@ -16,11 +16,13 @@ using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Data;
 using Planarian.Modules.Import.Parsing;
 using Planarian.Modules.Import.Planning;
+using Planarian.Modules.Import.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
@@ -42,6 +44,8 @@ internal sealed class IntegrationTestServices
     private readonly Lazy<ImportService> _imports;
     private readonly ArchiveJobCoordinator _archiveCoordinator;
     private readonly AccountMaintenanceLockRepository _maintenance;
+    private readonly AzureBlobTransportService _blobTransport;
+    private readonly StorageCleanupService _storageCleanup;
 
     private IntegrationTestServices(PlanarianDbContext db, TestFileBlobStore blobs,
         ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null,
@@ -62,24 +66,52 @@ internal sealed class IntegrationTestServices
         var mutations = new CaveMutationCoordinator(new CaveMutationRepository(db, user, snapshots));
         var tagLocks = new TagReferenceLockRepository(db, user);
         var countyLocks = new CountyReferenceLockRepository(db, user);
-        var files = new IntegrationTestFileService(fileRepository, user, tags,
-            new FileOptions { ConnectionString = fileConnectionString ?? "UseDevelopmentStorage=true" },
-            settings, caves, CreateThrottle(db), mutations, tagLocks, blobs);
+        var fileOptions = new FileOptions
+            { ConnectionString = fileConnectionString ?? "UseDevelopmentStorage=true" };
+        _blobTransport = new IntegrationTestAzureBlobTransportService(fileOptions, blobs);
+        _storageCleanup = new StorageCleanupService(
+            new StorageCleanupRepository(db, user),
+            user,
+            blobs,
+            NullLogger<StorageCleanupService>.Instance);
+        var files = new FileService(
+            fileRepository, user, tags, settings, caves, CreateThrottle(db), mutations, tagLocks,
+            blobs, new AuthoringFileRepository(db, user, TimeProvider.System),
+            _storageCleanup, _blobTransport, TimeProvider.System);
         var notifications = new NotificationService(new NoOpNotificationHubContext());
 
         Files = files;
-        Caves = new CaveService(caves, user, files, new FeatureSettingRepository(db, user),
+        Caves = new CaveService(caves, user, files, _storageCleanup, new FeatureSettingRepository(db, user),
             new ClientUrlBuilder(new FixedClientRequestOrigin()), mutations, tagLocks, countyLocks);
         CaveChangeRequests = new CaveChangeRequestService(new CaveChangeRequestRepository(db, user), caves, Caves,
-            new CaveRevisionQueryRepository(db, user), mutations, files, user);
+            new CaveRevisionQueryRepository(db, user), mutations, files, _storageCleanup, user);
         _imports = new Lazy<ImportService>(() =>
         {
             var bulkRevisions = new CaveBulkRevisionRepository(db, user);
-            return new ImportService(user, files, tags, settings, notifications, new AccountRepository(db, user), caves,
-                fileRepository, new ChunkedUploadService(user, files, new RequestThrottleOptions()),
-                new CaveImportCsvParser(), new EntranceImportCsvParser(),
-                new CaveImportPlanningRepository(db, user), new EntranceImportPlanningRepository(db, user),
-                new CaveImportPlanner(), new EntranceImportPlanner(),
+            var importSources = new ImportSourceService(
+                new ImportSourceRepository(db, user),
+                _storageCleanup,
+                user,
+                blobs,
+                TimeProvider.System);
+            return new ImportService(
+                user,
+                files,
+                importSources,
+                _storageCleanup,
+                tags,
+                settings,
+                notifications,
+                new AccountRepository(db, user),
+                caves,
+                fileRepository,
+                new ChunkedUploadService(user, _blobTransport, new RequestThrottleOptions()),
+                new CaveImportCsvParser(),
+                new EntranceImportCsvParser(),
+                new CaveImportPlanningRepository(db, user),
+                new EntranceImportPlanningRepository(db, user),
+                new CaveImportPlanner(),
+                new EntranceImportPlanner(),
                 new CaveImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks, countyLocks),
                 new EntranceImportExecutionRepository(db, user, snapshots, bulkRevisions, tagLocks));
         });
@@ -91,6 +123,8 @@ internal sealed class IntegrationTestServices
     public CaveChangeRequestService CaveChangeRequests { get; }
     public CaveService Caves { get; }
     public FileService Files { get; }
+    public StorageCleanupService StorageCleanup => _storageCleanup;
+    public AzureBlobTransportService BlobTransport => _blobTransport;
     public ImportService Imports => _imports.Value;
 
     public static IntegrationTestServices For(PlanarianDbContext db, TestFileBlobStore? blobs = null,
@@ -110,7 +144,7 @@ internal sealed class IntegrationTestServices
         }
         catch
         {
-            await Files.DeleteUnpublishedFileAsync(file.Id, CancellationToken.None);
+            await Files.DeleteAuthoringStagedFileAsync(file.Id, CancellationToken.None);
             throw;
         }
     }
@@ -118,7 +152,7 @@ internal sealed class IntegrationTestServices
     private AccountService CreateAccountService()
     {
         var user = _db.RequestUser;
-        return new AccountService(new AccountRepository(_db, user), user, Files,
+        return new AccountService(new AccountRepository(_db, user), user, _blobTransport, _storageCleanup,
             new NotificationService(new NoOpNotificationHubContext()), new FeatureSettingRepository(_db, user),
             _archiveCoordinator, CreateThrottle(_db),
             new TagTypeAdministrationRepository(_db, user, _tagLocks, _snapshots,
@@ -210,6 +244,8 @@ internal sealed class TestFileBlobStore : IObjectStorage
     public int DeleteIfExistsAttempts { get; private set; }
     public bool FailContainerDeletes { get; set; }
     public Func<string, Task>? BeforeContainerDeleteAsync { get; set; }
+    public Action<StorageObjectAddress>? BeforeCreate { get; set; }
+    public Action<StorageObjectAddress>? BeforeReadStream { get; set; }
     public IReadOnlyCollection<(string Container, string Key)> Keys
     {
         get
@@ -236,14 +272,6 @@ internal sealed class TestFileBlobStore : IObjectStorage
     public void FailDelete(string container, string key)
     {
         lock (_gate) _deleteFailures.Add((container, key));
-    }
-
-    public async Task WriteAsync(Stream stream, string container, string key, CancellationToken cancellationToken)
-    {
-        if (FailWrites) throw new IOException("The test blob boundary rejected the write.");
-        using var copy = new MemoryStream();
-        await stream.CopyToAsync(copy, cancellationToken);
-        lock (_gate) _content[(container, key)] = copy.ToArray();
     }
 
     public Stream OpenRead(string container, string key)
@@ -281,12 +309,13 @@ internal sealed class TestFileBlobStore : IObjectStorage
         CancellationToken cancellationToken)
     {
         if (FailWrites) throw new IOException("The test blob boundary rejected the write.");
+        BeforeCreate?.Invoke(address);
         using var copy = new MemoryStream();
         await content.CopyToAsync(copy, cancellationToken);
         lock (_gate)
         {
             if (_content.ContainsKey((address.Partition, address.Key)))
-                throw new IOException("The test object address already exists.");
+                throw new StorageObjectAlreadyExistsException(address.Key);
             _content[(address.Partition, address.Key)] = copy.ToArray();
         }
         if (FailAfterCreate) throw new IOException("The object was stored but upload acknowledgement was lost.");
@@ -298,7 +327,11 @@ internal sealed class TestFileBlobStore : IObjectStorage
         if (!Contains(address.Partition, address.Key))
             return Task.FromResult<StoredObjectReadResult?>(null);
         return Task.FromResult<StoredObjectReadResult?>(new StoredObjectReadResult(
-            _ => Task.FromResult(OpenRead(address.Partition, address.Key)),
+            _ =>
+            {
+                BeforeReadStream?.Invoke(address);
+                return Task.FromResult(OpenRead(address.Partition, address.Key));
+            },
             "application/octet-stream", null, null));
     }
 

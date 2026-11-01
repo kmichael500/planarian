@@ -161,7 +161,6 @@ public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : I
         {
             var file = await seed.Files.SingleAsync(row => row.Id == testFile.FileId);
             file.Name = "Preserved display";
-            file.ExpiresOn = new DateTime(2027, 1, 2, 0, 0, 0, DateTimeKind.Utc);
             await seed.SaveChangesAsync();
         }
         await using var db = database.CreateDbContext("a", tenant.AccountId);

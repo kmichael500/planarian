@@ -2,6 +2,13 @@ namespace Planarian.Shared.Services;
 
 public sealed record StorageObjectAddress(string Partition, string Key);
 
+/// <summary>
+/// A create-only write found an existing object. The caller did not create those bytes
+/// and must never compensate by deleting them.
+/// </summary>
+public sealed class StorageObjectAlreadyExistsException(string key, Exception? innerException = null)
+    : IOException($"An object already exists at storage key '{key}'.", innerException);
+
 public sealed record StoredObjectReadResult(
     Func<CancellationToken, Task<Stream>> OpenReadStreamAsync,
     string? ContentType,

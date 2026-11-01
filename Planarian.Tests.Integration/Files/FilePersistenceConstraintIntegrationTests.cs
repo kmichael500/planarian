@@ -45,6 +45,9 @@ public sealed class FilePersistenceConstraintIntegrationTests(PostgresTestServer
             {
                 Id = $"bad{index:0000000}",
                 AccountId = tenant.AccountId,
+                CaveId = tenant.CaveId,
+                BlobContainer = valid.BlobContainer,
+                BlobKey = $"objects/files/bad{index:0000000}",
                 FileTypeTagId = valid.FileTypeId,
                 Name = name,
                 Extension = extension

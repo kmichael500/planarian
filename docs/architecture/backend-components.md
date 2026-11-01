@@ -33,19 +33,24 @@ Approval ultimately uses the same single-Cave publication semantics as direct au
 
 | Component | Responsibility |
 | --- | --- |
-| `FileService` | File staging, streaming, object verification, cleanup, and one-Cave File-import publication |
-| `FileRepository` | File metadata and staged ownership persistence |
-| `IObjectStorage` | Provider-neutral immutable object create/open/delete boundary |
+| `FileService` | Coordinate File upload, staging, authenticated reads, object availability checks, one-Cave File-import publication, and post-commit cleanup |
+| `FileRepository` | Current Cave File access/metadata projection and duplicate checks |
+| `AuthoringFileRepository` | Account-owned staged File eligibility, proposal claims, publication attachment, expiration and relational removal |
+| `StorageCleanupRepository` | Idempotent durable cleanup-target queueing, live-reference queries, acknowledgement, and retry ordering |
+| `StorageCleanupService` | Bounded post-commit object deletion, retries, and uncertain-create reconciliation |
+| `IObjectStorage` | Provider-neutral create-only object, read, and delete boundary |
 | `AzureBlobObjectStorage` | Azure Blob implementation of `IObjectStorage` |
+| `AzureBlobTransportService` | Azure-specific chunk-upload, archive, and container transport APIs |
 | `StorageCleanupTarget` | Durable post-commit external cleanup responsibility |
 
-Older archive/photo/trip storage paths still contain Azure-specific APIs; `IObjectStorage` is the Cave/File boundary, not a repository-wide abstraction.
+The Cave/File and import-source lifecycles use `IObjectStorage`. Chunk uploads, archives, and certain older photo/trip workflows still need Azure transport; these do not expand the provider-neutral contract.
 
 ## Imports
 
 | Component | Responsibility |
 | --- | --- |
 | `CaveImportCsvParser` / `EntranceImportCsvParser` | Parse CSV into typed records |
+| `ImportSourceService` / `ImportSourceRepository` | Create/read account-owned CSV provenance, promote an uploaded source atomically with apply, and retire expired temporary sources with durable cleanup |
 | Import planning repositories | Load account-scoped state required for planning |
 | `CaveImportPlanner` / `EntranceImportPlanner` | Produce immutable plans without database writes |
 | Import execution repositories | Lock, revalidate, and apply plans with set-oriented writes |

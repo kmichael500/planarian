@@ -68,8 +68,12 @@ internal static class CurrentMainV32DatabaseCensus
         "CaveRevisions"
     ];
 
+    // New application tables whose initial rows are intentionally derived from v32 data.
+    internal static readonly string[] CompletionPopulatedTables =
+        ["CaveImportSources"];
+
     internal static readonly string[] MigrationOwnedTables =
-        ["__BackfillEntranceOtherFeatureSettingRows", "__CaveRevisionsCompletionLegacyFileNames"];
+        ["__BackfillEntranceOtherFeatureSettingRows", "__CaveRevisionsCompletionLegacyFileState"];
 
     internal static string[] ExactBaselineTables =>
         BaselineTables.Except(TransformedBaselineTables, StringComparer.Ordinal)
@@ -78,7 +82,8 @@ internal static class CurrentMainV32DatabaseCensus
 
     // A future migration that adds or removes an application table must classify it here.
     internal static string[] ExpectedLatestTables =>
-        BaselineTables.Concat(CompletionOwnedTables).Concat(MigrationOwnedTables)
+        BaselineTables.Concat(CompletionOwnedTables).Concat(CompletionPopulatedTables)
+            .Concat(MigrationOwnedTables)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
@@ -139,9 +144,24 @@ internal static class CurrentMainV32DatabaseCensus
         CaptureRowsAsync(database, "Entrances",
             "(to_jsonb(t) - 'ReportedByUserId') || jsonb_build_object('__xmin', t.xmin::text)");
 
-    internal static Task<IReadOnlyList<string>> CaptureFileStableRowsAsync(PostgresTestDatabase database) =>
-        CaptureRowsAsync(database, "Files",
-            "to_jsonb(t) - 'FileName' - 'DisplayName' - 'Name' - 'Extension' - 'AccountId'");
+    internal static async Task<IReadOnlyList<string>> CaptureFileStableRowsAsync(
+        PostgresTestDatabase database)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select (to_jsonb(t) - 'FileName' - 'DisplayName' - 'Name' - 'Extension' -
+                    'AccountId' - 'ExpiresOn')::text as row
+            from "Files" t
+            where not ("CaveId" is null and "BlobKey" like 'temp/import/caves/%')
+            order by row
+            """, connection);
+        var rows = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            rows.Add(reader.GetString(0));
+        return rows;
+    }
 
     internal static Task<IReadOnlyList<string>> CaptureCaveRolloutRowsAsync(PostgresTestDatabase database) =>
         CaptureRowsAsync(database, "Caves", "to_jsonb(t) - 'CurrentRevisionId'");

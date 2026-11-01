@@ -86,7 +86,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
                    exists(select 1 from information_schema.columns where table_name='Caves' and column_name='ReportedByUserId'),
                    not exists(select 1 from "FeatureSettings" where "AccountId"='mainacct01' and "Key"='EnabledFieldEntranceOtherTags'),
                    (select column_default is null from information_schema.columns where table_name='Files' and column_name='FileName'),
-                   to_regclass('public."__CaveRevisionsCompletionLegacyFileNames"') is null
+                   to_regclass('public."__CaveRevisionsCompletionLegacyFileState"') is null
             from "Files" f where f."Id"='mainfiler1'
             """, connection))
         await using (var reader = await verify.ExecuteReaderAsync())
@@ -481,11 +481,14 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
                 tag.EntranceId == "mainentr01" && tag.TagTypeId == "mainstat01"));
 
             var files = await verify.Files.OrderBy(file => file.Id).ToListAsync();
-            Assert.Equal(2, files.Count);
+            Assert.Single(files);
             Assert.Equal(("mainacct01", "maincave01", "existing-cave", ".pdf"),
                 (files[0].AccountId, files[0].CaveId, files[0].Name, files[0].Extension));
-            Assert.Equal(("mainacct01", (string?)null, "temporary", ".csv"),
-                (files[1].AccountId, files[1].CaveId, files[1].Name, files[1].Extension));
+
+            var importSource = await verify.CaveImportSources.SingleAsync(source => source.Id == "mainfilet1");
+            Assert.Equal(("mainacct01", "temporary.csv", "temp/import/caves/mainfilet1.csv"),
+                (importSource.AccountId, importSource.FileName, importSource.BlobKey));
+            Assert.Null(importSource.ExpiresOn);
 
             var entranceOtherSetting = await verify.FeatureSettings.SingleAsync(setting =>
                 setting.AccountId == "mainacct01" &&

@@ -1,3 +1,4 @@
+using Planarian.Shared.Services;
 using System.Formats.Tar;
 using System.IO.Compression;
 using Azure.Storage.Blobs;
@@ -393,8 +394,8 @@ public sealed class ArchiveJobCoordinatorRuntimeIntegrationTests(
 
         var services = new ServiceCollection();
         services.AddSingleton(repository);
-        services.AddSingleton<FileService>(testServices.Files);
-        services.AddSingleton(new ExportService(repository, testServices.Files));
+        services.AddSingleton<AzureBlobTransportService>(testServices.BlobTransport);
+        services.AddSingleton(new ExportService(repository, testServices.BlobTransport));
         services.AddSingleton(new NotificationService(notifications));
         var provider = services.BuildServiceProvider();
 

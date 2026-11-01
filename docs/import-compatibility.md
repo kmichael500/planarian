@@ -17,6 +17,7 @@ internal implementation. Do not rewrite the fixture merely to make a refactor pa
 - When multiple eligible tags match, selection is deterministic: exact spelling, then active-account ownership, then
   stable ID. Tag identity includes its key/type, and foreign-account-only custom tags are never reused.
 - Relational import changes and revisions are atomic. Physical blob cleanup for Cave deletion occurs only after commit.
+- An uploaded Cave/Entrance CSV remains temporary for dry run or failed apply. Successful apply retains the same `CaveImportSource` row and immutable storage object as account-level provenance and links it to the import batch in the same relational transaction.
 
 ## Approved semantic differences
 

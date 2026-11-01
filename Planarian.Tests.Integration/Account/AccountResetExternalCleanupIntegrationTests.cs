@@ -227,6 +227,8 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
 
         await using (var seed = database.CreateDbContext("a", account.AccountId))
         {
+            await seed.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Files" DROP CONSTRAINT "CK_Files_StorageAddressCompleteness" """);
             var live = await seed.Files.SingleAsync(row => row.Id == file.FileId);
             live.BlobKey = hasStorageKey ? "objects/partial" : null;
             live.BlobContainer = hasStoragePartition ? "portable-store" : null;

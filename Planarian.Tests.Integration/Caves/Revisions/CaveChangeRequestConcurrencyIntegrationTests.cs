@@ -445,7 +445,7 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
         var file = await FileTestDataFactory.AddFileAsync(database, tenant);
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("racing approval bytes"));
+        blobs.Seed(file.BlobContainer, file.BlobKey, System.Text.Encoding.UTF8.GetBytes("racing approval bytes"));
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
         await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 

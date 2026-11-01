@@ -17,6 +17,28 @@ public sealed class FileImportIntegrationTests(
     : IClassFixture<PostgresTestServer>, IClassFixture<AzuriteTestServer>
 {
     [Fact]
+    public async Task DeletingMissingLegacyBlobDoesNotRecreateContainer()
+    {
+        await using var database = await postgres.CreateDatabaseAsync(
+            nameof(DeletingMissingLegacyBlobDoesNotRecreateContainer));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await SeedFileImportRequirementsAsync(database, cave, "manager");
+        await using var db = database.CreateDbContext("manager", cave.AccountId);
+        await db.RequestUser.Initialize(cave.AccountId, db.RequestUser.Id);
+        var services = IntegrationTestServices.For(
+            db, new TestFileBlobStore(), fileConnectionString: azurite.ConnectionString);
+        var containerName = $"delete-{Guid.NewGuid():N}";
+        var container = new BlobServiceClient(azurite.ConnectionString)
+            .GetBlobContainerClient(containerName);
+
+        Assert.False((await container.ExistsAsync()).Value);
+
+        await services.BlobTransport.DeleteFile("already-gone.bin", containerName);
+
+        Assert.False((await container.ExistsAsync()).Value);
+    }
+
+    [Fact]
     public async Task ChunkedFileImportMatchesOrdinaryUploadPublicationSemantics()
     {
         await using var directDatabase = await postgres.CreateDatabaseAsync(
@@ -163,6 +185,232 @@ public sealed class FileImportIntegrationTests(
         Assert.Single(await db.Files.Where(row => row.CaveId == cave.CaveId).ToListAsync());
         Assert.Equal(revisionsBefore + 1,
             await db.CaveRevisions.CountAsync(row => row.CaveId == cave.CaveId));
+    }
+
+    [Fact]
+    public async Task CancelAllSkipsSessionThatBeginsFinalizingAfterSelection()
+    {
+        await using var database = await postgres.CreateDatabaseAsync(
+            nameof(CancelAllSkipsSessionThatBeginsFinalizingAfterSelection));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await SeedFileImportRequirementsAsync(database, cave, "manager");
+        await using var db = database.CreateDbContext("manager", cave.AccountId);
+        await db.RequestUser.Initialize(cave.AccountId, db.RequestUser.Id);
+        var services = IntegrationTestServices.For(
+            db, new TestFileBlobStore(), fileConnectionString: azurite.ConnectionString);
+        var chunked = new Planarian.Shared.Services.ChunkedUploadService(
+            db.RequestUser, services.BlobTransport, new Planarian.Shared.Options.RequestThrottleOptions());
+        var session = await chunked.CreateSession(
+            new Planarian.Shared.Services.ChunkedUploadSessionCreateRequest
+            {
+                FileName = "cancel-race.pdf", FileSize = 10,
+                BlobKeyPrefix = "temp/import/file-upload-sessions"
+            }, default);
+
+        var other = await chunked.CreateSession(
+            new Planarian.Shared.Services.ChunkedUploadSessionCreateRequest
+            {
+                FileName = "other-cancel.pdf", FileSize = 10,
+                BlobKeyPrefix = "temp/import/file-upload-sessions"
+            }, default);
+
+        await session.Gate.WaitAsync();
+        var gateHeld = true;
+        try
+        {
+            // Cancel-all selects the Created session and then blocks acquiring Gate.
+            var cancelTask = chunked.CancelActiveSessionsForCurrentUser(default);
+            Assert.False(cancelTask.IsCompleted,
+                "Cancel-all must have selected the session before finalization begins.");
+
+            // Another operation acquires the same upload gate first and advances
+            // the state to Finalizing before cancellation can enter CloseSession.
+            session.Status = Planarian.Shared.Services.ChunkedUploadSessionStatus.Finalizing;
+            session.Gate.Release();
+            gateHeld = false;
+            await cancelTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.Equal(Planarian.Shared.Services.ChunkedUploadSessionStatus.Finalizing, session.Status);
+            Assert.Same(session, chunked.GetRequiredSession(session.SessionId));
+            Assert.Equal(Planarian.Shared.Services.ChunkedUploadSessionStatus.Canceled, other.Status);
+            Assert.Throws<ApiException>(() => chunked.GetRequiredSession(other.SessionId));
+            session.Status = Planarian.Shared.Services.ChunkedUploadSessionStatus.Uploaded;
+            session.ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(-1);
+            Assert.Same(session, Assert.Single(await chunked.CleanupExpiredSessions(default)));
+        }
+        finally
+        {
+            if (gateHeld) session.Gate.Release();
+        }
+    }
+
+    [Fact]
+    public async Task ExpiredSessionSweepCannotRemoveSessionDuringActiveUploadOrFinalization()
+    {
+        await using var database = await postgres.CreateDatabaseAsync(
+            nameof(ExpiredSessionSweepCannotRemoveSessionDuringActiveUploadOrFinalization));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await SeedFileImportRequirementsAsync(database, cave, "manager");
+        await using var db = database.CreateDbContext("manager", cave.AccountId);
+        await db.RequestUser.Initialize(cave.AccountId, db.RequestUser.Id);
+        var services = IntegrationTestServices.For(
+            db, new TestFileBlobStore(), fileConnectionString: azurite.ConnectionString);
+        var chunked = new Planarian.Shared.Services.ChunkedUploadService(
+            db.RequestUser, services.BlobTransport, new Planarian.Shared.Options.RequestThrottleOptions());
+        var session = await chunked.CreateSession(
+            new Planarian.Shared.Services.ChunkedUploadSessionCreateRequest
+            {
+                FileName = "sweep.pdf", FileSize = 10,
+                BlobKeyPrefix = "temp/import/file-upload-sessions"
+            }, default);
+
+        await session.Gate.WaitAsync();
+        var gateHeld = true;
+        try
+        {
+            session.ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(-1);
+            var sweep = chunked.CleanupExpiredSessions(default);
+            await Task.Delay(250);
+            Assert.False(sweep.IsCompleted,
+                "An expiration sweep must not delete a session while an upload holds its gate.");
+
+            // A completed chunk refreshes expiration under the same gate.
+            session.ExpiresOn = DateTimeOffset.UtcNow.AddHours(1);
+            session.Gate.Release();
+            gateHeld = false;
+            Assert.Empty(await sweep.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Same(session, chunked.GetRequiredSession(session.SessionId));
+        }
+        finally
+        {
+            if (gateHeld)
+                session.Gate.Release();
+        }
+
+        // Finalization may legitimately extend past its original upload TTL.
+        session.Status = Planarian.Shared.Services.ChunkedUploadSessionStatus.Finalizing;
+        session.ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(-1);
+        Assert.Empty(await chunked.CleanupExpiredSessions(default));
+        Assert.Same(session, chunked.GetRequiredSession(session.SessionId));
+
+        // A stale operation can still hold a reference obtained before a sweep.
+        // Retiring that session must mark it canceled as well as remove its ID.
+        session.Status = Planarian.Shared.Services.ChunkedUploadSessionStatus.Uploaded;
+        var retired = await chunked.CleanupExpiredSessions(default);
+        Assert.Same(session, Assert.Single(retired));
+        Assert.Equal(Planarian.Shared.Services.ChunkedUploadSessionStatus.Canceled, session.Status);
+        Assert.Throws<ApiException>(() => chunked.GetRequiredSession(session.SessionId));
+    }
+
+    [Fact]
+    public async Task ConcurrentFinalizationOfSameSessionPublishesOnlyOnce()
+    {
+        await using var database = await postgres.CreateDatabaseAsync(
+            nameof(ConcurrentFinalizationOfSameSessionPublishesOnlyOnce));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await SeedFileImportRequirementsAsync(database, cave, "manager");
+        var payload = System.Text.Encoding.UTF8.GetBytes("one publication only");
+        var blobs = new TestFileBlobStore();
+        using var firstWriteEntered = new ManualResetEventSlim();
+        using var allowFirstWrite = new ManualResetEventSlim();
+        var createAttempts = 0;
+        blobs.BeforeCreate = _ =>
+        {
+            if (Interlocked.Increment(ref createAttempts) != 1) return;
+            firstWriteEntered.Set();
+            if (!allowFirstWrite.Wait(TimeSpan.FromSeconds(20)))
+                throw new TimeoutException("Concurrent finalization test did not release the first writer.");
+        };
+
+        await using var firstDb = database.CreateDbContext("manager", cave.AccountId);
+        await firstDb.RequestUser.Initialize(cave.AccountId, firstDb.RequestUser.Id);
+        await using var secondDb = database.CreateDbContext("manager", cave.AccountId);
+        await secondDb.RequestUser.Initialize(cave.AccountId, secondDb.RequestUser.Id);
+        var first = IntegrationTestServices.For(firstDb, blobs, fileConnectionString: azurite.ConnectionString);
+        var second = IntegrationTestServices.For(secondDb, blobs, fileConnectionString: azurite.ConnectionString);
+        var session = await first.Imports.CreateFileUploadSession(
+            Request("A01-1-concurrent.pdf", payload.Length, "concurrent-file-import"), default);
+        await first.Imports.UploadFileChunk(session.SessionId, new MemoryStream(payload),
+            0, 0, payload.Length, default);
+
+        var firstTask = Task.Run(() => first.Imports.FinalizeFileUploadSession(session.SessionId, default));
+        try
+        {
+            Assert.True(await Task.Run(() => firstWriteEntered.Wait(TimeSpan.FromSeconds(15))),
+                "First finalization never reached the durable object write.");
+
+            // Cancel must not delete the committed staging blob while publication
+            // is already in progress; that can make an otherwise valid File fail.
+            var cancellation = await Assert.ThrowsAsync<ApiException>(() =>
+                second.Imports.CancelFileUploadSession(session.SessionId, default));
+            Assert.Equal(ApiExceptionType.Conflict, cancellation.ErrorCode);
+
+            var secondTask = Task.Run(() => second.Imports.FinalizeFileUploadSession(session.SessionId, default));
+            await Task.Delay(450); // The first writer is held; the second can reach the same boundary.
+            allowFirstWrite.Set();
+
+            var results = await Task.WhenAll(firstTask, secondTask).WaitAsync(TimeSpan.FromSeconds(25));
+            Assert.All(results, result => Assert.True(result.IsSuccessful));
+            Assert.Equal(1, Volatile.Read(ref createAttempts));
+            Assert.Equal(results[0].FileName, results[1].FileName);
+            Assert.Equal(results[0].RequestId, results[1].RequestId);
+            // The API overwrites RequestId with each HTTP trace identifier. The
+            // cached publication result must not be shared mutable response state.
+            Assert.NotSame(results[0], results[1]);
+            var originalSecondRequestId = results[1].RequestId;
+            results[0].RequestId = "first-http-trace";
+            Assert.Equal(originalSecondRequestId, results[1].RequestId);
+        }
+        finally
+        {
+            allowFirstWrite.Set();
+        }
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        Assert.Single(await verify.Files.Where(file => file.CaveId == cave.CaveId).ToListAsync());
+        Assert.Equal(2, await verify.CaveRevisions.CountAsync(revision => revision.CaveId == cave.CaveId));
+    }
+
+    [Fact]
+    public async Task ChunkedFileImportRetriesOrdinaryCleanupDebt()
+    {
+        await using var database = await postgres.CreateDatabaseAsync(
+            nameof(ChunkedFileImportRetriesOrdinaryCleanupDebt));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await SeedFileImportRequirementsAsync(database, cave, "manager");
+        var blobs = new TestFileBlobStore();
+        var payload = "published upload bytes"u8.ToArray();
+
+        await using var db = database.CreateDbContext("manager", cave.AccountId);
+        await db.RequestUser.Initialize(cave.AccountId, db.RequestUser.Id);
+        var container = db.RequestUser.AccountContainerName;
+        const string orphanKey = "temp/import/caves/abandoned-source";
+        blobs.Seed(container, orphanKey, "unreferenced source"u8.ToArray());
+        db.StorageCleanupTargets.Add(new StorageCleanupTarget
+        {
+            AccountId = cave.AccountId,
+            StoragePartition = container,
+            StorageKey = orphanKey,
+            Purpose = StorageCleanupPurpose.ImportSourceRemoval
+        });
+        await db.SaveChangesAsync();
+
+        var services = IntegrationTestServices.For(
+            db, blobs, fileConnectionString: azurite.ConnectionString);
+        var session = await services.Imports.CreateFileUploadSession(
+            Request("A01-1-cleanup.pdf", payload.Length, "file-import-cleanup"), default);
+        await services.Imports.UploadFileChunk(
+            session.SessionId, new MemoryStream(payload), 0, 0, payload.Length, default);
+
+        var result = await services.Imports.FinalizeFileUploadSession(session.SessionId, default);
+
+        Assert.True(result.IsSuccessful);
+        Assert.False(blobs.Contains(container, orphanKey));
+        Assert.False(await db.StorageCleanupTargets.AnyAsync(target =>
+            target.AccountId == cave.AccountId && target.StorageKey == orphanKey));
+        db.ChangeTracker.Clear();
+        var published = Assert.Single(await db.Files.Where(row => row.CaveId == cave.CaveId).ToListAsync());
+        Assert.Equal(payload, blobs.Read(container, published.BlobKey!));
     }
 
     [Fact]

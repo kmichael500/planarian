@@ -14,7 +14,7 @@ import Papa from "papaparse";
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
 import { ImportApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { FileVm } from "../../Files/Models/FileVm";
+import { ImportSourceUploadVm } from "../Models/ImportSourceUploadVm";
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
@@ -45,7 +45,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     FailedCsvRecord<EntranceCsvModel>[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
+  const [uploadResult, setUploadResult] = useState<ImportSourceUploadVm | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [dryRunData, setDryRunData] = useState<EntranceDryRun[]>([]);
   const [isDryRunComplete, setIsDryRunComplete] = useState(false);
@@ -66,7 +66,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     );
 
   const handleDryRunClick = async () => {
-    if (!uploadResult?.id) return message.error("File id not found");
+    if (!uploadResult?.id) return message.error("Import source id not found");
     setIsLoading(true);
     setIsProcessing(true);
     try {
@@ -91,7 +91,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
   };
 
   const handleProcessClick = async () => {
-    if (!uploadResult?.id) return message.error("File id not found");
+    if (!uploadResult?.id) return message.error("Import source id not found");
     setIsLoading(true);
     setIsProcessing(true);
     try {
@@ -180,7 +180,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                     singleFile
                     allowedFileTypes={[".csv"]}
                     style={{ display: "flex", height: "100%" }}
-                    uploadFunction={async (params): Promise<FileVm> => {
+                    uploadFunction={async (params): Promise<ImportSourceUploadVm> => {
                       try {
                         const result = await AccountService.ImportEntrancesFile(
                           params.file,
@@ -189,6 +189,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                         );
                         setUploadResult(result);
                         setIsUploaded(true);
+                        return result;
                       } catch (e) {
                         const error = e as ImportApiErrorResponse<EntranceCsvModel>;
 
@@ -198,9 +199,10 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                           setUploadFailed(true);
                         }
 
-                        message.error(error.message);
+                        // The uploader must observe a rejected upload rather than
+                        // treating an empty placeholder as a successful source.
+                        throw e;
                       }
-                      return {} as FileVm;
                     }}
                     updateFunction={() => {
                       throw new Error("Function not implemented intentionally.");

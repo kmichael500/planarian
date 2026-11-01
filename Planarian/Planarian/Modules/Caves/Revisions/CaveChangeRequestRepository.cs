@@ -7,9 +7,12 @@ using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Query.Constants;
+using Planarian.Modules.Files.Repositories;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Tags;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Caves.Revisions;
 
@@ -33,7 +36,6 @@ public sealed record CaveChangeRequestReviewEventReadRow(CaveChangeRequestReview
 
 public sealed class CaveChangeRequestRepository
 {
-    private const int CleanupLookupBatchSize = 500;
     private static readonly string[] UserViewSatisfyingPermissionKeys =
         PermissionPolicy.GetSatisfyingUserPermissionKeys(PermissionPolicyKey.View);
     private static readonly string[] CaveViewSatisfyingPermissionKeys =
@@ -46,12 +48,18 @@ public sealed class CaveChangeRequestRepository
     private readonly RequestUser _user;
     private readonly AccountExecutionScope _scope;
     private readonly CaveRevisionDiffService _diff = new();
+    private readonly AuthoringFileRepository<PlanarianDbContext> _authoringFiles;
 
-    public CaveChangeRequestRepository(PlanarianDbContext db, RequestUser user)
+    public CaveChangeRequestRepository(
+        PlanarianDbContext db,
+        RequestUser user,
+        TimeProvider? timeProvider = null)
     {
         _db = db;
         _user = user;
         _scope = AccountExecutionScope.Require(user);
+        _authoringFiles = new AuthoringFileRepository<PlanarianDbContext>(
+            db, user, timeProvider ?? TimeProvider.System);
     }
 
     public Task<string> CreateAsync(string caveId, string baseRevisionId, CaveProposalSnapshotV1 proposal,
@@ -324,63 +332,15 @@ public sealed class CaveChangeRequestRepository
             .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
             .Select(staged => staged.FileId).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
 
-    public async Task<IReadOnlySet<string>> GetAuthorableStagedFileIdsAsync(IEnumerable<string> fileIds,
-        string? requestId, CancellationToken cancellationToken)
-    {
-        var ids = fileIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
-        if (ids.Count == 0) return new HashSet<string>(StringComparer.Ordinal);
+    public Task<IReadOnlySet<string>> GetAuthorableStagedFileIdsAsync(
+        IEnumerable<string> fileIds, string? requestId, CancellationToken cancellationToken) =>
+        _authoringFiles.GetAuthorableIdsAsync(fileIds, requestId, cancellationToken);
 
-        var now = DateTime.UtcNow;
-        var rows = await _db.Files.IgnoreQueryFilters().AsNoTracking()
-            .Where(file => file.AccountId == _scope.AccountId && ids.Contains(file.Id) && file.CaveId == null &&
-                           ((requestId != null && _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().Any(staged =>
-                                staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId &&
-                                staged.FileId == file.Id)) ||
-                            (file.CreatedByUserId == _user.Id && file.ExpiresOn != null && file.ExpiresOn > now &&
-                             !_db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().Any(staged =>
-                                 staged.AccountId == _scope.AccountId && staged.FileId == file.Id))))
-            .Select(file => file.Id)
-            .ToListAsync(cancellationToken);
-        return rows.ToHashSet(StringComparer.Ordinal);
-    }
-
-    public async Task<IReadOnlyList<StagedCaveFilePublication>> PlanStagedFilePublicationsAsync(
+    public Task<IReadOnlyList<StagedCaveFilePublication>> PlanStagedFilePublicationsAsync(
         string requestId, IReadOnlyDictionary<string, string> extensionsByFileId,
-        CancellationToken cancellationToken)
-    {
-        var ids = extensionsByFileId.Keys.OrderBy(id => id, StringComparer.Ordinal).ToList();
-        if (ids.Count == 0) return [];
-
-        var rows = await (from staged in _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
-                join file in _db.Files.IgnoreQueryFilters()
-                    on new { staged.AccountId, staged.FileId } equals new { file.AccountId, FileId = file.Id }
-                where staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId &&
-                      ids.Contains(staged.FileId) && file.CaveId == null
-                select file)
-            .ToListAsync(cancellationToken);
-        if (rows.Count != ids.Count || rows.Select(row => row.Id).Distinct(StringComparer.Ordinal).Count() != ids.Count)
-            throw ApiExceptionDictionary.NotFound("Staged file");
-
-        var sharedPendingFileId = await (from staged in _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
-                join request in _db.CaveChangeRequests.IgnoreQueryFilters()
-                    on new { staged.AccountId, Id = staged.ChangeRequestId }
-                    equals new { request.AccountId, request.Id }
-                where staged.AccountId == _scope.AccountId && ids.Contains(staged.FileId) &&
-                      staged.ChangeRequestId != requestId && CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status)
-                select staged.FileId)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (sharedPendingFileId is not null)
-            throw ApiExceptionDictionary.BadRequest(
-                "A staged file shared with another pending request cannot be published.");
-
-        return rows.Select(file =>
-        {
-            if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
-                throw ApiExceptionDictionary.NotFound("Staged file");
-            return new StagedCaveFilePublication(file.Id, file.BlobKey, file.BlobContainer,
-                extensionsByFileId[file.Id]);
-        }).OrderBy(publication => publication.FileId, StringComparer.Ordinal).ToList();
-    }
+        CancellationToken cancellationToken) =>
+        _authoringFiles.PlanRequestPublicationsAsync(
+            requestId, extensionsByFileId, cancellationToken);
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
         CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
@@ -614,132 +574,14 @@ public sealed class CaveChangeRequestRepository
         return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
     }
 
-    private async Task<IReadOnlyList<StorageCleanupTarget>> RemoveRemainingStagedFilesAsync(
-        string requestId, CancellationToken cancellationToken)
-    {
-        var stagedFileIds = await _db.CaveChangeRequestStagedFiles
-            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
-            .Select(staged => staged.FileId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        if (stagedFileIds.Count == 0) return [];
+    private Task<IReadOnlyList<StorageCleanupTarget>> RemoveRemainingStagedFilesAsync(
+        string requestId, CancellationToken cancellationToken) =>
+        _authoringFiles.RemoveRequestClaimsAndUnreferencedAsync(requestId, cancellationToken);
 
-        await _db.CaveChangeRequestStagedFiles
-            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
-            .ExecuteDeleteAsync(cancellationToken);
-        var filesToDelete = await _db.Files
-            .Where(file => file.AccountId == _scope.AccountId && stagedFileIds.Contains(file.Id) &&
-                           file.CaveId == null &&
-                           !_db.CaveChangeRequestStagedFiles.Any(staged =>
-                               staged.AccountId == _scope.AccountId && staged.FileId == file.Id))
-            .ToListAsync(cancellationToken);
-
-        var cleanupTargets = await QueueUnpublishedFileObjectCleanupAsync(
-            filesToDelete, cancellationToken);
-
-        _db.Files.RemoveRange(filesToDelete);
-        return cleanupTargets;
-    }
-
-    private async Task<IReadOnlyList<StorageCleanupTarget>> QueueUnpublishedFileObjectCleanupAsync(
-        IEnumerable<Planarian.Model.Database.Entities.RidgeWalker.File> files,
-        CancellationToken cancellationToken)
-    {
-        var candidates = new List<(string Partition, string Key)>();
-        foreach (var file in files)
-        {
-            if (file.AccountId != _scope.AccountId || file.CaveId is not null)
-                throw new InvalidOperationException("The staged File is not an unpublished File for this account.");
-            if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) continue;
-            if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
-                throw new InvalidOperationException("A staged File has an incomplete object-storage address.");
-            candidates.Add((file.BlobContainer, file.BlobKey));
-        }
-
-        var addresses = candidates.Distinct().ToList();
-        if (addresses.Count == 0) return [];
-
-        var existingByAddress = _db.StorageCleanupTargets.Local
-            .Where(row => row.AccountId == _scope.AccountId &&
-                          row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval && !row.IsContainer)
-            .ToDictionary(row => (row.StoragePartition, row.StorageKey));
-
-        foreach (var partition in addresses.GroupBy(address => address.Partition))
-        {
-            foreach (var keyChunk in partition.Select(address => address.Key)
-                         .Distinct().Chunk(CleanupLookupBatchSize))
-            {
-                var keys = keyChunk.ToArray();
-                var existing = await _db.StorageCleanupTargets
-                    .Where(row => row.AccountId == _scope.AccountId &&
-                                  row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval &&
-                                  !row.IsContainer && row.StoragePartition == partition.Key &&
-                                  keys.Contains(row.StorageKey))
-                    .ToListAsync(cancellationToken);
-                foreach (var target in existing)
-                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
-            }
-        }
-
-        var targets = new List<StorageCleanupTarget>(addresses.Count);
-        foreach (var address in addresses)
-        {
-            if (existingByAddress.TryGetValue(address, out var existing))
-            {
-                targets.Add(existing);
-                continue;
-            }
-
-            var target = new StorageCleanupTarget
-            {
-                AccountId = _scope.AccountId,
-                StoragePartition = address.Partition,
-                StorageKey = address.Key,
-                Purpose = StorageCleanupPurpose.UnpublishedFileRemoval
-            };
-            _db.StorageCleanupTargets.Add(target);
-            existingByAddress.Add(address, target);
-            targets.Add(target);
-        }
-
-        return targets;
-    }
-
-    private async Task ClaimAuthoringStagedFilesAsync(CaveChangeRequest request, IEnumerable<string> fileIds,
-        CancellationToken cancellationToken)
-    {
-        var requestedIds = fileIds.Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-        if (requestedIds.Count == 0) return;
-
-        var existingIds = (await _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
-            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == request.Id &&
-                             requestedIds.Contains(staged.FileId))
-            .Select(staged => staged.FileId).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
-
-        var now = DateTime.UtcNow;
-        foreach (var fileId in requestedIds.Where(id => !existingIds.Contains(id)))
-        {
-            var file = await _db.Files.FromSqlInterpolated(
-                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {fileId} FOR UPDATE")
-                .IgnoreQueryFilters().SingleOrDefaultAsync(cancellationToken);
-            if (file is null || file.CaveId is not null || file.ExpiresOn is null || file.ExpiresOn <= now ||
-                file.CreatedByUserId != _user.Id)
-                throw ApiExceptionDictionary.NotFound("Staged file");
-
-            var alreadyBound = await _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AnyAsync(staged =>
-                staged.AccountId == _scope.AccountId && staged.FileId == fileId, cancellationToken);
-            if (alreadyBound)
-                throw ApiExceptionDictionary.BadRequest("The staged file is already bound to another change request.");
-
-            _db.CaveChangeRequestStagedFiles.Add(new CaveChangeRequestStagedFile
-            {
-                AccountId = _scope.AccountId,
-                ChangeRequestId = request.Id,
-                FileId = fileId
-            });
-        }
-    }
+    private Task ClaimAuthoringStagedFilesAsync(
+        CaveChangeRequest request, IEnumerable<string> fileIds,
+        CancellationToken cancellationToken) =>
+        _authoringFiles.ClaimAsync(request.Id, fileIds, cancellationToken);
 
     private static void RequireAwaitingReviewer(CaveChangeRequestStatus status)
     {

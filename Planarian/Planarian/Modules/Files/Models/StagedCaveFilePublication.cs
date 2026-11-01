@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Caves.Revisions;
+namespace Planarian.Modules.Files.Models;
 
 /// <summary>
 /// Identifies an already-uploaded immutable staged File object that may be

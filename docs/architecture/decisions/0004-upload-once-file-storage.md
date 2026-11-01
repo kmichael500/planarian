@@ -39,7 +39,7 @@ Publication changes relational lifecycle only:
 
 Application logic for this lifecycle depends on IObjectStorage rather than Azure SDK types.
 
-Upload occurs before the short relational insert. If the relational insert fails, the service attempts compensating object deletion.
+Upload occurs before the short relational insert. If object creation or relational persistence has an uncertain outcome, the service records/reconciles durable cleanup responsibility and checks live File references before deleting bytes. A known create-only collision is never treated as owned bytes and is never compensated.
 
 ## Consequences
 
@@ -54,7 +54,7 @@ Upload occurs before the short relational insert. If the relational insert fails
 ### Costs
 
 - Staged objects can temporarily outlive abandoned authoring and require cleanup.
-- External upload can succeed before relational persistence, so compensation remains necessary.
+- External upload can succeed before relational persistence, so uncertain outcomes require reconciliation and durable cleanup responsibility; direct compensation is safe only when ownership of the created bytes is proven.
 - Provider neutrality is scoped; older storage workflows still use Azure-specific APIs.
 - Object-address immutability is an application invariant; the production adapter behavior should be contract-tested (including retries/accidental reuse) rather than assumed from the interface alone.
 

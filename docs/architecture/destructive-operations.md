@@ -95,7 +95,7 @@ sequenceDiagram
     Service->>Repo: ExecuteResetAsync
     Repo->>DB: Begin transaction
     Service->>DB: Acquire exclusive account maintenance lease
-    Repo->>DB: Capture live File + pending asset-cleanup addresses
+    Repo->>DB: Capture live File/import-source + pending cleanup addresses
     Repo->>DB: Persist cleanup targets; purge Cave/account graph
     Repo->>DB: Commit
     loop persisted cleanup targets
@@ -108,10 +108,8 @@ sequenceDiagram
 The relational reset is committed **before** external cleanup.
 
 Before the commit, the repository rejects cleanup addresses that would delete bytes also referenced by another
-tenant's live relational File. It also fails closed if a live File has only one half of its object-storage address,
-because purging that row would otherwise lose the information needed to prove cleanup responsibility. Pending ordinary
-File-cleanup addresses—both `CaveAssetRemoval` and `UnpublishedFileRemoval`—are folded into Reset Account cleanup
-responsibility before their original targets are purged. This preflight fails closed, leaving relational data and
+tenant's live relational File or CaveImportSource. It also fails closed if a live File has only one half of its object-storage address,
+because purging that row would otherwise lose the information needed to prove cleanup responsibility. Pending ordinary cleanup addresses—`CaveAssetRemoval`, `UnpublishedFileRemoval`, and `ImportSourceRemoval`—are folded into Reset Account cleanup responsibility before their original targets are purged. Live account-owned `CaveImportSources` are also included in the reset address inventory and relational purge. This preflight fails closed, leaving relational data and
 storage untouched rather than committing an unsafe or unrecoverable purge. Cross-tenant reference checks operate in
 bounded key batches to avoid one query per stored object.
 

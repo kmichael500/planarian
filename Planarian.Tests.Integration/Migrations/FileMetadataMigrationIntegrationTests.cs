@@ -33,9 +33,10 @@ public sealed class FileMetadataMigrationIntegrationTests(PostgresTestServer fix
             await upgraded.OpenAsync();
             await using var command = new NpgsqlCommand("""
                 select f."Name", f."Extension", legacy."OriginalFileName",
-                       legacy."MigratedName", legacy."MigratedExtension"
+                       legacy."MigratedName", legacy."MigratedExtension",
+                       legacy."OriginalExpiresOn", legacy."RestoreExpiresOn"
                 from "Files" f
-                join "__CaveRevisionsCompletionLegacyFileNames" legacy on legacy."FileId" = f."Id"
+                join "__CaveRevisionsCompletionLegacyFileState" legacy on legacy."FileId" = f."Id"
                 where f."Id" = 'mainfiler1'
                 """, upgraded);
             await using var reader = await command.ExecuteReaderAsync();
@@ -45,6 +46,8 @@ public sealed class FileMetadataMigrationIntegrationTests(PostgresTestServer fix
             Assert.Equal("legacy-original.pdf", reader.GetString(2));
             Assert.Equal("Friendly Label", reader.GetString(3));
             Assert.Equal(".pdf", reader.GetString(4));
+            Assert.True(reader.IsDBNull(5));
+            Assert.False(reader.GetBoolean(6));
         }
 
         await database.MigrateAsync(baseline);
@@ -56,7 +59,7 @@ public sealed class FileMetadataMigrationIntegrationTests(PostgresTestServer fix
                    (select column_default is null
                     from information_schema.columns
                     where table_name='Files' and column_name='FileName'),
-                   to_regclass('public."__CaveRevisionsCompletionLegacyFileNames"') is null
+                   to_regclass('public."__CaveRevisionsCompletionLegacyFileState"') is null
             from "Files" f
             where f."Id" = 'mainfiler1'
             """, verify);
@@ -260,7 +263,18 @@ public sealed class FileMetadataMigrationIntegrationTests(PostgresTestServer fix
         }
 
         Assert.Equal(("Entrance Survey", ".pdf"), results["mainfiler1"]);
-        Assert.Equal(("temporary", ".csv"), results["mainfilet1"]);
+        Assert.DoesNotContain("mainfilet1", results.Keys);
+        await using (var source = new NpgsqlCommand("""
+                         select "FileName", "BlobKey"
+                         from "CaveImportSources"
+                         where "Id"='mainfilet1'
+                         """, verify))
+        await using (var sourceReader = await source.ExecuteReaderAsync())
+        {
+            Assert.True(await sourceReader.ReadAsync());
+            Assert.Equal("temporary.csv", sourceReader.GetString(0));
+            Assert.Equal("temp/import/caves/mainfilet1.csv", sourceReader.GetString(1));
+        }
         Assert.Equal(("survey.final", ".PDF"), results["filemulti1"]);
         Assert.Equal(("README", ""), results["fileplain1"]);
         Assert.Equal((".gitignore", ""), results["filedot001"]);

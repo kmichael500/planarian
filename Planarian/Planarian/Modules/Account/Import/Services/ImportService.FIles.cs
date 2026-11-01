@@ -80,50 +80,72 @@ public partial class ImportService
         await CleanupExpiredUploadSessions(cancellationToken);
 
         var importSession = GetRequiredImportUploadSession(sessionId);
-        if (importSession.CompletionResult != null)
-        {
-            return importSession.CompletionResult;
-        }
-
-        var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
-
+        await importSession.FinalizationGate.WaitAsync(cancellationToken);
         try
         {
-            var result = await ProcessStagedFileImport(
-                session.BlobKey,
-                session.FileName,
-                importSession.IdRegex,
-                importSession.DelimiterRegex,
-                importSession.IgnoreDuplicates,
-                importSession.CompletionRequestId ?? session.SessionId,
-                cancellationToken);
+            // CommitSession serializes Azure block commitment, but not the subsequent
+            // File publication. A second HTTP request must await the first publication
+            // and reuse its result rather than creating another File/revision.
+            if (importSession.CompletionResult != null)
+                return CopyCompletionResult(importSession.CompletionResult);
 
-            result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
-            importSession.CompletionResult = result;
-            return result;
+            var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
+            try
+            {
+                var result = await ProcessStagedFileImport(
+                    session.BlobKey,
+                    session.FileName,
+                    importSession.IdRegex,
+                    importSession.DelimiterRegex,
+                    importSession.IgnoreDuplicates,
+                    importSession.CompletionRequestId ?? session.SessionId,
+                    cancellationToken);
+
+                result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
+                importSession.CompletionResult = result;
+                return CopyCompletionResult(result);
+            }
+            finally
+            {
+                try
+                {
+                    await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
+                }
+                catch
+                {
+                    // The file may already be published. Do not replace the result
+                    // with a best-effort staging cleanup failure.
+                }
+
+                try
+                {
+                    _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+                }
+                catch
+                {
+                    // The import attempt is finished; slot cleanup is best effort.
+                }
+            }
         }
         finally
         {
-            try
-            {
-                await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
-            }
-            catch
-            {
-                // The file has already been published successfully. Cleanup failures
-                // should not turn the request into a user-visible import failure.
-            }
-
-            try
-            {
-                _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
-            }
-            catch
-            {
-                // The import attempt is finished; treat slot-release cleanup as best effort.
-            }
+            importSession.FinalizationGate.Release();
         }
     }
+
+    // The controller assigns the HTTP trace ID on each response. Never hand it the
+    // cached mutable session result: simultaneous responses would overwrite each
+    // other's correlation IDs and mutate the result retained for later retries.
+    private static FileImportResult CopyCompletionResult(FileImportResult result) => new()
+    {
+        FileName = result.FileName,
+        IsSuccessful = result.IsSuccessful,
+        AssociatedCave = result.AssociatedCave,
+        Message = result.Message,
+        FailureCode = result.FailureCode,
+        IsRetryable = result.IsRetryable,
+        RequestId = result.RequestId
+    };
 
     public async Task CancelFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {

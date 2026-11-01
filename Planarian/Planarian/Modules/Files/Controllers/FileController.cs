@@ -5,6 +5,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Files.Models;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
@@ -72,16 +73,9 @@ public class FileController : PlanarianControllerBase<FileService>
     public async Task<IActionResult> DeleteAuthoringStagedFile(string fileId,
         CancellationToken cancellationToken)
     {
-        await Service.DeleteUnpublishedFileAsync(fileId, cancellationToken);
+        await Service.DeleteAuthoringStagedFileAsync(fileId, cancellationToken);
         return NoContent();
     }
 
 
-}
-
-public class EditFileMetadataVm
-{
-    public string Id { get; set; }
-    [Required, MaxLength(PropertyLength.FileName)] public string Name { get; set; }
-    public string FileTypeTagId { get; set; }
 }

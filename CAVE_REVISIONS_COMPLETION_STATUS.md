@@ -2,8 +2,8 @@
 
 **Branch:** `feature/cave-revisions-completion`
 **Status:** Cave Revisions is integrated and validated. The coordinated deployment pipeline is implemented but not yet activated; Development environment setup and a Development rehearsal remain required before Production.
-**Ledger last refreshed:** 2026-10-29
-**Completion HEAD reviewed:** `d132a00a3491b588d7997c080831a7b7782a31c6` (tree-identical to reviewed sibling commit `16c495ddefc9f98bd8f4cecf90fd20ddb8f526d9`)
+**Ledger last refreshed:** 2026-11-01
+**Completion HEAD reviewed:** `c5d68f0d59d689ac63c67774de463a40ca9cf479` (includes the committed branch; additional staged/unstaged work is identified separately below)
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 
 ## Current verdict
@@ -61,7 +61,22 @@ See [`docs/deployment.md`](docs/deployment.md) for setup, environment protection
 
 ## Validation evidence
 
-Validation claims below remain tied to the commits that produced them; later documentation-only cleanup does not imply those suites were rerun.
+Validation claims below are tied to the exact committed or local staged state that produced them. Historical evidence is retained as historical evidence; a focused post-suite fix does not imply unrelated suites were rerun.
+
+### November 1 working-tree validation
+
+At `c5d68f0d` plus the staged File/import refactor as it stood at the comprehensive run, completed validation included:
+
+- Backend unit/architecture tests: **533/533 passed**.
+- Disposable PostgreSQL/PostGIS integration tests (ordinary persistence, migrations, golden compatibility, and supported scale): **730/730 passed**, no skips.
+- Frontend Jest: **405/405 passed** across 80 suites; TypeScript checking and production frontend build passed (with existing tooling warnings).
+- Deployment planner/task tests: **72/72 passed**; deployment shell syntax, example environment, generated client routes, and repository documentation validated.
+- Release solution build passed with **0 errors, 144 compiler warnings**; EF reported **no pending model changes**.
+- The later static review found a downgrade edge case for a migrated CSV source whose original File type was legitimately deleted after upgrade. Its regression first failed with a PostgreSQL FK violation, then passed after fallback/fail-closed handling was added; **3 focused migration tests passed**. The full 730-test suite was run *before* this narrow migration fix and was not repeated after it.
+- A subsequent audit confirmed two additional narrow edge cases with failing-before/passing-after PostgreSQL regressions: concurrent File-import finalizations shared a mutable cached response (the HTTP controller changes its trace ID), and retained CSV download leaked a `FileNotFoundException` instead of 404 when the object disappeared between storage metadata and stream opening. The affected File-import class passed **10/10** after response isolation; the retained-source download slice passed **2/2** after the missing-object correction. These focused results do not replace another full-suite run.
+- An additional broad review reproduced a cancel-all/finalization race: a session selected for cancellation could enter `Finalizing` before its gate was acquired, causing the batch cancellation to fail. Cancel-all now rechecks under the gate and skips the publishing session while canceling other eligible sessions. The complete File-import integration class passed **11/11** after the fix and after expanding the race regression. The prior 730-test run predates this fix.
+
+This evidence does not include a fresh Chromium/WebKit browser-E2E run, hosted Development rehearsal, live Azure validation, or Production deployment. The staged refactor and subsequent local corrections are not committed merely because they passed tests.
 
 ### Deployment and rollout
 

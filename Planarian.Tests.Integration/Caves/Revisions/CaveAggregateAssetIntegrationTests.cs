@@ -353,7 +353,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         await using (var cleanup = database.CreateDbContext(
                          "cleanup-ack", tenant.AccountId, failAcknowledgement))
         {
-            await IntegrationTestServices.For(cleanup, blobs).Files
+            await IntegrationTestServices.For(cleanup, blobs).StorageCleanup
                 .CleanupAssetRemovalTargetsAsync([cleanupId], default);
         }
 
@@ -363,7 +363,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
             Assert.True(await pending.StorageCleanupTargets.AnyAsync(row => row.Id == cleanupId));
 
         await using (var retry = database.CreateDbContext("retry-cleanup-ack", tenant.AccountId))
-            await IntegrationTestServices.For(retry, blobs).Files
+            await IntegrationTestServices.For(retry, blobs).StorageCleanup
                 .CleanupAssetRemovalTargetsAsync([cleanupId], default);
 
         await using var verify = database.CreateDbContext("verify-cleanup-ack", tenant.AccountId);
@@ -399,7 +399,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         }
 
         await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager", blobs))
-            await manager.Services.Files.CleanupAssetRemovalTargetsAsync([cleanupId], default);
+            await manager.Services.StorageCleanup.CleanupAssetRemovalTargetsAsync([cleanupId], default);
 
         await using var verify = database.CreateDbContext("verify-stale-cleanup", tenant.AccountId);
         Assert.True(await verify.Files.AnyAsync(row => row.Id == file.FileId));
@@ -438,7 +438,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         // read visibility filter but still qualify by AccountId.
         await using (var otherMember = await CaveTestActor.CreateAsync(
                          database, tenant.AccountId, "other-member", blobs))
-            await otherMember.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([cleanupId], default);
+            await otherMember.Services.StorageCleanup.CleanupUnpublishedFileTargetsAsync([cleanupId], default);
 
         await using var verify = database.CreateDbContext("verify-hidden-cleanup", tenant.AccountId);
         Assert.True(await verify.Files.IgnoreQueryFilters().AnyAsync(row =>
@@ -486,7 +486,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         }
 
         await using (var actor = await CaveTestActor.CreateAsync(database, tenantA.AccountId, "manager-a", blobs))
-            await actor.Services.Files.CleanupAssetRemovalTargetsAsync([cleanupId], default);
+            await actor.Services.StorageCleanup.CleanupAssetRemovalTargetsAsync([cleanupId], default);
 
         await using var verify = database.CreateDbContext("verify-cross-account-cleanup", tenantA.AccountId);
         Assert.True(await verify.Files.IgnoreQueryFilters().AnyAsync(row =>
@@ -717,6 +717,32 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
     }
 
     [Fact]
+    public async Task ExpiredAuthoringStagedFileCannotBeOpenedThroughAuthoringEndpoint()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ExpiredAuthoringStagedFileCannotBeOpenedThroughAuthoringEndpoint));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
+        var blobs = new TestFileBlobStore();
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId,
+            "contributor", blobs);
+        await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("expired staging"));
+        var staged = await contributor.Services.Files.StageAuthoringFile(content, "expired-open.pdf", default);
+        var stagedRow = await contributor.Db.Files.SingleAsync(row => row.Id == staged.Id);
+        stagedRow.ExpiresOn = DateTime.UtcNow.AddMinutes(-1);
+        await contributor.Db.SaveChangesAsync();
+
+        var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            contributor.Services.Files.OpenAuthoringStagedFileAsync(staged.Id, default));
+
+        Assert.Equal(404, failure.StatusCode);
+        contributor.Db.ChangeTracker.Clear();
+        Assert.True(await contributor.Db.Files.AsNoTracking().AnyAsync(row => row.Id == staged.Id));
+    }
+
+    [Fact]
     public async Task InitialProposalClaimsGenericStagedFileOnlyWhenProposalIsCreated()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -877,7 +903,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
                 other.Services.Files.OpenAuthoringStagedFileAsync(fileId, default));
             Assert.Equal(404, failure.StatusCode);
             Assert.Contains("Staged file", failure.Message, StringComparison.Ordinal);
-            await other.Services.Files.DeleteUnpublishedFileAsync(fileId, default);
+            await other.Services.Files.DeleteAuthoringStagedFileAsync(fileId, default);
         }
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);

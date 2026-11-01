@@ -45,8 +45,13 @@ public sealed class AzureBlobObjectStorageContractIntegrationTests :
 
         await storage.CreateAsync(address, new MemoryStream(original), "text/plain", default);
 
-        await Assert.ThrowsAsync<RequestFailedException>(() =>
+        var collision = await Assert.ThrowsAsync<StorageObjectAlreadyExistsException>(() =>
             storage.CreateAsync(address, new MemoryStream(replacement), "text/plain", default));
+        var storageFailure = Assert.IsType<RequestFailedException>(collision.InnerException);
+        Assert.True(
+            (storageFailure.Status == 409 && storageFailure.ErrorCode == "BlobAlreadyExists") ||
+            (storageFailure.Status == 412 && storageFailure.ErrorCode == "TargetConditionNotMet"),
+            $"Unexpected create-only collision response: {storageFailure.Status} {storageFailure.ErrorCode}");
 
         var result = await storage.OpenReadAsync(address, default);
         Assert.NotNull(result);

@@ -310,7 +310,8 @@ public sealed class SaveChangesInterceptorTenantOwnershipIntegrationTests(Postgr
                 AccountId = cave.AccountId,
                 FileTypeTagId = fileType.Id,
                 Name = "temporary",
-                Extension = ".pdf"
+                Extension = ".pdf",
+                ExpiresOn = DateTime.UtcNow.AddDays(1)
             };
             fileOwned.Files.Add(file);
             await fileOwned.SaveChangesAsync();

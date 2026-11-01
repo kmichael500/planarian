@@ -16,6 +16,8 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Files.Models;
+using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
@@ -27,10 +29,13 @@ namespace Planarian.Modules.Caves.Repositories;
 
 public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    private const int CleanupLookupBatchSize = 500;
+    private readonly AuthoringFileRepository<TDbContext> _authoringFiles;
 
-    public CaveRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public CaveRepository(TDbContext dbContext, RequestUser requestUser, TimeProvider? timeProvider = null)
+        : base(dbContext, requestUser)
     {
+        _authoringFiles = new AuthoringFileRepository<TDbContext>(
+            dbContext, requestUser, timeProvider ?? TimeProvider.System);
     }
 
     public IQueryable<string> GetCaveIds(FilterQuery filterQuery, string? permissionKey = null)
@@ -1224,39 +1229,10 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return ids.ToHashSet(StringComparer.Ordinal);
     }
 
-    public async Task<IReadOnlyList<Planarian.Model.Database.Entities.RidgeWalker.File>>
+    public Task<IReadOnlyList<Planarian.Model.Database.Entities.RidgeWalker.File>>
         AttachAuthoringStagedFilesAsync(string caveId, IEnumerable<string> fileIds,
-            CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId) || string.IsNullOrWhiteSpace(RequestUser.Id))
-            throw new InvalidOperationException("An active account user is required to publish staged files.");
-        var ids = fileIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
-            .OrderBy(id => id, StringComparer.Ordinal).ToList();
-        if (ids.Count == 0) return [];
-
-        var files = new List<Planarian.Model.Database.Entities.RidgeWalker.File>(ids.Count);
-        foreach (var id in ids)
-        {
-            var file = await DbContext.Files.FromSqlInterpolated(
-                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {RequestUser.AccountId} AND \"Id\" = {id} FOR UPDATE")
-                .IgnoreQueryFilters()
-                .SingleOrDefaultAsync(cancellationToken);
-            if (file is null || file.CreatedByUserId != RequestUser.Id || file.CaveId is not null ||
-                file.ExpiresOn is null || file.ExpiresOn <= DateTime.UtcNow ||
-                await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AnyAsync(staged =>
-                    staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id, cancellationToken) ||
-                string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
-                throw ApiExceptionDictionary.NotFound("Staged file");
-            files.Add(file);
-        }
-
-        foreach (var file in files)
-        {
-            file.CaveId = caveId;
-            file.ExpiresOn = null;
-        }
-        return files;
-    }
+            CancellationToken cancellationToken = default) =>
+        _authoringFiles.AttachUnclaimedToCaveAsync(caveId, fileIds, cancellationToken);
 
     public async Task<StorageCleanupTarget?> QueuePublishedFileObjectCleanupAsync(
         Planarian.Model.Database.Entities.RidgeWalker.File file, string caveId,
@@ -1270,67 +1246,28 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         IEnumerable<Planarian.Model.Database.Entities.RidgeWalker.File> files,
         string caveId, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            throw new InvalidOperationException("An active account is required for published File cleanup.");
+        var accountId = RequestUser.AccountId
+            ?? throw new InvalidOperationException("An active account is required for published File cleanup.");
 
-        var candidates = new List<(string Partition, string Key)>();
+        var addresses = new List<StorageCleanupAddress>();
         foreach (var file in files)
         {
-            if (file.AccountId != RequestUser.AccountId || file.CaveId != caveId)
+            if (file.AccountId != accountId || file.CaveId != caveId)
                 throw new InvalidOperationException("The File is not a current File for this account/Cave.");
-            if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) continue;
+            if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer))
+                continue;
             if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
                 throw new InvalidOperationException("The File has an incomplete object-storage address.");
-            candidates.Add((file.BlobContainer, file.BlobKey));
+            addresses.Add(new StorageCleanupAddress(file.BlobContainer, file.BlobKey));
         }
 
-        var addresses = candidates.Distinct().ToList();
-        if (addresses.Count == 0) return [];
-
-        var existingByAddress = DbContext.StorageCleanupTargets.Local
-            .Where(row => row.AccountId == RequestUser.AccountId &&
-                          row.Purpose == StorageCleanupPurpose.CaveAssetRemoval && !row.IsContainer)
-            .ToDictionary(row => (row.StoragePartition, row.StorageKey));
-
-        foreach (var partition in addresses.GroupBy(address => address.Partition))
-        {
-            foreach (var keyChunk in partition.Select(address => address.Key)
-                         .Distinct().Chunk(CleanupLookupBatchSize))
-            {
-                var keys = keyChunk.ToArray();
-                var existing = await DbContext.StorageCleanupTargets
-                    .Where(row => row.AccountId == RequestUser.AccountId &&
-                                  row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
-                                  !row.IsContainer && row.StoragePartition == partition.Key &&
-                                  keys.Contains(row.StorageKey))
-                    .ToListAsync(cancellationToken);
-                foreach (var target in existing)
-                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
-            }
-        }
-
-        var targets = new List<StorageCleanupTarget>(addresses.Count);
-        foreach (var address in addresses)
-        {
-            if (existingByAddress.TryGetValue(address, out var existing))
-            {
-                targets.Add(existing);
-                continue;
-            }
-
-            var target = new StorageCleanupTarget
-            {
-                AccountId = RequestUser.AccountId,
-                StoragePartition = address.Partition,
-                StorageKey = address.Key,
-                Purpose = StorageCleanupPurpose.CaveAssetRemoval
-            };
-            DbContext.StorageCleanupTargets.Add(target);
-            existingByAddress.Add(address, target);
-            targets.Add(target);
-        }
-
-        return targets;
+        return await StorageCleanupRepository.QueueAsync(
+            DbContext,
+            accountId,
+            RequestUser.Id,
+            StorageCleanupPurpose.CaveAssetRemoval,
+            addresses,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> DeleteAggregateForHardDeleteAsync(
@@ -1419,63 +1356,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task<List<Planarian.Model.Database.Entities.RidgeWalker.File>> AttachStagedFilesAsync(
+    public Task<List<Planarian.Model.Database.Entities.RidgeWalker.File>> AttachStagedFilesAsync(
         string changeRequestId, string caveId, IReadOnlyList<StagedCaveFilePublication> publications,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            throw new InvalidOperationException("An active account is required to publish staged files.");
-        var byId = publications.ToDictionary(publication => publication.FileId, StringComparer.Ordinal);
-        var ids = byId.Keys.OrderBy(id => id, StringComparer.Ordinal).ToList();
-        if (ids.Count == 0) return [];
-
-        var stagedIds = await DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
-            .Where(staged => staged.AccountId == RequestUser.AccountId &&
-                             staged.ChangeRequestId == changeRequestId && ids.Contains(staged.FileId))
-            .Select(staged => staged.FileId).ToListAsync(cancellationToken);
-        if (stagedIds.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
-
-        var files = new List<Planarian.Model.Database.Entities.RidgeWalker.File>(ids.Count);
-        foreach (var id in ids)
-        {
-            var file = await DbContext.Files.FromSqlInterpolated(
-                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {RequestUser.AccountId} AND \"Id\" = {id} FOR UPDATE")
-                .IgnoreQueryFilters()
-                .SingleOrDefaultAsync(cancellationToken);
-            if (file is not null && file.CaveId is null) files.Add(file);
-        }
-        if (files.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
-
-        var sharedPendingFileId = await (from staged in DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
-                join request in DbContext.CaveChangeRequests.IgnoreQueryFilters()
-                    on new { staged.AccountId, Id = staged.ChangeRequestId }
-                    equals new { request.AccountId, request.Id }
-                where staged.AccountId == RequestUser.AccountId && ids.Contains(staged.FileId) &&
-                      staged.ChangeRequestId != changeRequestId &&
-                      CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status)
-                select staged.FileId)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (sharedPendingFileId is not null)
-            throw ApiExceptionDictionary.BadRequest(
-                "A staged file shared with another pending request cannot be published.");
-
-        foreach (var file in files)
-        {
-            var publication = byId[file.Id];
-            if (!string.Equals(file.BlobKey, publication.StorageKey, StringComparison.Ordinal) ||
-                !string.Equals(file.BlobContainer, publication.StoragePartition, StringComparison.Ordinal))
-                throw ApiExceptionDictionary.NotFound("Staged file");
-            file.Extension = publication.Extension;
-            file.CaveId = caveId;
-            file.ExpiresOn = null;
-        }
-
-        await DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
-            .Where(staged => staged.AccountId == RequestUser.AccountId &&
-                             staged.ChangeRequestId == changeRequestId && stagedIds.Contains(staged.FileId))
-            .ExecuteDeleteAsync(cancellationToken);
-        return files;
-    }
+        CancellationToken cancellationToken = default) =>
+        _authoringFiles.AttachRequestFilesToCaveAsync(
+            changeRequestId, caveId, publications, cancellationToken);
 
     public async Task<IReadOnlyList<GeoJsonUploadVm>> GetCaveLinePlotsAsync(string caveId,
         CancellationToken cancellationToken = default)
@@ -1562,7 +1447,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
 public class CaveRepository : CaveRepository<PlanarianDbContext>
 {
-    public CaveRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public CaveRepository(PlanarianDbContext dbContext, RequestUser requestUser, TimeProvider? timeProvider = null)
+        : base(dbContext, requestUser, timeProvider)
     {
     }
 }

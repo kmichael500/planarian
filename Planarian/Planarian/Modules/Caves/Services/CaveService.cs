@@ -20,6 +20,7 @@ using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Repositories;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
@@ -37,6 +38,7 @@ internal sealed record CaveSaveResult(
 public class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
+    private readonly StorageCleanupService _storageCleanup;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
@@ -45,12 +47,14 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly CaveRevisionDiffService _revisionDiff = new();
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
+        StorageCleanupService storageCleanup,
         FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
         CaveMutationCoordinator caveMutationCoordinator, TagReferenceLockRepository tagReferenceLocks,
         CountyReferenceLockRepository countyReferenceLocks) : base(
         repository, requestUser)
     {
         _fileService = fileService;
+        _storageCleanup = storageCleanup;
         _featureSettingRepository = featureSettingRepository;
         _clientUrlBuilder = clientUrlBuilder;
         _caveMutationCoordinator = caveMutationCoordinator;
@@ -522,8 +526,8 @@ public class CaveService : ServiceBase<CaveRepository>
             requireOwnedTransaction: true, cancellationToken);
         // Opportunistic cleanup is a side effect: rejected/stale edits must not execute it.
         // Both older debt and this publication's new targets are safe to process after commit.
-        await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
-        await _fileService.CleanupAssetRemovalTargetsAsync(result.StorageCleanupTargetIds, CancellationToken.None);
+        await _storageCleanup.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        await _storageCleanup.CleanupAssetRemovalTargetsAsync(result.StorageCleanupTargetIds, CancellationToken.None);
         return result.Mutation.CaveId;
     }
 
@@ -1241,7 +1245,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
         // Object storage is outside PostgreSQL. The cleanup targets were committed with the
         // hard delete so a post-commit provider failure remains durable and safely retryable.
-        await _fileService.CleanupAssetRemovalTargetsAsync(cleanupTargetIds, CancellationToken.None);
+        await _storageCleanup.CleanupAssetRemovalTargetsAsync(cleanupTargetIds, CancellationToken.None);
     }
 
     public async Task ArchiveCave(string caveId)

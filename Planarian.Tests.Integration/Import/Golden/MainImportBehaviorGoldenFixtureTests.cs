@@ -508,16 +508,9 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
                 return;
             case "existing-entrance-and-file":
                 await SeedEntranceAsync(database, tenant, "preserved0", "Preserved", true);
-                var testFile = await FileTestDataFactory.AddFileAsync(database, tenant);
-                await using (var db = database.CreateDbContext("a", tenant.AccountId))
-                {
-                    var file = await db.Files.SingleAsync(value => value.Id == testFile.FileId);
-                    file.CaveId = tenant.CaveId;
-                    // The main-anchored Golden scenario observes the complete filename as seed-a.pdf.
-                    // Legacy DisplayName was not part of that observable contract, so do not change Name here.
-                    file.ExpiresOn = new DateTime(2027, 1, 2, 0, 0, 0, DateTimeKind.Utc);
-                    await db.SaveChangesAsync();
-                }
+                // The main-anchored Golden scenario observes the complete filename as seed-a.pdf.
+                // A published File has no expiry; legacy invalid lifecycle state is not part of the import contract.
+                await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true);
                 return;
             case "existing-primary":
                 await SeedEntranceAsync(database, tenant, "existing00", "Existing", true);

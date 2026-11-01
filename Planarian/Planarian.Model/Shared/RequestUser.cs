@@ -85,8 +85,11 @@ public class RequestUser
         }
     }
 
+    public static string BuildAccountContainerName(string accountId) =>
+        $"account-{accountId.ToLowerInvariant()}";
+
     public string AccountUploadFileChunkName =>
-        $"account-{AccountId?.ToLower() ?? throw new NullReferenceException($" {nameof(AccountId)} is null")}";
+        BuildAccountContainerName(AccountId ?? throw new NullReferenceException($" {nameof(AccountId)} is null"));
 
     public string AccountContainerName => AccountUploadFileChunkName;
 

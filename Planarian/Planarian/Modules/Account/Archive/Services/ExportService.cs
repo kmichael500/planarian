@@ -1,3 +1,4 @@
+using Planarian.Modules.Files.Models;
 using System.Globalization;
 using System.Formats.Tar;
 using System.IO.Compression;
@@ -11,7 +12,6 @@ using Planarian.Library.Constants;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Repositories;
-using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
 using Planarian.Shared.Services;
 
@@ -23,14 +23,14 @@ public class ExportService
     internal const long ArchiveFileMemoryBufferThresholdBytes = 8L * 1024 * 1024;
 
     private readonly AccountRepository _accountRepository;
-    private readonly FileService _fileService;
+    private readonly AzureBlobTransportService _blobStorage;
 
     public ExportService(
         AccountRepository accountRepository,
-        FileService fileService)
+        AzureBlobTransportService blobStorage)
     {
         _accountRepository = accountRepository;
-        _fileService = fileService;
+        _blobStorage = blobStorage;
     }
 
     public async Task WriteArchive(
@@ -81,7 +81,7 @@ public class ExportService
         {
             try
             {
-                var candidateContainerClient = await _fileService.GetBlobContainerClient(accountContainerName);
+                var candidateContainerClient = await _blobStorage.GetBlobContainerClient(accountContainerName);
                 var containerExists = await candidateContainerClient.ExistsAsync(cancellationToken);
                 if (containerExists.Value)
                 {

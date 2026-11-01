@@ -16,7 +16,7 @@ public partial class ImportService
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started planning cave import");
 
         Planarian.Modules.Import.Planning.CaveImportPlan plan;
-        await using (var stream = await _fileService.GetFileStream(temporaryFileId))
+        await using (var stream = await _importSourceService.OpenReadAsync(temporaryFileId, cancellationToken))
         {
             var records = await _caveParser.ParseAsync(stream, cancellationToken);
             var state = await _cavePlanningRepository.LoadAsync(records, syncExisting, cancellationToken);
@@ -30,11 +30,11 @@ public partial class ImportService
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying cave import");
-        var result = await _caveExecutor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
+        var result = await _caveExecutor.ExecuteUploadedAsync(plan, temporaryFileId, cancellationToken);
 
         // Relational state, revision history, and cleanup responsibility commit atomically
         // inside the executor. External deletion is attempted only after that commit.
-        await _fileService.CleanupAssetRemovalTargetsAsync(
+        await _storageCleanup.CleanupAssetRemovalTargetsAsync(
             result.StorageCleanupTargetIds, CancellationToken.None);
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished cave import");

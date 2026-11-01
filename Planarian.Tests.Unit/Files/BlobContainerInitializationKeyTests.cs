@@ -1,5 +1,4 @@
 using Azure.Storage.Blobs;
-using Planarian.Modules.Files.Services;
 using Planarian.Shared.Services;
 using Xunit;
 
@@ -17,22 +16,22 @@ public sealed class BlobContainerInitializationKeyTests
         var differentEndpoint = new BlobContainerClient(
             new Uri("http://127.0.0.1:12000/devstoreaccount1/account-a?sig=first"));
 
-        var fileServiceKey = FileService.GetContainerInitializationKey(first);
+        var transportKey = AzureBlobTransportService.GetContainerInitializationKey(first);
         var objectStorageKey = AzureBlobObjectStorage.GetContainerInitializationKey(first);
 
-        Assert.Equal(fileServiceKey, objectStorageKey);
+        Assert.Equal(transportKey, objectStorageKey);
         Assert.Equal(
-            fileServiceKey,
-            FileService.GetContainerInitializationKey(sameEndpointDifferentQuery));
+            transportKey,
+            AzureBlobTransportService.GetContainerInitializationKey(sameEndpointDifferentQuery));
         Assert.Equal(
             objectStorageKey,
             AzureBlobObjectStorage.GetContainerInitializationKey(sameEndpointDifferentQuery));
         Assert.NotEqual(
-            fileServiceKey,
-            FileService.GetContainerInitializationKey(differentEndpoint));
+            transportKey,
+            AzureBlobTransportService.GetContainerInitializationKey(differentEndpoint));
         Assert.NotEqual(
             objectStorageKey,
             AzureBlobObjectStorage.GetContainerInitializationKey(differentEndpoint));
-        Assert.DoesNotContain("sig=", fileServiceKey, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sig=", transportKey, StringComparison.OrdinalIgnoreCase);
     }
 }

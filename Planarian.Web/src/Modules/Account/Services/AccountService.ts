@@ -1,7 +1,6 @@
 import { RcFile } from "antd/lib/upload";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
-import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
 import { TagTypeTableVm } from "../Models/TagTypeTableVm";
 import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
@@ -13,6 +12,7 @@ import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
+import { ImportSourceUploadVm } from "../../Import/Models/ImportSourceUploadVm";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
@@ -95,7 +95,7 @@ const AccountService = {
     file: string | Blob | RcFile,
     uuid: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<FileVm> {
+  ): Promise<ImportSourceUploadVm> {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -106,7 +106,7 @@ const AccountService = {
       onUploadProgress: onProgress,
     };
 
-    const response = await HttpClient.post<FileVm>(
+    const response = await HttpClient.post<ImportSourceUploadVm>(
       `${baseUrl}/import/caves/file?uuid=${uuid}`,
       formData,
       config
@@ -114,12 +114,12 @@ const AccountService = {
     return response.data;
   },
   async ImportCavesFileProcess(
-    fileId: string,
+    sourceId: string,
     isDryRun = false,
     syncExisting = false
   ): Promise<CaveDryRunRecord[]> {
     const response = await HttpClient.post<CaveDryRunRecord[]>(
-      `${baseUrl}/import/caves/process/${fileId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
+      `${baseUrl}/import/caves/process/${sourceId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
     );
     return response.data;
   },
@@ -127,7 +127,7 @@ const AccountService = {
     file: string | Blob | RcFile,
     uuid: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<FileVm> {
+  ): Promise<ImportSourceUploadVm> {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -138,7 +138,7 @@ const AccountService = {
       onUploadProgress: onProgress,
     };
 
-    const response = await HttpClient.post<FileVm>(
+    const response = await HttpClient.post<ImportSourceUploadVm>(
       `${baseUrl}/import/entrances/file?uuid=${uuid}`,
       formData,
       config
@@ -146,12 +146,12 @@ const AccountService = {
     return response.data;
   },
   async ImportEntrancesProcess(
-    fileId: string,
+    sourceId: string,
     isDryRun: boolean,
     syncExisting = false
   ): Promise<EntranceDryRun[]> {
     const response = await HttpClient.post<EntranceDryRun[]>(
-      `${baseUrl}/import/entrances/process/${fileId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
+      `${baseUrl}/import/entrances/process/${sourceId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
     );
     return response.data;
   },

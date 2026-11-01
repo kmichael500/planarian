@@ -9,7 +9,6 @@ using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
-using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Map.Controllers;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Models;
@@ -85,7 +84,6 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
         await using var contributorReads = await CaveTestActor.CreateAsync(database, cave.AccountId, "contributor", blobs);
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         var repository = new CaveRepository(manager.Db, manager.Db.RequestUser);
-        var fileRepository = new FileRepository(manager.Db, manager.Db.RequestUser);
         var map = new MapRepository(manager.Db, manager.Db.RequestUser, repository);
         var revision = new CaveRevisionService(repository,
             new CaveRevisionQueryRepository(manager.Db, manager.Db.RequestUser));
@@ -108,10 +106,9 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
                 await map.GetLinePlotIds(36, 34, -85, -87, 12, default), plotId, foreignPlotId)),
             ("Map line plot GeoJSON", async () => Assert.NotNull(await map.GetLinePlotGeoJson(plotId, default))),
             ("Published line plots", async () => Assert.Single(await repository.GetCaveLinePlotsAsync(cave.CaveId, default))),
-            ("File metadata", async () => Assert.Equal("Document",
-                (await fileRepository.GetFileVm(file.FileId))?.FileTypeKey)),
-            ("File authorization metadata", async () => Assert.NotNull(
-                await fileRepository.GetFileAuthorizationContext(file.FileId))),
+            ("Published Cave file metadata", async () => Assert.Equal("Document",
+                Assert.IsType<CaveVm>(await manager.Services.Caves.GetCave(cave.CaveId)).Files
+                    .Single(row => row.Id == file.FileId).FileTypeKey)),
             ("File view response setup", async () => Assert.NotNull(
                 await manager.Services.Files.CreateFileResponse(file.FileId, false, default))),
             ("File download response setup", async () => Assert.NotNull(
@@ -134,7 +131,6 @@ public sealed class CaveReadIntegrityIntegrationTests(PostgresTestServer fixture
             ("Tag lookup", async () => Assert.NotEmpty(await repository.GetTagCandidatesByIdsAsync([biology.Id], default))),
             ("Foreign Cave detail", async () => await Assert.ThrowsAsync<ApiException>(() =>
                 manager.Services.Caves.GetCave(foreign.CaveId))),
-            ("Foreign File metadata", async () => Assert.Null(await fileRepository.GetFileVm(foreignFile.FileId))),
             ("Foreign File download", async () => await Assert.ThrowsAsync<ApiException>(() =>
                 manager.Services.Files.CreateFileResponse(foreignFile.FileId, true, default))),
             ("Foreign map line plot", async () => Assert.Null(await map.GetLinePlotGeoJson(foreignPlotId, default))),

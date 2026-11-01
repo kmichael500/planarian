@@ -161,9 +161,11 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
 
         await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
         {
-            var expired = (await new FileRepository(contributor, contributor.RequestUser)
-                .GetExpiredFiles()).ToList();
-            Assert.DoesNotContain(expired, file => file.Id == staged.FileId);
+            var cleanupTargets = await new AuthoringFileRepository(contributor, contributor.RequestUser, TimeProvider.System)
+                .RemoveExpiredAsync(16, default);
+            contributor.ChangeTracker.Clear();
+            Assert.Empty(cleanupTargets);
+            Assert.True(await contributor.Files.AnyAsync(file => file.Id == staged.FileId));
         }
 
         await using (var manager = database.CreateDbContext("reviewer", tenant.AccountId))

@@ -10,13 +10,14 @@ public enum StorageCleanupPurpose
 {
     AccountReset,
     CaveAssetRemoval,
-    UnpublishedFileRemoval
+    UnpublishedFileRemoval,
+    ImportSourceRemoval
 }
 
 /// <summary>
 /// Durable post-commit object-storage cleanup debt. Storage bytes must never be deleted before
-/// the owning relational mutation commits. Targets remain until the external cleanup is safely
-/// completed or the address is proven to still belong to a live File.
+/// the owning relational mutation commits. Targets remain until external cleanup is safely
+/// completed or the address is proven to still belong to a live File or CaveImportSource.
 /// </summary>
 public sealed class StorageCleanupTarget : EntityBase
 {

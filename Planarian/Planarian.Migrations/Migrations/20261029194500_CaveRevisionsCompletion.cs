@@ -23,8 +23,16 @@ namespace Planarian.Migrations.Migrations
                 name: "FK_Files_Accounts_AccountId",
                 table: "Files");
 
+            migrationBuilder.DropForeignKey(
+                name: "FK_Files_Caves_CaveId",
+                table: "Files");
+
             migrationBuilder.DropIndex(
                 name: "IX_Files_AccountId",
+                table: "Files");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Files_CaveId",
                 table: "Files");
 
             migrationBuilder.DropIndex(
@@ -158,29 +166,36 @@ namespace Planarian.Migrations.Migrations
                 oldMaxLength: 1000,
                 oldNullable: true);
 
-            // Preserve v32 filenames that Name + Extension cannot reconstruct. Down restores the original
-            // filename only when migrated metadata is unchanged; later edits remain authoritative.
+            // Preserve the pieces of v32 File state that Up intentionally transforms and that Down
+            // cannot reconstruct from the latest schema alone. Down restores each value only when its
+            // migrated representation is still unchanged, so later application edits remain authoritative.
             // Remove this migration-only table when v32 downgrade support is retired.
             migrationBuilder.CreateTable(
-                name: "__CaveRevisionsCompletionLegacyFileNames",
+                name: "__CaveRevisionsCompletionLegacyFileState",
                 columns: table => new
                 {
                     FileId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     OriginalFileName = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     MigratedName = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
-                    MigratedExtension = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false)
+                    MigratedExtension = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    OriginalFileTypeTagId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    OriginalExpiresOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    RestoreExpiresOn = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK___CaveRevisionsCompletionLegacyFileNames", x => x.FileId);
+                    table.PrimaryKey("PK___CaveRevisionsCompletionLegacyFileState", x => x.FileId);
                 });
 
             migrationBuilder.Sql("""
-                INSERT INTO "__CaveRevisionsCompletionLegacyFileNames"
-                    ("FileId", "OriginalFileName", "MigratedName", "MigratedExtension")
-                SELECT "Id", "FileName", "Name", "Extension"
+                INSERT INTO "__CaveRevisionsCompletionLegacyFileState"
+                    ("FileId", "OriginalFileName", "MigratedName", "MigratedExtension",
+                     "OriginalFileTypeTagId", "OriginalExpiresOn", "RestoreExpiresOn")
+                SELECT "Id", "FileName", "Name", "Extension", "FileTypeTagId", "ExpiresOn",
+                       ("CaveId" IS NULL AND "BlobKey" LIKE 'temp/import/caves/%')
                 FROM "Files"
-                WHERE "FileName" <> "Name" || "Extension";
+                WHERE "FileName" <> "Name" || "Extension"
+                   OR ("CaveId" IS NULL AND "BlobKey" LIKE 'temp/import/caves/%');
                 """);
 
             migrationBuilder.DropColumn(
@@ -226,6 +241,126 @@ namespace Planarian.Migrations.Migrations
                 table: "Files",
                 columns: new[] { "AccountId", "Id" });
 
+            migrationBuilder.CreateTable(
+                name: "CaveImportSources",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    FileName = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    BlobContainer = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    BlobKey = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    ExpiresOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CaveImportSources", x => x.Id);
+                    table.UniqueConstraint("AK_CaveImportSources_AccountId_Id", x => new { x.AccountId, x.Id });
+                    table.CheckConstraint("CK_CaveImportSources_FileName", "length(\"FileName\") > 0");
+                    table.CheckConstraint("CK_CaveImportSources_StorageAddress",
+                        "btrim(\"BlobContainer\") <> '' AND btrim(\"BlobKey\") <> ''");
+                    table.ForeignKey(
+                        name: "FK_CaveImportSources_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CaveImportSources_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_CaveImportSources_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            // v32 stored Cave/Entrance CSV provenance in Files. The new model separates
+            // import provenance from Cave assets. Historical import uploads are all retained
+            // because pre-feature production data cannot distinguish applied from abandoned.
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "Files"
+                        WHERE "CaveId" IS NULL
+                          AND "BlobKey" LIKE 'temp/import/caves/%'
+                          AND (NULLIF(btrim("BlobContainer"), '') IS NULL OR NULLIF(btrim("BlobKey"), '') IS NULL)
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot migrate legacy import sources with incomplete object-storage addresses.';
+                    END IF;
+                END $$;
+
+                INSERT INTO "CaveImportSources"
+                    ("Id", "AccountId", "FileName", "BlobContainer", "BlobKey", "ExpiresOn",
+                     "CreatedByUserId", "ModifiedByUserId", "CreatedOn", "ModifiedOn")
+                SELECT file."Id", file."AccountId", legacy."OriginalFileName",
+                       file."BlobContainer", file."BlobKey", NULL,
+                       file."CreatedByUserId", file."ModifiedByUserId", file."CreatedOn", file."ModifiedOn"
+                FROM "Files" AS file
+                JOIN "__CaveRevisionsCompletionLegacyFileState" AS legacy
+                  ON legacy."FileId" = file."Id"
+                WHERE file."CaveId" IS NULL
+                  AND file."BlobKey" LIKE 'temp/import/caves/%';
+
+                DELETE FROM "Files"
+                WHERE "CaveId" IS NULL
+                  AND "BlobKey" LIKE 'temp/import/caves/%';
+
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "Files"
+                        WHERE NOT (
+                            ("CaveId" IS NULL AND "ExpiresOn" IS NOT NULL)
+                            OR ("CaveId" IS NOT NULL AND "ExpiresOn" IS NULL)
+                        )
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot migrate Files: remaining rows violate the staged/published lifecycle invariant.';
+                    END IF;
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "Files"
+                        WHERE ("BlobContainer" IS NULL) <> ("BlobKey" IS NULL)
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot migrate Files: a live File has an incomplete object-storage address.';
+                    END IF;
+                END $$;
+                """);
+
+            migrationBuilder.AddCheckConstraint(
+                name: "CK_Files_Lifecycle",
+                table: "Files",
+                sql: "(\"CaveId\" IS NULL AND \"ExpiresOn\" IS NOT NULL) OR (\"CaveId\" IS NOT NULL AND \"ExpiresOn\" IS NULL)");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "CK_Files_StorageAddressCompleteness",
+                table: "Files",
+                sql: "(\"BlobContainer\" IS NULL) = (\"BlobKey\" IS NULL)");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CaveImportSources_AccountId_ExpiresOn_Id",
+                table: "CaveImportSources",
+                columns: new[] { "AccountId", "ExpiresOn", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CaveImportSources_CreatedByUserId",
+                table: "CaveImportSources",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CaveImportSources_ModifiedByUserId",
+                table: "CaveImportSources",
+                column: "ModifiedByUserId");
+
             migrationBuilder.AddUniqueConstraint(
                 name: "AK_Counties_AccountId_Id",
                 table: "Counties",
@@ -242,6 +377,7 @@ namespace Planarian.Migrations.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    SourceFileId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     SourceFileName = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     SyncExisting = table.Column<bool>(type: "boolean", nullable: false),
                     Kind = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
@@ -264,6 +400,12 @@ namespace Planarian.Migrations.Migrations
                         column: x => x.AccountId,
                         principalTable: "Accounts",
                         principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CaveImportBatches_CaveImportSources_AccountId_SourceFileId",
+                        columns: x => new { x.AccountId, x.SourceFileId },
+                        principalTable: "CaveImportSources",
+                        principalColumns: new[] { "AccountId", "Id" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -521,6 +663,11 @@ namespace Planarian.Migrations.Migrations
                 sql: "length(\"Name\") + length(\"Extension\") <= 1000 AND btrim(\"Name\", ' ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13) || chr(133) || chr(160) || chr(5760) || chr(8192) || chr(8193) || chr(8194) || chr(8195) || chr(8196) || chr(8197) || chr(8198) || chr(8199) || chr(8200) || chr(8201) || chr(8202) || chr(8232) || chr(8233) || chr(8239) || chr(8287) || chr(12288)) <> '' AND \"Name\" NOT IN ('.', '..') AND \"Name\" NOT LIKE '%/%' AND \"Name\" NOT LIKE '%\\\\%' AND \"Name\" !~ '[[:cntrl:]]' AND (\"Extension\" = '' OR (length(\"Extension\") > 1 AND left(\"Extension\", 1) = '.' AND \"Extension\" NOT LIKE '%/%' AND \"Extension\" NOT LIKE '%\\\\%' AND \"Extension\" !~ '[[:cntrl:]]'))");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Files_AccountId_CaveId",
+                table: "Files",
+                columns: new[] { "AccountId", "CaveId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Caves_AccountId_Id_CurrentRevisionId",
                 table: "Caves",
                 columns: new[] { "AccountId", "Id", "CurrentRevisionId" });
@@ -607,6 +754,11 @@ namespace Planarian.Migrations.Migrations
                 columns: new[] { "AccountId", "CreatedOn" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_CaveImportBatches_AccountId_SourceFileId",
+                table: "CaveImportBatches",
+                columns: new[] { "AccountId", "SourceFileId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_CaveProposalVersions_AccountId_CaveId_BaseRevisionId",
                 table: "CaveProposalVersions",
                 columns: new[] { "AccountId", "CaveId", "BaseRevisionId" });
@@ -686,6 +838,14 @@ namespace Planarian.Migrations.Migrations
                 column: "AccountId",
                 principalTable: "Accounts",
                 principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Files_Caves_AccountId_CaveId",
+                table: "Files",
+                columns: new[] { "AccountId", "CaveId" },
+                principalTable: "Caves",
+                principalColumns: new[] { "AccountId", "Id" },
                 onDelete: ReferentialAction.Restrict);
 
             migrationBuilder.AddForeignKey(
@@ -1126,7 +1286,7 @@ namespace Planarian.Migrations.Migrations
                 DO $$ BEGIN
                     IF EXISTS (
                         SELECT 1 FROM "StorageCleanupTargets"
-                        WHERE "Purpose" IN ('CaveAssetRemoval', 'UnpublishedFileRemoval')
+                        WHERE "Purpose" IN ('CaveAssetRemoval', 'UnpublishedFileRemoval', 'ImportSourceRemoval')
                     ) THEN
                         RAISE EXCEPTION 'Cannot downgrade with pending File storage cleanup';
                     END IF;
@@ -1235,6 +1395,22 @@ namespace Planarian.Migrations.Migrations
                 table: "Files");
 
             migrationBuilder.DropForeignKey(
+                name: "FK_Files_Caves_AccountId_CaveId",
+                table: "Files");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Files_AccountId_CaveId",
+                table: "Files");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "CK_Files_Lifecycle",
+                table: "Files");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "CK_Files_StorageAddressCompleteness",
+                table: "Files");
+
+            migrationBuilder.DropForeignKey(
                 name: "FK_CaveProposalVersions_CaveChangeRequests_AccountId_CaveId_Ch~",
                 table: "CaveProposalVersions");
 
@@ -1260,8 +1436,125 @@ namespace Planarian.Migrations.Migrations
             migrationBuilder.DropTable(
                 name: "CaveRevisions");
 
+            // Reconstruct the pre-feature File representation before dropping import provenance.
+            // Historical rows recover their original FileType when still present, plus
+            // migrated Name/Extension from the helper. If the original FileType was
+            // legitimately removed after Up separated import provenance, use a live
+            // account/default Other FileType, as for sources created after upgrade.
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "CaveImportSources" AS source
+                        JOIN "Files" AS file ON file."Id" = source."Id"
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot downgrade: an import-source ID collides with a live File ID.';
+                    END IF;
+
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "CaveImportSources" AS source
+                        LEFT JOIN "__CaveRevisionsCompletionLegacyFileState" AS legacy
+                          ON legacy."FileId" = source."Id"
+                        WHERE (
+                            legacy."FileId" IS NULL
+                            OR NOT EXISTS (
+                                SELECT 1
+                                FROM "TagTypes" AS original_tag
+                                WHERE original_tag."Id" = legacy."OriginalFileTypeTagId"
+                                  AND original_tag."Key" = 'File'
+                                  AND (original_tag."AccountId" = source."AccountId"
+                                       OR original_tag."IsDefault")
+                            )
+                        )
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM "TagTypes" AS tag
+                              WHERE tag."Key" = 'File'
+                                AND tag."Name" = 'Other'
+                                AND (tag."AccountId" = source."AccountId" OR tag."IsDefault")
+                          )
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot downgrade: an import source with no available original FileType has no compatible Other FileType.';
+                    END IF;
+                END $$;
+
+                UPDATE "__CaveRevisionsCompletionLegacyFileState" AS legacy
+                SET "RestoreExpiresOn" = FALSE
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM "CaveImportBatches" AS batch
+                    WHERE batch."SourceFileId" = legacy."FileId"
+                );
+
+                INSERT INTO "Files"
+                    ("Id", "AccountId", "CaveId", "FileTypeTagId", "Name", "Extension",
+                     "BlobKey", "BlobContainer", "ExpiresOn",
+                     "CreatedByUserId", "ModifiedByUserId", "CreatedOn", "ModifiedOn")
+                SELECT source."Id",
+                       source."AccountId",
+                       NULL,
+                       COALESCE(
+                           (
+                               SELECT original_tag."Id"
+                               FROM "TagTypes" AS original_tag
+                               WHERE original_tag."Id" = legacy."OriginalFileTypeTagId"
+                                 AND original_tag."Key" = 'File'
+                                 AND (original_tag."AccountId" = source."AccountId"
+                                      OR original_tag."IsDefault")
+                           ),
+                           (
+                               SELECT tag."Id"
+                               FROM "TagTypes" AS tag
+                               WHERE tag."Key" = 'File'
+                                 AND tag."Name" = 'Other'
+                                 AND (tag."AccountId" = source."AccountId" OR tag."IsDefault")
+                               ORDER BY CASE WHEN tag."AccountId" = source."AccountId" THEN 0 ELSE 1 END,
+                                        tag."Id"
+                               LIMIT 1
+                           )
+                       ),
+                       COALESCE(
+                           legacy."MigratedName",
+                           CASE
+                               WHEN position('.' in reverse(source."FileName")) > 1
+                                    AND length(source."FileName") -
+                                        position('.' in reverse(source."FileName")) + 1 > 1
+                               THEN substring(source."FileName" from 1 for
+                                   length(source."FileName") - position('.' in reverse(source."FileName")))
+                               ELSE source."FileName"
+                           END
+                       ),
+                       COALESCE(
+                           legacy."MigratedExtension",
+                           CASE
+                               WHEN position('.' in reverse(source."FileName")) > 1
+                                    AND length(source."FileName") -
+                                        position('.' in reverse(source."FileName")) + 1 > 1
+                               THEN substring(source."FileName" from
+                                   length(source."FileName") -
+                                   position('.' in reverse(source."FileName")) + 1)
+                               ELSE ''
+                           END
+                       ),
+                       source."BlobKey",
+                       source."BlobContainer",
+                       source."ExpiresOn",
+                       source."CreatedByUserId",
+                       source."ModifiedByUserId",
+                       source."CreatedOn",
+                       source."ModifiedOn"
+                FROM "CaveImportSources" AS source
+                LEFT JOIN "__CaveRevisionsCompletionLegacyFileState" AS legacy
+                  ON legacy."FileId" = source."Id";
+                """);
+
             migrationBuilder.DropTable(
                 name: "CaveImportBatches");
+
+            migrationBuilder.DropTable(
+                name: "CaveImportSources");
 
             migrationBuilder.DropUniqueConstraint(
                 name: "AK_Files_AccountId_Id",
@@ -1300,10 +1593,17 @@ namespace Planarian.Migrations.Migrations
 
                 UPDATE "Files" AS file
                 SET "FileName" = legacy."OriginalFileName"
-                FROM "__CaveRevisionsCompletionLegacyFileNames" AS legacy
+                FROM "__CaveRevisionsCompletionLegacyFileState" AS legacy
                 WHERE legacy."FileId" = file."Id"
                   AND file."Name" = legacy."MigratedName"
                   AND file."Extension" = legacy."MigratedExtension";
+
+                UPDATE "Files" AS file
+                SET "ExpiresOn" = legacy."OriginalExpiresOn"
+                FROM "__CaveRevisionsCompletionLegacyFileState" AS legacy
+                WHERE legacy."FileId" = file."Id"
+                  AND legacy."RestoreExpiresOn"
+                  AND file."ExpiresOn" IS NULL;
                 """);
 
             migrationBuilder.AlterColumn<string>(
@@ -1318,7 +1618,7 @@ namespace Planarian.Migrations.Migrations
                 oldNullable: true);
 
             migrationBuilder.DropTable(
-                name: "__CaveRevisionsCompletionLegacyFileNames");
+                name: "__CaveRevisionsCompletionLegacyFileState");
 
             migrationBuilder.DropColumn(
                 name: "Extension",
@@ -1377,6 +1677,11 @@ namespace Planarian.Migrations.Migrations
                 column: "AccountId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Files_CaveId",
+                table: "Files",
+                column: "CaveId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Entrances_ReportedByUserId",
                 table: "Entrances",
                 column: "ReportedByUserId");
@@ -1410,6 +1715,13 @@ namespace Planarian.Migrations.Migrations
                 table: "Files",
                 column: "AccountId",
                 principalTable: "Accounts",
+                principalColumn: "Id");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Files_Caves_CaveId",
+                table: "Files",
+                column: "CaveId",
+                principalTable: "Caves",
                 principalColumn: "Id");
         }
     }

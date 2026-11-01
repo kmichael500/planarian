@@ -72,6 +72,10 @@ public sealed class ArchiveGeneratedContentIntegrationTests(
 
         await using (var db = database.CreateDbContext("archive-seed", caveA.AccountId))
         {
+            // Deliberately simulate historical/corrupt rows so archive generation still fails soft
+            // even though the current schema prevents creating a half-specified storage address.
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Files" DROP CONSTRAINT "CK_Files_StorageAddressCompleteness" """);
             var firstCave = await db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == caveA.CaveId);
             firstCave.Name = "Cave: One / Primary";
             firstCave.SetAlternateNamesList(["Alt One", "Ált Two"]);
@@ -202,7 +206,7 @@ public sealed class ArchiveGeneratedContentIntegrationTests(
             fileConnectionString: azurite.ConnectionString);
         var export = new ExportService(
             new AccountRepository(exportDb, exportDb.RequestUser),
-            services.Files);
+            services.BlobTransport);
 
         var expectedLinePlotPayloads = await exportDb.CaveGeoJsons
             .IgnoreQueryFilters()
@@ -337,7 +341,7 @@ public sealed class ArchiveGeneratedContentIntegrationTests(
 
         await using var dbExport = database.CreateDbContext("cancel-export", cave.AccountId);
         var services = IntegrationTestServices.For(dbExport, fileConnectionString: azurite.ConnectionString);
-        var export = new ExportService(new AccountRepository(dbExport, dbExport.RequestUser), services.Files);
+        var export = new ExportService(new AccountRepository(dbExport, dbExport.RequestUser), services.BlobTransport);
 
         using (var alreadyCanceled = new CancellationTokenSource())
         {

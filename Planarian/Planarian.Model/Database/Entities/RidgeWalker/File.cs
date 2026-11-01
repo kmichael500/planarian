@@ -10,8 +10,8 @@ public class File : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
-    // Every persisted file is account-owned. Temporary import files have no Cave,
-    // but are still owned by the uploading account.
+    // Every persisted Cave File is account-owned, including unclaimed authoring uploads.
+    // CSV import provenance is stored separately in CaveImportSources.
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
 
     [MaxLength(PropertyLength.Key)] public string? BlobKey { get; set; }
@@ -39,6 +39,11 @@ public class FileConfiguration : BaseEntityTypeConfiguration<File>
     {
         builder.ToTable("Files", table =>
         {
+            table.HasCheckConstraint("CK_Files_Lifecycle",
+                "(\"CaveId\" IS NULL AND \"ExpiresOn\" IS NOT NULL) OR " +
+                "(\"CaveId\" IS NOT NULL AND \"ExpiresOn\" IS NULL)");
+            table.HasCheckConstraint("CK_Files_StorageAddressCompleteness",
+                "(\"BlobContainer\" IS NULL) = (\"BlobKey\" IS NULL)");
             table.HasCheckConstraint("CK_Files_ValidNameAndExtension",
                 $"length(\"Name\") + length(\"Extension\") <= {PropertyLength.FileName} AND " +
                 $"btrim(\"Name\", {DotNetWhitespaceCharactersSql}) <> '' AND \"Name\" NOT IN ('.', '..') AND " +
@@ -58,8 +63,9 @@ public class FileConfiguration : BaseEntityTypeConfiguration<File>
         builder
             .HasOne(e => e.Cave)
             .WithMany(e => e.Files)
-            .HasForeignKey(bc => bc.CaveId)
-            .OnDelete(DeleteBehavior.NoAction);
+            .HasPrincipalKey(cave => new { cave.AccountId, cave.Id })
+            .HasForeignKey(file => new { file.AccountId, file.CaveId })
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.FileTypeTag)
             .WithMany(e => e.FileTypeTags)

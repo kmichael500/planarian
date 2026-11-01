@@ -9,6 +9,7 @@ using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Tags;
@@ -24,12 +25,13 @@ public sealed class CaveChangeRequestService
     private readonly CaveRevisionQueryRepository _revisions;
     private readonly CaveMutationCoordinator _mutations;
     private readonly FileService _files;
+    private readonly StorageCleanupService _storageCleanup;
     private readonly RequestUser _user;
     private readonly CaveRevisionDiffService _diff = new();
 
     public CaveChangeRequestService(CaveChangeRequestRepository requests, CaveRepository caves,
         CaveService caveService, CaveRevisionQueryRepository revisions, CaveMutationCoordinator mutations,
-        FileService files, RequestUser user)
+        FileService files, StorageCleanupService storageCleanup, RequestUser user)
     {
         _requests = requests;
         _caves = caves;
@@ -37,6 +39,7 @@ public sealed class CaveChangeRequestService
         _revisions = revisions;
         _mutations = mutations;
         _files = files;
+        _storageCleanup = storageCleanup;
         _user = user;
     }
 
@@ -368,7 +371,7 @@ public sealed class CaveChangeRequestService
 
         // Process only debt from earlier committed removals. New cleanup targets created by
         // this approval are handled after the outer approval transaction commits below.
-        await _files.CleanupOrdinaryFileRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        await _storageCleanup.CleanupOrdinaryTargetsAsync(cancellationToken: CancellationToken.None);
         var approval = await _mutations.ExecuteOwnedTransactionAsync(async token =>
         {
             CaveSaveResult saveResult;
@@ -401,10 +404,10 @@ public sealed class CaveChangeRequestService
         }, cancellationToken);
         var publishedRevisionId = approval.SaveResult.Mutation.RevisionId;
 
-        await _files.CleanupAssetRemovalTargetsAsync(
+        await _storageCleanup.CleanupAssetRemovalTargetsAsync(
             approval.SaveResult.StorageCleanupTargetIds, CancellationToken.None);
 
-        await _files.CleanupUnpublishedFileRemovalTargetsAsync(
+        await _storageCleanup.CleanupUnpublishedFileTargetsAsync(
             approval.DiscardedCleanupTargetIds, CancellationToken.None);
 
         if (string.IsNullOrWhiteSpace(publishedRevisionId))
@@ -456,7 +459,7 @@ public sealed class CaveChangeRequestService
             throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
         var cleanupTargetIds = await _requests.RejectAsync(
             requestId, expectedProposalVersionId, notes.Trim(), cancellationToken);
-        await _files.CleanupUnpublishedFileRemovalTargetsAsync(cleanupTargetIds, CancellationToken.None);
+        await _storageCleanup.CleanupUnpublishedFileTargetsAsync(cleanupTargetIds, CancellationToken.None);
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Rejected, requestId, null,
             row.CurrentRevision?.Id);
     }

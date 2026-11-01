@@ -14,7 +14,7 @@ public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCon
     {
     }
 
-    public async Task<TagType?> GetFileTypeTagByName(string fileTagTypeName, string? accountId = null)
+    public async Task<TagType?> GetFileTypeTagByName(string fileTagTypeName)
     {
         var result = await GetTagTypesQuery(TagTypeKeyConstant.File)
             .Where(e =>e.Name == fileTagTypeName)

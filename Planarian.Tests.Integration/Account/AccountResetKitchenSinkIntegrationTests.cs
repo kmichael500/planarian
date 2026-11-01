@@ -72,7 +72,7 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
         // A fixed whitelist: the SQL here is a test observation, not domain setup.
         string[] tables =
         [
-            "Caves", "Files", "StorageCleanupTargets", "CaveRevisions",
+            "Caves", "Files", "CaveImportSources", "StorageCleanupTargets", "CaveRevisions",
             "CaveChangeRequests", "CaveProposalVersions", "CaveChangeRequestReviewEvents",
             "CaveImportBatches", "Favorites", "Counties", "TagTypes",
             "AccountStates", "AccountUsers", "FeatureSettings", "CavePermission"
@@ -171,6 +171,26 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
             Extension = ".pdf", BlobContainer = "account-" + cave.AccountId, BlobKey = "objects/temporary-" + actor,
             ExpiresOn = DateTime.UtcNow.AddMinutes(30)
         });
+        var importSourceId = "impsrc000" + actor;
+        db.CaveImportSources.Add(new CaveImportSource
+        {
+            Id = importSourceId,
+            AccountId = cave.AccountId,
+            FileName = "applied-" + actor + ".csv",
+            BlobContainer = "account-" + cave.AccountId,
+            BlobKey = "temp/import/caves/" + importSourceId + ".csv"
+        });
+        db.CaveImportBatches.Add(new CaveImportBatch
+        {
+            Id = "batch0000" + actor,
+            AccountId = cave.AccountId,
+            SourceFileId = importSourceId,
+            SourceFileName = "applied-" + actor + ".csv",
+            SyncExisting = false,
+            Kind = CaveImportKind.CaveCsv,
+            SourceRecordCount = 1,
+            NoChangeCount = 1
+        });
         db.StorageCleanupTargets.Add(new StorageCleanupTarget
         {
             AccountId = cave.AccountId,
@@ -187,6 +207,7 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
 
         blobs.Seed("account-" + cave.AccountId, "objects/live-" + actor, [1]);
         blobs.Seed("account-" + cave.AccountId, "objects/temporary-" + actor, [2]);
+        blobs.Seed("account-" + cave.AccountId, "temp/import/caves/" + importSourceId + ".csv", [7]);
         blobs.Seed("account-" + cave.AccountId, "archives/backup-" + actor, [3]);
         blobs.Seed("account-" + cave.AccountId, "archives/temp/working-" + actor, [4]);
         blobs.Seed("account-" + cave.AccountId, "import/transport-" + actor, [5]);
@@ -202,9 +223,11 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
             ["Caves"] = await db.Caves.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Entrances"] = await db.Entrances.IgnoreQueryFilters().Where(x => x.Cave!.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Files"] = await db.Files.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
+            ["ImportSources"] = await db.CaveImportSources.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["CleanupTargets"] = await db.StorageCleanupTargets.IgnoreQueryFilters()
                 .Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Revisions"] = await db.CaveRevisions.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
+            ["ImportBatches"] = await db.CaveImportBatches.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Requests"] = await db.CaveChangeRequests.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Versions"] = await db.CaveProposalVersions.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Reviews"] = await db.CaveChangeRequestReviewEvents.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),

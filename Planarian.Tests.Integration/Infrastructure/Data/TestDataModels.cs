@@ -42,7 +42,7 @@ internal sealed record PublishedCaveTestData(
     int CountyNumber,
     string RevisionId);
 
-internal sealed record TestFileData(string FileId, string FileTypeId);
+internal sealed record TestFileData(string FileId, string FileTypeId, string BlobContainer, string BlobKey);
 internal sealed record PendingChangeRequestTestData(string ChangeRequestId, string? ProposalVersionId = null);
 internal sealed record PendingReviewWithStagedFileTestData(
     string ChangeRequestId,

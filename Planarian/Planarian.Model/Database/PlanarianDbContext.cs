@@ -43,6 +43,7 @@ public partial class PlanarianDbContextBase : DbContext
     public DbSet<Cave> Caves { get; set; } = null!;
     public DbSet<CaveRevision> CaveRevisions { get; set; } = null!;
     public DbSet<CaveImportBatch> CaveImportBatches { get; set; } = null!;
+    public DbSet<CaveImportSource> CaveImportSources { get; set; } = null!;
     public DbSet<CaveChangeRequest> CaveChangeRequests { get; set; } = null!;
     public DbSet<CaveChangeRequestReviewEvent> CaveChangeRequestReviewEvents { get; set; } = null!;
     public DbSet<CaveProposalVersion> CaveProposalVersions { get; set; } = null!;
@@ -134,6 +135,10 @@ public class PlanarianDbContext : PlanarianDbContextBase
         modelBuilder.Entity<CaveRevision>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveImportBatch>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveImportSource>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<File>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveChangeRequest>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);

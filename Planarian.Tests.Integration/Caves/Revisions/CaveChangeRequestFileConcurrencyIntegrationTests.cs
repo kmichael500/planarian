@@ -123,7 +123,7 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "approve00a");
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("concurrency bytes"));
+        blobs.Seed(file.BlobContainer, file.BlobKey, System.Text.Encoding.UTF8.GetBytes("concurrency bytes"));
         var mapType = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.File, "Map", "filemap00a");
         var laterType = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,

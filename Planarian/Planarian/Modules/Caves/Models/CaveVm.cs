@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Files.Models;
 
 namespace Planarian.Modules.Caves.Models;
 

@@ -14,8 +14,6 @@ import {
 import { AxiosProgressEvent } from "axios";
 import { RcFile } from "antd/lib/upload/interface";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { UploadRequestError } from "rc-upload/lib/interface";
-import { FileVm } from "../Models/FileVm";
 import { useEffect, useState } from "react";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
@@ -25,14 +23,14 @@ import { CancelButtonComponent } from "../../../Shared/Components/Buttons/Cancel
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 import { getFileType } from "../Services/FileHelpers";
 
-interface AddCaveFilesForm {
-  files: FileVm[];
+interface UploadFilesForm<TUpload> {
+  files: TUpload[];
 }
 
-interface UploadComponentProps {
+interface UploadComponentProps<TUpload> {
   onClose?: () => void;
-  uploadFunction: (params: UploadParams) => Promise<FileVm>;
-  updateFunction: (files: FileVm[]) => Promise<void>;
+  uploadFunction: (params: UploadParams) => Promise<TUpload>;
+  updateFunction: (files: TUpload[]) => Promise<void>;
   allowedFileTypes?: string[];
   hideCancelButton?: boolean;
   style?: React.CSSProperties;
@@ -48,7 +46,7 @@ export interface UploadParams {
   [key: string]: any;
 }
 
-const UploadComponent = ({
+const UploadComponent = <TUpload,>({
   onClose,
   uploadFunction,
   updateFunction,
@@ -58,8 +56,9 @@ const UploadComponent = ({
   draggerTitle,
   singleFile,
   allowedFileTypes,
-}: UploadComponentProps) => {
-  const [form] = Form.useForm<AddCaveFilesForm>();
+}: UploadComponentProps<TUpload>) => {
+  const [form] = Form.useForm<UploadFilesForm<TUpload>>();
+  const [uploadedFiles, setUploadedFiles] = useState<TUpload[]>([]);
   const [formChanged, setFormChanged] = useState(false);
 
   const [singleFileUploadPercent, setSingleFileUploadPercent] =
@@ -71,6 +70,7 @@ const UploadComponent = ({
 
   const [numberOfFilesToUpload, setNumberOfFilesToUpload] = useState(0);
   const [completedNumberOfUploads, setCompletedNumberOfUploads] = useState(0);
+  const [successfulNumberOfUploads, setSuccessfulNumberOfUploads] = useState(0);
   const [uploadProgress, setUploadProgress] = useState<
     Record<string, { progress: number; name: string }>
   >({});
@@ -78,20 +78,22 @@ const UploadComponent = ({
   useEffect(() => {
     if (
       completedNumberOfUploads === numberOfFilesToUpload &&
-      completedNumberOfUploads !== 0
+      successfulNumberOfUploads === numberOfFilesToUpload &&
+      numberOfFilesToUpload !== 0
     ) {
       message.success("All files have been uploaded successfully!");
     }
-  }, [completedNumberOfUploads, numberOfFilesToUpload]);
+  }, [completedNumberOfUploads, numberOfFilesToUpload, successfulNumberOfUploads]);
 
   const uploadsInProgress = () => {
     return (
       numberOfFilesToUpload === 0 ||
-      completedNumberOfUploads !== numberOfFilesToUpload
+      completedNumberOfUploads !== numberOfFilesToUpload ||
+      successfulNumberOfUploads === 0
     );
   };
 
-  const onSubmit = async (values: AddCaveFilesForm) => {
+  const onSubmit = async (values: UploadFilesForm<TUpload>) => {
     try {
       await updateFunction(values.files);
       message.success("Files successfully updated!");
@@ -134,9 +136,19 @@ const UploadComponent = ({
     return true;
   };
 
+  const showUploadForm =
+    numberOfFilesToUpload > 0 &&
+    completedNumberOfUploads === numberOfFilesToUpload &&
+    successfulNumberOfUploads > 0;
+
+  // Keep upload results locally until the edit form is mounted. Writing to an
+  // unmounted Ant Design Form instance is unreliable and produces a warning.
   useEffect(() => {
-    form.setFieldsValue({ files: [] });
-  }, []);
+    if (showUploadForm) {
+      form.setFieldValue("files", uploadedFiles);
+    }
+  }, [form, showUploadForm, uploadedFiles]);
+
   const props: UploadProps = {
     name: "file",
     multiple: !singleFile,
@@ -164,9 +176,11 @@ const UploadComponent = ({
           file,
           uid: (file as RcFile).uid,
           onProgress: (event: AxiosProgressEvent) => {
-            const percent = Math.round(
-              (100 * event.loaded) / (event.total ?? 0)
-            );
+            // Browsers may omit the upload total. Never pass NaN or Infinity
+            // to Ant Design's Progress component or its callback.
+            const percent = event.total && event.total > 0
+              ? Math.min(100, Math.max(0, Math.round((100 * event.loaded) / event.total)))
+              : 0;
 
             setSingleFileUploadPercent(percent);
 
@@ -183,18 +197,19 @@ const UploadComponent = ({
             }
           },
         });
-        form.setFieldsValue({
-          files: [...form.getFieldValue("files"), result],
-        });
+        setUploadedFiles((previous) => [...previous, result]);
 
+        setSuccessfulNumberOfUploads((previous) => previous + 1);
         if (onSuccess) {
           onSuccess({});
         }
       } catch (e) {
-        const errorMessage = e as ApiErrorResponse;
-        message.error(errorMessage.message);
+        const error = e instanceof Error
+          ? e
+          : new Error((e as ApiErrorResponse)?.message || "Upload failed.");
+        message.error(error.message);
         if (onError) {
-          onError({} as UploadRequestError);
+          onError(error);
         }
       } finally {
         setCompletedNumberOfUploads((prevCount) => prevCount + 1);
@@ -256,14 +271,13 @@ const UploadComponent = ({
                 <>
                   <Row gutter={16}>
                     {fields.map((field) => (
-                      <Col>
-                        <Card bordered style={{ height: "100%" }}>
+                      <Col key={field.key}>
+                        <Card variant="outlined" style={{ height: "100%" }}>
                           <Form.Item
                             name={[
                               field.name,
                               nameof<EditFileMetadataVm>("name"),
                             ]}
-                            key={field.key}
                             label={`Name`}
                             required
                           >
@@ -274,7 +288,6 @@ const UploadComponent = ({
                               field.name,
                               nameof<EditFileMetadataVm>("fileTypeTagId"),
                             ]}
-                            key={field.key}
                             label={`File Type`}
                             required
                           >

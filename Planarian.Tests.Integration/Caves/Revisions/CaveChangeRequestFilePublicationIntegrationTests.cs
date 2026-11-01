@@ -229,7 +229,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, tenant);
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("file-only bytes"));
+        blobs.Seed(file.BlobContainer, file.BlobKey, System.Text.Encoding.UTF8.GetBytes("file-only bytes"));
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
         await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 
@@ -300,7 +300,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
         var file = await FileTestDataFactory.AddFileAsync(database, tenant);
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("application approval bytes"));
+        blobs.Seed(file.BlobContainer, file.BlobKey, System.Text.Encoding.UTF8.GetBytes("application approval bytes"));
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
         await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
         string requestId;
@@ -398,7 +398,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             await Assert.ThrowsAsync<InvalidOperationException>(() => mutations.ExecuteOwnedTransactionAsync(async token =>
             {
                 await services.Caves.ApproveChangeRequestAsync(values, tenant.RevisionId, requestId,
-                    [new StagedCaveFilePublication(file.FileId, "seed-a", "test", ".pdf")], token);
+                    [new StagedCaveFilePublication(file.FileId, file.BlobKey, file.BlobContainer, ".pdf")], token);
                 throw new InvalidOperationException("Simulated approval failure");
             }, default));
         }
@@ -455,7 +455,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
         {
             var caves = new Planarian.Modules.Caves.Repositories.CaveRepository(reviewer, reviewer.RequestUser);
             var attached = await caves.AttachStagedFilesAsync(requestId, tenant.CaveId,
-                [new StagedCaveFilePublication(fileId, "seed-a", "test", ".pdf")]);
+                [new StagedCaveFilePublication(fileId, stagedFile.BlobKey, stagedFile.BlobContainer, ".pdf")]);
             await reviewer.SaveChangesAsync();
             Assert.Single(attached);
         }
@@ -613,7 +613,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             blobs.FailDeletes = false;
             await using (var retry = await CaveTestActor.CreateAsync(
                              database, tenant.AccountId, "reviewer", blobs))
-                await retry.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([cleanupId], default);
+                await retry.Services.StorageCleanup.CleanupUnpublishedFileTargetsAsync([cleanupId], default);
 
             await using var cleaned = database.CreateDbContext("verify-cleaned", tenant.AccountId);
             Assert.False(await cleaned.StorageCleanupTargets.AnyAsync(row => row.Id == cleanupId));

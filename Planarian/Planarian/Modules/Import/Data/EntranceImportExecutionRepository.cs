@@ -38,8 +38,16 @@ public sealed class EntranceImportExecutionRepository
         _tagReferenceLocks = tagReferenceLocks;
     }
 
-    public async Task<string> ExecuteAsync(EntranceImportPlan plan, string? sourceFileName,
-        CancellationToken cancellationToken = default)
+    public Task<string> ExecuteAsync(EntranceImportPlan plan, string? sourceFileName,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCoreAsync(plan, sourceFileName, sourceFileId: null, cancellationToken);
+
+    public Task<string> ExecuteUploadedAsync(EntranceImportPlan plan, string sourceFileId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCoreAsync(plan, sourceFileName: null, sourceFileId, cancellationToken);
+
+    private async Task<string> ExecuteCoreAsync(EntranceImportPlan plan, string? sourceFileName,
+        string? sourceFileId, CancellationToken cancellationToken)
     {
         if (plan.AccountId != _scope.AccountId)
             throw new InvalidOperationException("Entrance import plan belongs to another account.");
@@ -49,6 +57,11 @@ public sealed class EntranceImportExecutionRepository
         {
             await VerifyTagsAsync(plan, cancellationToken);
             await LockAndVerifyTargetsAsync(plan, cancellationToken);
+
+            PersistedImportSource? persistedSource = null;
+            if (sourceFileId is not null)
+                persistedSource = await ImportSourceRepository.PromoteAsync(
+                    _db, _scope.AccountId, _scope.UserId, sourceFileId, cancellationToken);
 
             var targetIds = plan.Targets.Keys.Order(StringComparer.Ordinal).ToList();
             var before = targetIds.Count == 0
@@ -60,7 +73,8 @@ public sealed class EntranceImportExecutionRepository
             {
                 Id = IdGenerator.Generate(),
                 AccountId = _scope.AccountId,
-                SourceFileName = sourceFileName,
+                SourceFileId = persistedSource?.Id,
+                SourceFileName = persistedSource?.FileName ?? sourceFileName,
                 SyncExisting = plan.SyncExisting,
                 Kind = CaveImportKind.EntranceCsv,
                 SourceRecordCount = plan.Entrances.Count,

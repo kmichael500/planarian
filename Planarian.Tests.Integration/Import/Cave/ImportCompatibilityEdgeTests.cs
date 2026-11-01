@@ -61,7 +61,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(CaveSyncDeleteReturnsBlobCleanupOnlyAfterRelationalCommit));
         var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
-        var testFile = await FileTestDataFactory.AddFileAsync(d, t);
+        var testFile = await FileTestDataFactory.AddFileAsync(d, t, associateWithCave: true);
         await using (var seed = d.CreateDbContext("a", t.AccountId))
         {
             var file = await seed.Files.SingleAsync(f => f.Id == testFile.FileId);
@@ -101,12 +101,14 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
             $"{nameof(CaveSyncDeleteWithIncompleteStorageAddressRollsBackWithoutLosingCleanupResponsibility)}_" +
             $"{hasStorageKey}_{hasStoragePartition}");
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var testFile = await FileTestDataFactory.AddFileAsync(database, tenant);
+        var testFile = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true);
 
         string originalRevisionId;
         int originalRevisionCount;
         await using (var seed = database.CreateDbContext("a", tenant.AccountId))
         {
+            await seed.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Files" DROP CONSTRAINT "CK_Files_StorageAddressCompleteness" """);
             var file = await seed.Files.SingleAsync(row => row.Id == testFile.FileId);
             file.CaveId = tenant.CaveId;
             file.BlobKey = hasStorageKey ? "partial-address" : null;

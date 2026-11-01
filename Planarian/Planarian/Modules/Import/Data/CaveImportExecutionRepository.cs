@@ -10,6 +10,7 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
+using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Tags.Repositories;
 
@@ -43,8 +44,16 @@ public sealed class CaveImportExecutionRepository
         _countyReferenceLocks = countyReferenceLocks;
     }
 
-    public async Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string? sourceFileName,
-        CancellationToken cancellationToken = default)
+    public Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string? sourceFileName,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCoreAsync(plan, sourceFileName, sourceFileId: null, cancellationToken);
+
+    public Task<CaveImportExecutionResult> ExecuteUploadedAsync(CaveImportPlan plan, string sourceFileId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCoreAsync(plan, sourceFileName: null, sourceFileId, cancellationToken);
+
+    private async Task<CaveImportExecutionResult> ExecuteCoreAsync(CaveImportPlan plan, string? sourceFileName,
+        string? sourceFileId, CancellationToken cancellationToken)
     {
         if (plan.AccountId != _scope.AccountId)
             throw new InvalidOperationException("Cave import plan belongs to another account.");
@@ -63,6 +72,11 @@ public sealed class CaveImportExecutionRepository
             await RejectPendingRequestDeletionsAsync(plan, cancellationToken);
             await VerifyNonTagReferenceMetadataAsync(plan, cancellationToken);
 
+            PersistedImportSource? persistedSource = null;
+            if (sourceFileId is not null)
+                persistedSource = await ImportSourceRepository.PromoteAsync(
+                    _db, _scope.AccountId, _scope.UserId, sourceFileId, cancellationToken);
+
             var mutationExistingIds = plan.Caves
                 .Where(c => c.Action == CaveImportAction.Update)
                 .Select(c => c.Id)
@@ -78,7 +92,8 @@ public sealed class CaveImportExecutionRepository
             {
                 Id = IdGenerator.Generate(),
                 AccountId = _scope.AccountId,
-                SourceFileName = sourceFileName,
+                SourceFileId = persistedSource?.Id,
+                SourceFileName = persistedSource?.FileName ?? sourceFileName,
                 SyncExisting = plan.SyncExisting,
                 Kind = CaveImportKind.CaveCsv,
                 SourceRecordCount = plan.Caves.Count,
@@ -141,51 +156,17 @@ public sealed class CaveImportExecutionRepository
 
         var addresses = cleanup
             .Where(item => !string.IsNullOrWhiteSpace(item.StorageKey))
-            .Select(item => (Partition: item.StoragePartition!, Key: item.StorageKey!))
+            .Select(item => new StorageCleanupAddress(item.StoragePartition!, item.StorageKey!))
             .Distinct()
             .ToList();
-        if (addresses.Count == 0) return [];
 
-        var existingByAddress = new Dictionary<(string Partition, string Key), StorageCleanupTarget>();
-        foreach (var partition in addresses.GroupBy(address => address.Partition))
-        {
-            foreach (var keyChunk in partition.Select(address => address.Key)
-                         .Distinct().Chunk(LookupBatchSize))
-            {
-                var keys = keyChunk.ToArray();
-                var existing = await _db.StorageCleanupTargets.IgnoreQueryFilters()
-                    .Where(row => row.AccountId == _scope.AccountId &&
-                                  row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
-                                  !row.IsContainer && row.StoragePartition == partition.Key &&
-                                  keys.Contains(row.StorageKey))
-                    .ToListAsync(cancellationToken);
-                foreach (var target in existing)
-                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
-            }
-        }
-
-        var targets = new List<StorageCleanupTarget>(addresses.Count);
-        foreach (var address in addresses)
-        {
-            if (existingByAddress.TryGetValue(address, out var existing))
-            {
-                targets.Add(existing);
-                continue;
-            }
-
-            var target = new StorageCleanupTarget
-            {
-                AccountId = _scope.AccountId,
-                StoragePartition = address.Partition,
-                StorageKey = address.Key,
-                Purpose = StorageCleanupPurpose.CaveAssetRemoval
-            };
-            _db.StorageCleanupTargets.Add(target);
-            existingByAddress.Add(address, target);
-            targets.Add(target);
-        }
-
-        return targets;
+        return await StorageCleanupRepository.QueueAsync(
+            _db,
+            _scope.AccountId,
+            _scope.UserId,
+            StorageCleanupPurpose.CaveAssetRemoval,
+            addresses,
+            cancellationToken);
     }
 
     private async Task RejectPendingRequestDeletionsAsync(CaveImportPlan plan,

@@ -46,6 +46,14 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
                 await container.GetBlobClient(address.Key).UploadAsync(content, uploadOptions, cancellationToken);
                 return;
             }
+            catch (RequestFailedException ex) when (
+                ex.Status == 412 ||
+                (ex.Status == 409 && ex.ErrorCode == BlobErrorCode.BlobAlreadyExists.ToString()))
+            {
+                // The If-None-Match create-only condition rejected the write. There is
+                // no newly owned object to compensate, even if the address is orphaned.
+                throw new StorageObjectAlreadyExistsException(address.Key, ex);
+            }
             catch (RequestFailedException ex) when (ex.Status == 409 &&
                 ex.ErrorCode == BlobErrorCode.ContainerBeingDeleted && attempt < 9)
             {

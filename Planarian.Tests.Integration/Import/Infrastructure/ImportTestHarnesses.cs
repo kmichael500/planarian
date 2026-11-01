@@ -46,12 +46,24 @@ internal sealed class CaveImportTestHarness
     public Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string sourceFileName,
         CancellationToken cancellationToken = default)
     {
+        var repository = CreateExecutionRepository();
+        return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
+    }
+
+    public Task<CaveImportExecutionResult> ExecuteUploadedAsync(CaveImportPlan plan, string sourceFileId,
+        CancellationToken cancellationToken = default)
+    {
+        var repository = CreateExecutionRepository();
+        return repository.ExecuteUploadedAsync(plan, sourceFileId, cancellationToken);
+    }
+
+    private CaveImportExecutionRepository CreateExecutionRepository()
+    {
         var snapshots = new CavePublishedSnapshotRepository(_db, _db.RequestUser);
         var revisions = new CaveBulkRevisionRepository(_db, _db.RequestUser);
         var locks = new TagReferenceLockRepository(_db, _db.RequestUser);
-        var repository = new CaveImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks,
+        return new CaveImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks,
             new CountyReferenceLockRepository(_db, _db.RequestUser));
-        return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
     }
 
     private static MemoryStream CsvStream(string csv) => new(Encoding.UTF8.GetBytes(csv));
@@ -89,11 +101,23 @@ internal sealed class EntranceImportTestHarness
     public Task<string> ExecuteAsync(EntranceImportPlan plan, string sourceFileName,
         CancellationToken cancellationToken = default)
     {
+        var repository = CreateExecutionRepository();
+        return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
+    }
+
+    public Task<string> ExecuteUploadedAsync(EntranceImportPlan plan, string sourceFileId,
+        CancellationToken cancellationToken = default)
+    {
+        var repository = CreateExecutionRepository();
+        return repository.ExecuteUploadedAsync(plan, sourceFileId, cancellationToken);
+    }
+
+    private EntranceImportExecutionRepository CreateExecutionRepository()
+    {
         var snapshots = new CavePublishedSnapshotRepository(_db, _db.RequestUser);
         var revisions = new CaveBulkRevisionRepository(_db, _db.RequestUser);
         var locks = new TagReferenceLockRepository(_db, _db.RequestUser);
-        var repository = new EntranceImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks);
-        return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
+        return new EntranceImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks);
     }
 
     private static MemoryStream CsvStream(string csv) => new(Encoding.UTF8.GetBytes(csv));

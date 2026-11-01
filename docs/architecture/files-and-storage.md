@@ -63,7 +63,7 @@ objects/files/{fileId}
 
 The uploaded extension is metadata, not part of object identity. The application allocates a unique address and treats it as immutable for the File lifecycle.
 
-`IObjectStorage.CreateAsync` is **create-only**. The Azure adapter supplies an `If-None-Match: *` condition so a generated-ID collision or future retry/path bug cannot overwrite bytes already stored at that address. If object creation itself fails, relational persistence does not proceed. Compensation deletes run only after this request has positively completed object creation; a create collision never deletes the pre-existing object.
+`IObjectStorage.CreateAsync` is **create-only**. The Azure adapter supplies an `If-None-Match: *` condition so a generated-ID collision or future retry/path bug cannot overwrite bytes already stored at that address. If object creation itself fails, relational persistence does not proceed. A known create collision never grants deletion ownership of the pre-existing object; uncertain write/commit outcomes are reconciled through live File references and durable cleanup responsibility.
 
 ~~~mermaid
 stateDiagram-v2
@@ -85,7 +85,49 @@ Relational shape:
 - `BlobContainer`/`BlobKey` store the provider address;
 - object already exists.
 
-The upload happens **before** the short relational insert transaction so a large external write does not hold a database transaction open. If the relational insert fails, the service best-effort deletes the newly written object.
+The upload happens **before** the short relational insert transaction so a large external write does not hold a database transaction open. If the object write or relational insert has an uncertain outcome, reconciliation checks live File references and records durable unpublished-file cleanup responsibility rather than directly deleting an address that might already be live.
+
+### Cave/Entrance CSV import sources
+
+Cave and Entrance CSV uploads are **import provenance, not Cave Files**. They live in the dedicated
+`CaveImportSources` table with an account, normalized `FileName`, immutable object-storage address,
+and nullable `ExpiresOn`. New uploads allocate the final import-source ID before object creation and
+use the extension-independent `temp/import/caves/{sourceId}` identity. Authoring Cave Files use the
+separate `objects/files/{fileId}` namespace.
+
+The upload happens before the short relational insert transaction, using the same create-only
+`IObjectStorage` contract as Cave Files. An address collision cannot overwrite an existing object.
+If object creation has an uncertain outcome, durable cleanup reconciliation first checks both live
+Cave File addresses and live import-source addresses before deleting anything.
+
+A successful non-dry-run import promotes the **same `CaveImportSource` row and object** to durable
+provenance by clearing `ExpiresOn` in the same PostgreSQL transaction that creates the
+`CaveImportBatch` and applies the import. The object address and bytes do not change. A retained
+source (`ExpiresOn = null`) may deliberately be reused for another apply. Dry runs, parse/planning
+failures, concurrency failures, and rolled-back executions never promote a temporary source.
+
+Promotion locks the import-source row and revalidates account ownership, the active account storage
+container, and the import key namespace. When a temporary source is promoted, the final update gates
+on `ExpiresOn > clock_timestamp()` so expiration is checked against PostgreSQL wall-clock time at the
+mutation itself rather than transaction-start time.
+
+Expired-source cleanup is independent from Cave File cleanup. Each opportunistic sweep claims at
+most 16 unretained `CaveImportSources` in stable ID order under `FOR UPDATE`, excludes any source
+already referenced by an import batch, queues durable `ImportSourceRemoval` cleanup debt, and removes
+the relational rows in the same transaction. Because promotion and expiration cleanup lock the same
+source row, whichever lifecycle transition commits first is observed by the other.
+
+Import-source access is workflow-specific; generic Cave File endpoints cannot read, delete, claim,
+publish, or FileType-administer an import source. Account Reset is the intentional destructive
+boundary that removes both Cave Files and import provenance for the account.
+
+The completion migration predates dedicated import provenance in production data. It therefore moves
+existing account-level `Files` whose object key is under the legacy `temp/import/caves/` prefix into
+`CaveImportSources`, conservatively treating them as durable because historical data cannot reliably
+distinguish applied imports from abandoned uploads. Older upload code could build the object key
+before the SaveChanges interceptor assigned the persisted 10-character File ID, so historical keys
+may contain a temporary GUID; validation intentionally preserves any prefix-valid historical key
+rather than requiring the current source ID in the key. Migration-only state preserves the old File metadata needed to reconstruct the v32 representation on downgrade. An original File type may legitimately be deleted after the upgrade because CSV provenance no longer references it. Downgrade restores the original File-type ID if it is still a valid account/default File type; otherwise it selects the account's `Other` File type (or a global default `Other`). If no compatible File type exists, downgrade fails explicitly and atomically rather than recreating a dangling foreign key.
 
 ### Published
 
@@ -108,11 +150,11 @@ Ordinary revisioned removal is payload-destructive, but the order is fail-safe:
 4. publish the Cave revision without that File;
 5. commit PostgreSQL;
 6. only after commit, attempt `DeleteIfExists` on the object;
-7. remove the cleanup target only after deletion succeeds, the object is already absent, or the address is proven to belong to a live File and therefore must not be deleted.
+7. remove the cleanup target only after deletion succeeds, the object is already absent, or the address is proven to belong to a live File or import source and therefore must not be deleted.
 
 If external deletion fails, the File is still correctly removed from current Cave state and revision history remains correct. The durable cleanup target stays for retry and the failure is logged as a structured warning. Ordinary `CaveAssetRemoval` debt does **not** trigger the account-wide write block used for failed Reset Account cleanup.
 
-Cleanup is attempted after the owning relational mutation commits. Targets created by that mutation are processed in bounded batches; older ordinary cleanup debt is retried opportunistically during later Cave/File authoring. No periodic inactive-account sweeper exists, so inactive accounts can retain failed cleanup debt or expired unlinked staging until later activity or an explicit destructive workflow assumes responsibility.
+Cleanup is attempted after the owning relational mutation commits. Targets created by that mutation are processed in bounded batches; older ordinary cleanup debt is retried opportunistically during later Cave/File authoring. Failed deletion attempts update the target's `ModifiedOn` retry-order timestamp so permanently failing addresses cannot starve other work in the 16-target opportunistic batches. No periodic inactive-account sweeper exists, so inactive accounts can retain failed cleanup debt or expired unlinked staging until later activity or an explicit destructive workflow assumes responsibility.
 
 Never-published staged Files use the same ordering with purpose `UnpublishedFileRemoval`. Explicit discard, expiration, proposal rejection, and unused staged Files discarded during approval queue the exact object address and remove the File row in the same relational commit; object deletion follows afterward. Provider failure leaves the cleanup target pending instead of losing responsibility for the object.
 
@@ -134,6 +176,7 @@ Current purposes:
 
 - `CaveAssetRemoval` — published File payload cleanup, including hard Cave and sync-import deletion;
 - `UnpublishedFileRemoval` — never-published staged File cleanup after discard, expiration, or proposal cleanup;
+- `ImportSourceRemoval` — expired, unretained CSV import-source cleanup;
 - `AccountReset` — stronger Reset Account cleanup debt.
 
 The purpose distinction matters. Reset Account cleanup can block subsequent account writes until the reset's external cleanup is resolved. Ordinary File cleanup debt is retryable but does not freeze unrelated writes.
@@ -167,7 +210,7 @@ A proposal version records exact File intent. For `PublishStaged` Files:
 5. no copy occurs;
 6. unused/discarded staged objects are queued as `UnpublishedFileRemoval` cleanup inside the approval transaction and processed after commit.
 
-If approval removes a currently published File, its `CaveAssetRemoval` cleanup target is created inside the approval transaction but object deletion does not run until the **outer approval transaction has committed**. Rejection similarly commits request state, staged-File row removal, and unpublished cleanup responsibility before attempting object deletion.
+If approval removes a currently published File, its `CaveAssetRemoval` cleanup target is created inside the approval transaction but object deletion does not run until the **outer approval transaction has committed**. Rejection similarly commits request state, staged-File row removal, and unpublished cleanup responsibility before attempting object deletion. Approval and rejection lock affected File rows in stable ID order before releasing proposal claims, preventing a concurrent proposal claim from racing with unreferenced-File deletion.
 
 ## Other destructive paths
 

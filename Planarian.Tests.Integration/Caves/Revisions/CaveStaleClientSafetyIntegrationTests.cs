@@ -103,7 +103,7 @@ public sealed class CaveStaleClientSafetyIntegrationTests(PostgresTestServer fix
             fileId: "clientfilA");
         await CavePermissions.GrantManagerAsync(database, cave, "manager");
         var blobs = new TestFileBlobStore();
-        blobs.Seed("test", "seed-a", [1, 2, 3]);
+        blobs.Seed(file.BlobContainer, file.BlobKey, [1, 2, 3]);
 
         string publishedRevision;
         string plotId;

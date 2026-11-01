@@ -77,6 +77,7 @@ public class CaveRevisionConfiguration : BaseEntityTypeConfiguration<CaveRevisio
 public class CaveImportBatch : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? SourceFileId { get; set; }
     [MaxLength(PropertyLength.FileName)] public string? SourceFileName { get; set; }
     public bool SyncExisting { get; set; }
     public CaveImportKind Kind { get; set; }
@@ -94,6 +95,10 @@ public class CaveImportBatchConfiguration : BaseEntityTypeConfiguration<CaveImpo
         builder.HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(e => e.Kind).HasConversion<string>().HasMaxLength(PropertyLength.Key);
         builder.HasAlternateKey(e => new { e.AccountId, e.Id });
+        builder.HasOne<CaveImportSource>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.SourceFileId })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => new { e.AccountId, e.CreatedOn });
     }
 }

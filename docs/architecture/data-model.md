@@ -23,6 +23,8 @@ erDiagram
     CAVE_CHANGE_REQUEST ||--o{ CAVE_CHANGE_REQUEST_REVIEW_EVENT : audit
     CAVE_CHANGE_REQUEST ||--o{ CAVE_CHANGE_REQUEST_STAGED_FILE : claims
     FILE ||--o{ CAVE_CHANGE_REQUEST_STAGED_FILE : staged_reference
+    ACCOUNT ||--o{ CAVE_IMPORT_SOURCE : retains
+    CAVE_IMPORT_SOURCE o|--o{ CAVE_IMPORT_BATCH : source_file
 
     ACCOUNT ||--o{ STORAGE_CLEANUP_TARGET : "logical AccountId cleanup ownership (no FK)"
     CAVE_REVISION }o--o| CAVE_IMPORT_BATCH : import_source
@@ -187,8 +189,15 @@ Fields:
 Typical lifecycle:
 
 - staged: CaveId null, ExpiresOn set;
-- published: CaveId set, ExpiresOn null;
+- published Cave asset: CaveId set, ExpiresOn null;
 - removed from current state: live File row deleted in the publication transaction after a `CaveAssetRemoval` storage-cleanup target is queued; bytes are deleted only after commit.
+
+The `CK_Files_Lifecycle` constraint requires exactly one of the staged or published shapes. Retained CSV import sources live in a separate table.
+
+## CaveImportSource
+
+Cave and Entrance CSV provenance lives in `CaveImportSources`, not `Files`.
+An upload has account ownership, `FileName`, an immutable `BlobContainer`/`BlobKey`, and nullable `ExpiresOn`. Temporary uploads have an expiration; successful apply clears it and links one or more `CaveImportBatch` records. Migrated historical sources can be retained without a batch because their original apply status is unknown. On downgrade, a migrated source's original File type is restored when still available; if it was deleted after the separation, downgrade uses a compatible account/default `Other` File type and fails closed when none exists.
 
 ## CaveChangeRequestStagedFile
 
@@ -208,11 +217,11 @@ Fields:
 - StoragePartition;
 - StorageKey;
 - IsContainer;
-- Purpose (`CaveAssetRemoval`, `UnpublishedFileRemoval`, or `AccountReset`).
+- Purpose (`CaveAssetRemoval`, `UnpublishedFileRemoval`, `ImportSourceRemoval`, or `AccountReset`).
 
 Constraints/indexes distinguish purpose so the same address can safely move from ordinary File cleanup responsibility into Reset Account cleanup responsibility inside one reset transaction.
 
-For published File removal, hard Cave deletion, and sync-import deletion, a `CaveAssetRemoval` target is inserted in the same transaction that makes the live File unreachable. Never-published staged File discard/expiration/proposal cleanup uses `UnpublishedFileRemoval` with the same commit-before-external-delete ordering. A target is removed after post-commit deletion succeeds, the object is already absent, or the address is proven to belong to a live File and therefore must not be deleted. Failed deletion leaves the target for retry.
+For published File removal, hard Cave deletion, and sync-import deletion, a `CaveAssetRemoval` target is inserted in the same transaction that makes the live File unreachable. Never-published staged File discard/expiration/proposal cleanup uses `UnpublishedFileRemoval` with the same commit-before-external-delete ordering. A target is removed after post-commit deletion succeeds, the object is already absent, or the address is proven to belong to a live File or import source and therefore must not be deleted. Failed deletion leaves the target for retry.
 
 `AccountReset` targets use the same persistence mechanism but have stronger operational semantics: pending Reset Account cleanup can block account writes until resolved. Ordinary asset cleanup does not.
 
@@ -234,6 +243,8 @@ Proposal versions store exact desired GeoJson.
 ## CaveImportBatch
 
 An import batch records import provenance and counts.
+
+`SourceFileId` optionally points to the account-owned `CaveImportSource` containing the applied Cave/Entrance CSV. Successful uploaded-file execution clears that source's `ExpiresOn` in the same PostgreSQL transaction that creates the batch and applies the import. `SourceFileName` preserves the normalized uploaded filename. Dry runs and failed executions do not promote the source.
 
 Import-created CaveRevisions may identify the batch through ImportBatchId.
 

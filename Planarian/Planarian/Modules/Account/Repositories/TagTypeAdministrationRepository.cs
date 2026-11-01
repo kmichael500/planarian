@@ -204,7 +204,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
                               e.CartographerNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.EntranceReportedByNameTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
                               e.FileTypeTags.Count(ee =>
-                                  ee.ExpiresOn == null && ee.Cave.AccountId == RequestUser.AccountId) + // Exclude temporary Files.
+                                  ee.AccountId == RequestUser.AccountId) +
                               e.MapStatusTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.GeologicAgeTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.PhysiographicProvinceTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
@@ -456,8 +456,9 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
                     .SetProperty(entrance => entrance.ModifiedOn, mutationTimestamp)
                     .SetProperty(entrance => entrance.ModifiedByUserId, actorUserId), cancellationToken);
         else if (key == TagTypeKeyConstant.File)
-            await DbContext.Files.IgnoreQueryFilters().Where(file => file.FileTypeTagId == sourceId && file.CaveId != null &&
-                file.Cave!.AccountId == _scope.AccountId).ExecuteUpdateAsync(
+            await DbContext.Files.IgnoreQueryFilters().Where(file => file.FileTypeTagId == sourceId &&
+                file.AccountId == _scope.AccountId)
+                .ExecuteUpdateAsync(
                 setters => setters.SetProperty(file => file.FileTypeTagId, destinationId)
                     .SetProperty(file => file.ModifiedOn, mutationTimestamp)
                     .SetProperty(file => file.ModifiedByUserId, actorUserId), cancellationToken);

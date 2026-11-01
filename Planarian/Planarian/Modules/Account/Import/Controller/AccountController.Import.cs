@@ -20,7 +20,7 @@ public partial class AccountController
         CancellationToken cancellationToken)
     {
         var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
+            await _importService.UploadCsvImportSourceAsync(file.OpenReadStream(), file.FileName, uuid,
                 cancellationToken);
 
         return new JsonResult(result);
@@ -45,10 +45,18 @@ public partial class AccountController
         CancellationToken cancellationToken)
     {
         var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
+            await _importService.UploadCsvImportSourceAsync(file.OpenReadStream(), file.FileName, uuid,
                 cancellationToken);
 
         return new JsonResult(result);
+    }
+
+    [HttpGet("import/source/{sourceId:length(10)}/download")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> DownloadImportSource(string sourceId, CancellationToken cancellationToken)
+    {
+        var source = await _importService.OpenCsvImportSourceDownloadAsync(sourceId, cancellationToken);
+        return File(source.Stream, "text/csv", source.FileName);
     }
 
     [HttpPost("import/file/session")]

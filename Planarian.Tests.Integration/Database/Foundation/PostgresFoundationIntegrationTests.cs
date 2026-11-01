@@ -57,6 +57,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "CaveId", "PreviousRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "CaveId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "ImportBatchId"], "CaveImportBatches", ["AccountId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveImportBatches", ["AccountId", "SourceFileId"], "CaveImportSources", ["AccountId", "Id"]);
+        AssertForeignKey(foreignKeys, "Files", ["AccountId", "CaveId"], "Caves", ["AccountId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "BaseRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "ApprovedRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "Id", "CurrentProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
@@ -105,8 +107,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using (var sameAccount = new NpgsqlCommand("""
-            insert into "Files" ("Id", "AccountId", "FileTypeTagId", "Name", "Extension", "CreatedOn")
-            select 'samefile02', @account, "FileTypeTagId", 'same-account', '.pdf', now()
+            insert into "Files" ("Id", "AccountId", "FileTypeTagId", "Name", "Extension", "ExpiresOn", "CreatedOn")
+            select 'samefile02', @account, "FileTypeTagId", 'same-account', '.pdf', now() + interval '1 day', now()
             from "Files" where "Id" = @existing_file;
 
             insert into "CaveChangeRequestStagedFiles" ("Id", "AccountId", "ChangeRequestId", "FileId", "CreatedOn")
@@ -128,6 +130,107 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         foreignAccount.Parameters.AddWithValue("file", bFile.FileId);
         var error = await Assert.ThrowsAsync<PostgresException>(() => foreignAccount.ExecuteNonQueryAsync());
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
+    }
+
+    [Fact]
+    public async Task FileLifecycleConstraintRejectsDurableUnpublishedRow()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(FileLifecycleConstraintRejectsDurableUnpublishedRow));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var existing = await FileTestDataFactory.AddFileAsync(database, cave, associateWithCave: true);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "Files"
+                ("Id", "AccountId", "FileTypeTagId", "Name", "Extension", "CreatedOn")
+            select 'invalidlf1', @account, "FileTypeTagId", 'invalid-lifecycle', '.pdf', now()
+            from "Files"
+            where "Id" = @existing
+            """, connection);
+        command.Parameters.AddWithValue("account", cave.AccountId);
+        command.Parameters.AddWithValue("existing", existing.FileId);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+        Assert.Equal("CK_Files_Lifecycle", error.ConstraintName);
+    }
+
+    [Fact]
+    public async Task FileStorageConstraintRejectsHalfSpecifiedAddress()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(FileStorageConstraintRejectsHalfSpecifiedAddress));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var existing = await FileTestDataFactory.AddFileAsync(database, cave, associateWithCave: true);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "Files"
+                ("Id", "AccountId", "FileTypeTagId", "Name", "Extension",
+                 "BlobContainer", "ExpiresOn", "CreatedOn")
+            select 'invalidsa1', @account, "FileTypeTagId", 'invalid-storage', '.pdf',
+                   'account-test', now() + interval '1 day', now()
+            from "Files"
+            where "Id" = @existing
+            """, connection);
+        command.Parameters.AddWithValue("account", cave.AccountId);
+        command.Parameters.AddWithValue("existing", existing.FileId);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+        Assert.Equal("CK_Files_StorageAddressCompleteness", error.ConstraintName);
+    }
+
+    [Fact]
+    public async Task FileTenantForeignKeyRejectsCaveFromAnotherAccount()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(FileTenantForeignKeyRejectsCaveFromAnotherAccount));
+        var a = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var b = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var existing = await FileTestDataFactory.AddFileAsync(database, a, associateWithCave: true);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "Files"
+                ("Id", "AccountId", "FileTypeTagId", "Name", "Extension",
+                 "CaveId", "CreatedOn")
+            select 'wrngcave01', @account, "FileTypeTagId", 'wrong-cave', '.pdf',
+                   @cave, now()
+            from "Files"
+            where "Id" = @existing
+            """, connection);
+        command.Parameters.AddWithValue("account", a.AccountId);
+        command.Parameters.AddWithValue("cave", b.CaveId);
+        command.Parameters.AddWithValue("existing", existing.FileId);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
+    }
+
+    [Fact]
+    public async Task ImportSourceStorageConstraintRejectsBlankAddress()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ImportSourceStorageConstraintRejectsBlankAddress));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "CaveImportSources"
+                ("Id", "AccountId", "FileName", "BlobContainer", "BlobKey", "CreatedOn")
+            values ('badsource1', @account, 'source.csv', 'account-test', '   ', now())
+            """, connection);
+        command.Parameters.AddWithValue("account", cave.AccountId);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+        Assert.Equal("CK_CaveImportSources_StorageAddress", error.ConstraintName);
     }
 
     private static void AssertForeignKey(IEnumerable<ForeignKeyShape> foreignKeys, string sourceTable,

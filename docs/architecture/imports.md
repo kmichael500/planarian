@@ -103,16 +103,18 @@ For Cave import they:
 3. acquire TagType reference locks;
 4. lock existing target Caves in deterministic order;
 5. revalidate expected xmin/current revision/reference metadata;
-6. persist planned new references;
+6. when execution came from an uploaded CSV, lock and revalidate the `CaveImportSource` account, storage container, import key namespace, and expiration, then clear its expiration inside the transaction;
 7. capture before snapshots;
-8. apply set-oriented Cave/tag/Entrance changes in bounded batches;
-9. capture after snapshots;
-10. create the CaveImportBatch;
-11. call CaveBulkRevisionRepository;
-12. commit;
-13. return durable File-cleanup target IDs for bounded post-commit processing.
+8. create and save the CaveImportBatch, including the import-source ID and normalized filename when available;
+9. persist planned new references;
+10. apply set-oriented Cave/tag/Entrance changes in bounded batches;
+11. queue any relational cleanup responsibility required by sync deletion;
+12. capture after snapshots;
+13. call CaveBulkRevisionRepository;
+14. commit;
+15. return durable storage-cleanup target IDs for bounded post-commit processing.
 
-If any relational step fails, the transaction rolls back.
+If any relational step fails, the transaction rolls back. Import-source promotion is part of that same transaction, so an upload remains temporary when apply fails. Before parsing, dry run and apply also validate that the selected `CaveImportSource` is an available import upload; dry run never reaches promotion.
 
 ## Revision publication
 
@@ -164,7 +166,7 @@ complete `CavePublishedSnapshotV1` values plus revision predecessor/provenance. 
 
 Account File import uses a separate path: after filename-to-Cave resolution and chunk staging it publishes
 through `FileService` and the normal Cave mutation coordinator, so the resulting Cave revision is the ordinary
-ManagerEdit/Update history entry and is not linked to a `CaveImportBatch`.
+ManagerEdit/Update history entry and is not linked to a `CaveImportBatch`. Finalization is serialized per upload session across request-scoped import services: Azure block commitment, relational File publication, and caching the completion result are one single-flight operation. A concurrent finalize reuses the cached publication outcome rather than publishing another File, but each caller receives an independent response object so its HTTP trace ID cannot mutate shared session state. Once a session is finalizing, cancellation cannot delete its source blob; cancel-all skips finalizing sessions even when they transition to finalizing after session selection but before their gate is acquired; other active sessions are still canceled. Expiration cleanup uses the chunk-upload session gate and rechecks expiration after acquiring it, so an in-flight chunk cannot refresh its TTL after a sweep decides to delete it. Finalizing sessions are retained through publication even if the original upload TTL passes.
 
 ## Sync deletion
 

@@ -232,11 +232,15 @@ internal static class CurrentMainV32CensusSeeder
                 ('filealpha2',null,'cavealpha1','tagfile001','photos.tar.gz',null,
                  'caves/alpha/photos.tar.gz','account-alpha',null,'useralpha1',null,'2024-04-02T00:00:00Z',null),
                 ('filealpha3','acctalpha1',null,'tagfile001','temporary.csv',null,
-                 'staging/temporary.csv','account-alpha','2026-12-31T23:59:59Z','useralpha1',null,'2024-04-03T00:00:00Z',null),
+                 'staging/temporary.csv','account-alpha','2024-05-01T00:00:00Z','useralpha1',null,'2024-04-03T00:00:00Z',null),
                 ('filealpha4','acctalpha1','cavealpha2','tagfile001','README','Field Notes',
                  'caves/archive/readme','account-alpha',null,'useralpha1',null,'2024-04-04T00:00:00Z',null),
+                ('filealpha5','acctalpha1',null,'tagfile001','legacy-caves.csv',null,
+                 'temp/import/caves/filealpha5.csv','account-alpha','2024-05-02T00:00:00Z','useralpha1',null,'2024-04-05T00:00:00Z',null),
+                ('filealpha6','acctalpha1',null,'tagfile001','legacy-entrances.csv',null,
+                 'temp/import/caves/filealpha6.csv','account-alpha','2027-12-31T23:59:59Z','useralpha1',null,'2024-04-06T00:00:00Z',null),
                 ('filebeta01','acctbeta01','cavebeta01','tagfile002','beta.gpx','beta',
-                 'caves/beta/beta.gpx','account-beta',null,'userbeta01',null,'2024-04-05T00:00:00Z',null);
+                 'caves/beta/beta.gpx','account-beta',null,'userbeta01',null,'2024-04-07T00:00:00Z',null);
 
             insert into "CaveGeoJsons"
                 ("Id","CaveId","Name","GeoJson","CreatedByUserId","ModifiedByUserId","CreatedOn","ModifiedOn")

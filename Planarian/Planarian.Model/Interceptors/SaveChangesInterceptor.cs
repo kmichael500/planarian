@@ -250,6 +250,9 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
             case nameof(CaveImportBatch):
                 ValidateCurrentAndOriginalAccount(entity, ((CaveImportBatch)entity.Entity).AccountId, requestUserAccountId, nameof(CaveImportBatch.AccountId));
                 break;
+            case nameof(CaveImportSource):
+                ValidateCurrentAndOriginalAccount(entity, ((CaveImportSource)entity.Entity).AccountId, requestUserAccountId, nameof(CaveImportSource.AccountId));
+                break;
             case nameof(CaveChangeRequest):
                 ValidateCurrentAndOriginalAccount(entity, ((CaveChangeRequest)entity.Entity).AccountId, requestUserAccountId, nameof(CaveChangeRequest.AccountId));
                 break;
