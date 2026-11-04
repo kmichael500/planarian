@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
@@ -16,10 +17,12 @@ import {
   AppInitializeVm,
   AppService,
 } from "../../Shared/Services/AppService";
-import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
+import { ApiErrorResponse, ApiExceptionType } from "../../Shared/Models/ApiErrorResponse";
 import { SelectListItem } from "../../Shared/Models/SelectListItem";
 import { hasPermission } from "../../Shared/Permissioning/PermissionHelpers";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { RequestRuntimeState } from "../../Shared/Http/RequestRuntimeState";
+import { message } from "antd";
 import { defaultAppContentStyle } from "../Layout/AppContentLayout";
 
 interface FeaturePermissions {
@@ -33,6 +36,7 @@ interface AppContextProps {
   currentAccountName: string | null;
   userGroupPrefix: string | null;
   accountIds: SelectListItem<string>[];
+  revokedAccountIds: SelectListItem<string>[];
   hasPermission: (permission: PermissionKey) => boolean;
   permissions: FeaturePermissions;
   setPermissions: (permissions: FeaturePermissions) => void;
@@ -74,6 +78,7 @@ export const AppContext = createContext<AppContextProps>({
   currentAccountName: null,
   userGroupPrefix: null,
   accountIds: [],
+  revokedAccountIds: [],
   hasPermission: () => false,
   permissions: defaultFeaturePermissions,
   setPermissions: () => {},
@@ -101,6 +106,7 @@ interface AppProviderProps {
 
 export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [headerTitleState, setHeaderTitleState] = useState({
     pathname: location.pathname,
     value: emptyHeaderTitle,
@@ -117,12 +123,18 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     useState<AppInitializeCurrentUserVm | null>(null);
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountIds, setAccountIds] = useState<SelectListItem<string>[]>([]);
+  const [revokedAccountIds, setRevokedAccountIds] = useState<SelectListItem<string>[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
     useState<ApiErrorResponse | null>(null);
   const [pendingInvitationCount, setPendingInvitationCount] =
     useState<number>(0);
+  const sessionGeneration = useRef(0);
+  const isCurrentSession = useCallback(
+    (generation: number) => generation === sessionGeneration.current,
+    []
+  );
 
   const headerTitle =
     headerTitleState.pathname === location.pathname
@@ -149,6 +161,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setCurrentUser(null);
     setCurrentAccountId(null);
     setAccountIds([]);
+    setRevokedAccountIds([]);
     setPermissionKeys([]);
     setPermissions(defaultFeaturePermissions);
     setPendingInvitationCount(0);
@@ -156,14 +169,17 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, []);
 
   const refreshPendingInvitations = useCallback(async () => {
+    const generation = sessionGeneration.current;
     if (!AuthenticationService.IsAuthenticated()) {
       setPendingInvitationCount(0);
       return;
     }
 
     const pendingInvitations = await UserService.GetPendingInvitations();
-    setPendingInvitationCount(pendingInvitations.length);
-  }, []);
+    if (isCurrentSession(generation) && AuthenticationService.IsAuthenticated()) {
+      setPendingInvitationCount(pendingInvitations.length);
+    }
+  }, [isCurrentSession]);
 
   const loadSession = useCallback(
     async (selectedAccountId?: string | null): Promise<AppInitializeVm> => {
@@ -193,37 +209,66 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   );
 
   const applySessionState = useCallback(
-    async (appOptions: AppInitializeVm): Promise<void> => {
+    async (appOptions: AppInitializeVm, generation: number): Promise<void> => {
+      if (!isCurrentSession(generation)) return;
+
       const isAuthenticated = appOptions.currentUser != null;
       const resolvedCurrentAccountId =
         appOptions.currentUser?.currentAccountId ?? null;
 
+      AppService.ApplyInitializationOptions(appOptions);
       AuthenticationService.SyncSession(appOptions.currentUser);
       setCurrentUser(appOptions.currentUser);
       setCurrentAccountId(resolvedCurrentAccountId);
       setAccountIds(appOptions.accountIds);
+      setRevokedAccountIds(appOptions.revokedAccountIds ?? []);
       setPermissionKeys(appOptions.permissions);
 
-      const featureSettings =
-        isAuthenticated && resolvedCurrentAccountId
-          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
-          : [];
-      setPermissions({ visibleFields: featureSettings });
+      // Account settings and invitations are supplementary. Their failure must not
+      // invalidate a session whose authentication was already confirmed by bootstrap.
+      let auxiliaryLoadFailed = false;
+      setPermissions(defaultFeaturePermissions);
+      if (isAuthenticated && resolvedCurrentAccountId) {
+        try {
+          const featureSettings = await AccountService.GetFeatureSettings(
+            false, resolvedCurrentAccountId
+          );
+          if (!isCurrentSession(generation)) return;
+          setPermissions({ visibleFields: featureSettings });
+        } catch (error) {
+          if (!isCurrentSession(generation)) return;
+          if ((error as ApiErrorResponse).statusCode === 401) throw error;
+          auxiliaryLoadFailed = true;
+        }
+      }
 
+      if (!isCurrentSession(generation)) return;
       if (isAuthenticated) {
-        await refreshPendingInvitations();
+        try {
+          await refreshPendingInvitations();
+        } catch (error) {
+          if (!isCurrentSession(generation)) return;
+          if ((error as ApiErrorResponse).statusCode === 401) throw error;
+          setPendingInvitationCount(0);
+          auxiliaryLoadFailed = true;
+        }
       } else {
         setPendingInvitationCount(0);
       }
 
+      if (!isCurrentSession(generation)) return;
+      if (auxiliaryLoadFailed) {
+        message.warning("Some account information could not be loaded. Refresh to try again.");
+      }
       setInitializedError(null);
       setIsInitialized(true);
     },
-    [refreshPendingInvitations]
+    [isCurrentSession, refreshPendingInvitations]
   );
 
   const refreshSession = useCallback(
     async (selectedAccountId?: string | null): Promise<void> => {
+      const generation = ++sessionGeneration.current;
       try {
         setIsLoading(true);
         const resolvedAccountId =
@@ -232,16 +277,18 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
             : AuthenticationService.GetAccountId() ?? undefined;
 
         const appOptions = await loadSession(resolvedAccountId);
-        await applySessionState(appOptions);
+        await applySessionState(appOptions, generation);
       } catch (e) {
-        const error = e as ApiErrorResponse;
-        setInitializedError(error);
-        throw error;
+        if (isCurrentSession(generation)) {
+          const error = e as ApiErrorResponse;
+          setInitializedError(error);
+          throw error;
+        }
       } finally {
-        setIsLoading(false);
+        if (isCurrentSession(generation)) setIsLoading(false);
       }
     },
-    [applySessionState, loadSession]
+    [applySessionState, isCurrentSession, loadSession]
   );
 
   const login = useCallback(
@@ -256,10 +303,12 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   );
 
   const logout = useCallback(async () => {
+    const generation = ++sessionGeneration.current;
     await AuthenticationService.Logout();
+    if (!isCurrentSession(generation)) return;
     clearSessionState();
     await refreshSession(null);
-  }, [clearSessionState, refreshSession]);
+  }, [clearSessionState, isCurrentSession, refreshSession]);
 
   const switchAccount = useCallback(
     (accountId: string, redirectPath?: string | null) => {
@@ -267,36 +316,98 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         return;
       }
 
+      ++sessionGeneration.current;
       AuthenticationService.SwitchAccount(accountId, redirectPath);
     },
     [currentUser]
   );
 
   useEffect(() => {
-    const unregister = AuthenticationService.RegisterUnauthorizedHandler(() => {
+    const unregister = AuthenticationService.RegisterUnauthorizedHandler((reason) => {
+      const generation = ++sessionGeneration.current;
+      const previouslySelectedAccountId = AuthenticationService.GetAccountId();
+      const wasAuthenticated = AuthenticationService.IsAuthenticated();
       AuthenticationService.ResetAccountId();
-      clearSessionState();
-      setInitializedError(null);
-      setIsInitialized(true);
-      setIsLoading(false);
+      RequestRuntimeState.setCurrentAccountId(null);
+      setCurrentAccountId(null);
+      setPermissionKeys([]);
+      setPermissions(defaultFeaturePermissions);
 
-      const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      const isLoginPage = window.location.pathname.startsWith("/login");
+      const redirectToLogin = () => {
+        if (!isCurrentSession(generation)) return;
+        clearSessionState();
+        setInitializedError(null);
+        setIsInitialized(true);
+        setIsLoading(false);
 
-      if (!isLoginPage) {
-        window.location.assign(
-          `/login?redirectUrl=${encodeURIComponent(redirectPath)}`
-        );
-      } else {
-        AuthenticationService.ResetUnauthorizedHandling();
+        const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const isLoginPage = window.location.pathname.startsWith("/login");
+        if (!isLoginPage) {
+          window.location.assign(
+            `/login?redirectUrl=${encodeURIComponent(redirectPath)}`
+          );
+        } else {
+          AuthenticationService.ResetUnauthorizedHandling();
+        }
+      };
+
+      if (reason === "unauthorized" || !wasAuthenticated) {
+        redirectToLogin();
+        return;
       }
+
+      // A revoked membership invalidates the selected account, not the user's login.
+      // Bootstrap without an account header before treating the session as expired.
+      void (async () => {
+        setIsLoading(true);
+        try {
+          const appOptions = await loadSession(null);
+          if (!isCurrentSession(generation)) return;
+          if (!appOptions.currentUser) {
+            redirectToLogin();
+            return;
+          }
+
+          await applySessionState(appOptions, generation);
+          if (!isCurrentSession(generation)) return;
+          if (appOptions.revokedAccountIds?.some(
+            (account) => account.value === previouslySelectedAccountId
+          )) {
+            message.warning("Your access to the selected account has been revoked.");
+          }
+          navigate("/", { replace: true });
+          AuthenticationService.ResetUnauthorizedHandling();
+        } catch (error) {
+          if (!isCurrentSession(generation)) return;
+          const apiError = error as ApiErrorResponse;
+          if (
+            apiError.statusCode === 401 ||
+            apiError.errorCode === ApiExceptionType.Unauthorized
+          ) {
+            redirectToLogin();
+          } else {
+            // A transient bootstrap failure does not prove the login cookie expired.
+            // Hide stale account data, and allow a page reload to retry initialization.
+            clearSessionState();
+            setInitializedError({
+              ...apiError,
+              message: "Could not refresh your account access. Reload to try again.",
+            });
+            setIsInitialized(false);
+            AuthenticationService.ResetUnauthorizedHandling();
+          }
+        } finally {
+          if (isCurrentSession(generation)) setIsLoading(false);
+        }
+      })();
     });
 
     return () => {
+      ++sessionGeneration.current;
       unregister();
       AuthenticationService.ResetUnauthorizedHandling();
     };
-  }, [clearSessionState]);
+  }, [applySessionState, clearSessionState, isCurrentSession, loadSession, navigate]);
 
   useEffect(() => {
     void refreshSession().catch(() => {});
@@ -337,6 +448,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         currentAccountName,
         userGroupPrefix,
         accountIds,
+        revokedAccountIds,
         hasPermission: hasCurrentPermission,
         permissions,
         setPermissions,

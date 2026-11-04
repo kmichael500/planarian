@@ -15,8 +15,9 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 
 const baseUrl = "api/account/user-manager";
 const AccountUserManagerService = {
-  async GetAccountUsers(): Promise<UserManagerGridVm[]> {
-    const response = await HttpClient.get<UserManagerGridVm[]>(`${baseUrl}`);
+  async GetAccountUsers(accountId?: string): Promise<UserManagerGridVm[]> {
+    const response = await HttpClient.get<UserManagerGridVm[]>(baseUrl,
+      accountId ? { headers: { "x-account": accountId } } : undefined);
     return response.data;
   },
   async GetUserById(userId: string): Promise<UserManagerGridVm> {
@@ -25,14 +26,20 @@ const AccountUserManagerService = {
     );
     return response.data;
   },
-  async InviteUser(request: InviteUserRequest): Promise<InviteUserResultVm> {
-    return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request)).data;
+  async InviteUser(request: InviteUserRequest, accountId?: string): Promise<InviteUserResultVm> {
+    return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request,
+      accountId ? { headers: { "x-account": accountId } } : undefined)).data;
   },
-  async RevokeAccess(userId: string): Promise<void> {
-    await HttpClient.delete(`${baseUrl}/${userId}`);
+  async RevokeAccess(userId: string, accountId?: string): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/${userId}`,
+      accountId ? { headers: { "x-account": accountId } } : undefined);
   },
-  async ResendInvitation(userId: string): Promise<void> {
-    await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {});
+  async RestoreAccess(userId: string): Promise<void> {
+    await HttpClient.post(`${baseUrl}/${userId}/restore-access`, {});
+  },
+  async ResendInvitation(userId: string, accountId?: string): Promise<void> {
+    await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {},
+      accountId ? { headers: { "x-account": accountId } } : undefined);
   },
   async GetInvitationEmailHistory(userId: string): Promise<InvitationEmailAttemptVm[]> {
     return (

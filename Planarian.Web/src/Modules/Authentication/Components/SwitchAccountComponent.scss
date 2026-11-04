@@ -13,6 +13,20 @@
   transition: background-color 0.3s, border-color 0.3s;
 }
 
-.planarian-account-option:hover {
+.planarian-account-option:not([aria-disabled="true"]):hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.planarian-account-choice {
+  min-height: 44px;
+  height: auto;
+  padding: 10px;
+  text-align: left;
+  white-space: normal;
+  color: var(--text-color);
+}
+
+.planarian-account-choice:hover,
+.planarian-account-choice:focus-visible {
   background: var(--hover-surface-color) !important;
 }

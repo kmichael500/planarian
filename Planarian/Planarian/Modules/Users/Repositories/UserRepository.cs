@@ -18,6 +18,31 @@ public class UserRepository : RepositoryBase
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 
+    public async Task LockInvitationEmail(string accountId, string email, CancellationToken cancellationToken)
+    {
+        if (DbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("Invitation lock requires an active transaction.");
+
+        var key = $"invitation:{accountId}:{NormalizeEmail(email)}";
+        await DbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", cancellationToken);
+    }
+
+    public Task<string?> GetPendingInvitationUserId(string accountId, string email,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeEmail(email);
+        return DbContext.AccountUsers
+            .Where(membership => membership.AccountId == accountId &&
+                membership.InvitationCode != null &&
+                membership.InvitationAcceptedOn == null &&
+                membership.AccessRevokedOn == null &&
+                membership.User != null && membership.User.IsTemporary &&
+                membership.User.EmailAddress.ToLower() == normalized)
+            .Select(membership => membership.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<User?> GetUserByEmail(string email)
     {
         var normalizedEmail = NormalizeEmail(email);
@@ -163,7 +188,9 @@ public class UserRepository : RepositoryBase
                 e.InvitationAcceptedOn == null &&
                 e.User != null &&
                 e.User.IsTemporary &&
-                e.User.EmailAddress.ToLower() == normalizedEmail)
+                e.User.EmailAddress.ToLower() == normalizedEmail &&
+                !DbContext.AccountUsers.Any(membership =>
+                    membership.AccountId == e.AccountId && membership.UserId == RequestUser.Id))
             .OrderByDescending(e => e.InvitationSentOn)
             .Select(e => new AcceptInvitationVm
             {
@@ -194,11 +221,10 @@ public class UserRepository : RepositoryBase
         return (accountUser, accountUser?.User, accountUser?.User?.CavePermissions, accountUser?.User?.UserPermissions);
     }
 
-    public async Task<bool> UserInAccount(string existingUserId, string accountId)
+    public Task<AccountUser?> GetUserAccountMembership(string userId, string accountId)
     {
-        return await DbContext.AccountUsers
-            .Where(e => e.UserId == existingUserId && e.AccountId == accountId)
-            .AnyAsync();
+        return DbContext.AccountUsers
+            .FirstOrDefaultAsync(e => e.UserId == userId && e.AccountId == accountId);
     }
 
     #region Manage Permissions
@@ -347,7 +373,9 @@ public class UserRepository : RepositoryBase
             InvitationSentOn = e.InvitationSentOn,
             InvitationAcceptedOn = e.InvitationAcceptedOn,
             LastActiveOn = e.User.LastActiveOn,
-            HasActiveInvitation = e.InvitationAcceptedOn == null && e.InvitationCode != null,
+            AccessRevokedOn = e.AccessRevokedOn,
+            HasActiveInvitation = e.AccessRevokedOn == null && e.InvitationAcceptedOn == null &&
+                                  e.InvitationCode != null && e.User != null && e.User.IsTemporary,
             InvitationEmailAttemptCount = e.InvitationMessageLogs.Count
         });
     }
@@ -406,7 +434,7 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<bool> DeleteAccountUserAccess(string userId, string accountId,
+    public async Task<bool> DeletePendingInvitationAccess(string userId, string accountId,
         CancellationToken cancellationToken = default)
     {
         await DbContext.CavePermissions
@@ -420,6 +448,16 @@ public class UserRepository : RepositoryBase
         var deletedAccountUsers = await DbContext.AccountUsers
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .ExecuteDeleteAsync(cancellationToken);
+
+        if (deletedAccountUsers > 0)
+        {
+            // The invitation identity is not a registered user. Preserve a shared temporary
+            // identity if another membership references it; remove orphaned identities otherwise.
+            await DbContext.Users
+                .Where(user => user.Id == userId && user.IsTemporary &&
+                               !DbContext.AccountUsers.Any(membership => membership.UserId == user.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
 
         return deletedAccountUsers > 0;
     }

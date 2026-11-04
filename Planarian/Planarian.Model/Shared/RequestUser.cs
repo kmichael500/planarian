@@ -37,7 +37,8 @@ public class RequestUser
                 e.LastName,
                 e.LastActiveOn,
                 e.SessionVersion,
-                IsValidAccountId = e.AccountUsers.Any(au => au.AccountId == accountId)
+                IsValidAccountId = e.AccountUsers.Any(au =>
+                    au.AccountId == accountId && au.AccessRevokedOn == null)
             })
             .FirstOrDefaultAsync();
 
@@ -57,9 +58,8 @@ public class RequestUser
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId) && throwOnInvalidAccountId)
         {
-            // Intentionally return 401 here so the client clears stale account selection state
-            // and forces a fresh login/session bootstrap instead of continuing with a bad account.
-            throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
+            // Authentication remains valid. Only this account selection is unavailable.
+            throw ApiExceptionDictionary.InvalidAccountSelection;
         }
 
         Id = user.Id;

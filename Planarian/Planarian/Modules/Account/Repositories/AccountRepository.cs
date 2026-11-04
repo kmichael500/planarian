@@ -1,8 +1,10 @@
+using System.Data;
 using System.Linq.Expressions;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using LinqToDB.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
@@ -936,6 +938,42 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return await DbContext.AccountUsers
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .FirstOrDefaultAsyncEF();
+    }
+
+    public Task<IDbContextTransaction> BeginAccountAccessTransactionAsync(CancellationToken cancellationToken)
+    {
+        return DbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+    }
+
+    public async Task<bool> WouldRevokeLastAdministrator(string userId, string accountId,
+        CancellationToken cancellationToken = default)
+    {
+        var activeAdmins = DbContext.AccountUsers.Where(m =>
+            m.AccountId == accountId && m.AccessRevokedOn == null && m.User != null &&
+            !m.User.IsTemporary &&
+            DbContext.UserPermissions.Any(permission =>
+                permission.UserId == m.UserId &&
+                (permission.AccountId == accountId || permission.AccountId == null) &&
+                (permission.Permission!.Key == PermissionPolicyKey.Admin ||
+                 permission.Permission.Key == PermissionPolicyKey.PlanarianAdmin)));
+
+        if (!await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                activeAdmins, m => m.UserId == userId, cancellationToken))
+        {
+            return false;
+        }
+
+        return !await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+            activeAdmins, m => m.UserId != userId, cancellationToken);
+    }
+
+    public Task<bool> HasGlobalAdministratorPermission(string userId, CancellationToken cancellationToken = default)
+    {
+        return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+            DbContext.UserPermissions, permission =>
+                permission.UserId == userId && permission.AccountId == null &&
+                (permission.Permission!.Key == PermissionPolicyKey.Admin ||
+                 permission.Permission.Key == PermissionPolicyKey.PlanarianAdmin), cancellationToken);
     }
 
     public async Task<bool> GetDefaultViewAccess()

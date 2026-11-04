@@ -2,5 +2,6 @@ import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliverySta
 
 export interface InviteUserResultVm {
   userId: string;
+  alreadyInvited?: boolean;
   invitationEmailDeliveryStatus?: MessageDeliveryStatus;
 }

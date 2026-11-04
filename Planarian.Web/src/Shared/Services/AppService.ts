@@ -24,15 +24,16 @@ const AppService = {
         : undefined,
     });
 
-    AppOptions = {
-      apiBaseUrl: response.data.apiBaseUrl,
-      signalrBaseUrl: response.data.signalrBaseUrl,
-      supportName: response.data.supportName,
-      supportEmail: response.data.supportEmail,
-    };
-    RequestRuntimeState.setAntiforgeryRequestToken(response.data.antiforgeryRequestToken);
-
     return response.data;
+  },
+  ApplyInitializationOptions(options: AppInitializeVm): void {
+    AppOptions = {
+      apiBaseUrl: options.apiBaseUrl,
+      signalrBaseUrl: options.signalrBaseUrl,
+      supportName: options.supportName,
+      supportEmail: options.supportEmail,
+    };
+    RequestRuntimeState.setAntiforgeryRequestToken(options.antiforgeryRequestToken);
   },
   GetAntiforgeryRequestToken(): string | null {
     return RequestRuntimeState.getAntiforgeryRequestToken();
@@ -72,6 +73,7 @@ export interface AppOptionsVm {
 
 export interface AppInitializeVm extends AppOptionsVm {
   accountIds: SelectListItem<string>[];
+  revokedAccountIds?: SelectListItem<string>[];
   permissions: PermissionKey[];
   currentUser: AppInitializeCurrentUserVm | null;
   antiforgeryRequestToken: string | null;

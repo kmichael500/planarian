@@ -1,4 +1,5 @@
 using Planarian.Model.Shared;
+using Planarian.Tests.EmailDelivery.TestInfrastructure;
 using Xunit;
 
 namespace Planarian.Tests.EmailDelivery.Migrations;
@@ -28,17 +29,27 @@ public sealed class AuthenticationMigrationContractTests
         Assert.Equal(10, PropertyLength.InvitationCode);
     }
 
+    [Fact]
+    public void V33AddsNullableRevocationStateAndRefusesUnsafeDowngrade()
+    {
+        var migrationsDirectory = Path.Combine(RepositoryPaths.Root,
+            "Planarian", "Planarian.Migrations", "Migrations");
+        var source = File.ReadAllText(Assert.Single(Directory.GetFiles(migrationsDirectory, "*_v33.cs")));
+
+        Assert.Contains("name: \"AccessRevokedOn\"", source);
+        Assert.Contains("nullable: true", source);
+        Assert.Contains("RAISE EXCEPTION", source);
+        Assert.Contains("WHERE \"AccessRevokedOn\" IS NOT NULL", source);
+        Assert.Contains("DropColumn", source);
+        Assert.DoesNotContain("DeleteData", source);
+    }
+
     private static string ReadV31()
     {
-        var migrationsDirectory = Path.Combine(FindRepositoryRoot(), "Planarian", "Planarian.Migrations", "Migrations");
+        var migrationsDirectory = Path.Combine(RepositoryPaths.Root,
+            "Planarian", "Planarian.Migrations", "Migrations");
         var migrationPath = Assert.Single(Directory.GetFiles(migrationsDirectory, "*_v31.cs"));
         return File.ReadAllText(migrationPath);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))) return directory.FullName;
-        throw new InvalidOperationException("Could not locate the repository root.");
-    }
 }

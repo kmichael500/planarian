@@ -284,3 +284,46 @@
     width: 100%;
   }
 }
+
+.user-manager-grid-card__header-extra {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.user-manager-selection-bar {
+  align-items: center;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+
+  > span {
+    color: var(--muted-text-color);
+    margin-left: auto;
+  }
+}
+
+.user-manager-selection-bar .ant-checkbox-wrapper {
+  min-height: 36px;
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .user-manager-selection-bar {
+    gap: 8px;
+
+    > span {
+      margin-left: 0;
+    }
+
+    > .ant-btn {
+      flex: 1 1 auto;
+      min-height: 44px;
+    }
+  }
+}

@@ -237,11 +237,13 @@ builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
+builder.Services.AddScoped<InvitationLifecycleService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
+builder.Services.AddScoped<AccountAccessService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -530,15 +532,14 @@ app.UseCors(x =>
 );
 
 app.UseAuthentication();
+// Handle account-selection failures raised by RequestUserMiddleware as well as API errors.
+app.UseMiddleware<HttpResponseExceptionMiddleware>();
 app.UseMiddleware<RequestUserMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
 
 app.MapHub<NotificationHub>("/api/notificationHub", options => { });
-
-
-app.UseMiddleware<HttpResponseExceptionMiddleware>();
 
 app.MapControllers();
 

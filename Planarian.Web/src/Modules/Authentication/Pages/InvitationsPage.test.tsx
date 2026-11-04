@@ -87,15 +87,19 @@ const invitation = (accountName: string): AcceptInvitationVm => ({
 
 let refreshPendingInvitationsMock: jest.Mock;
 
-const AppContextOverride: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+type AppContextValue = React.ContextType<typeof AppContext>;
+
+const AppContextOverride: React.FC<{
+  children: React.ReactNode;
+  overrides?: Partial<AppContextValue>;
+}> = ({ children, overrides }) => {
   const defaults = useContext(AppContext);
   return (
     <AppContext.Provider
       value={{
         ...defaults,
         refreshPendingInvitations: refreshPendingInvitationsMock,
+        ...overrides,
       }}
     >
       {children}
@@ -103,9 +107,12 @@ const AppContextOverride: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-const renderPage = (strictMode = false) => {
+const renderPage = (
+  strictMode = false,
+  overrides?: Partial<AppContextValue>
+) => {
   const page = (
-    <AppContextOverride>
+    <AppContextOverride overrides={overrides}>
       <InvitationsPage />
     </AppContextOverride>
   );
@@ -120,6 +127,28 @@ describe("InvitationsPage", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it("explains revoked access when the user has no active account", async () => {
+    jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
+
+    renderPage(false, {
+      currentAccountId: null,
+      revokedAccountIds: [
+        {
+          display: "Tennessee Cave Survey",
+          value: "tcsaccount",
+        },
+      ],
+    });
+
+    await screen.findByText(
+      "No pending invitations were found for your email."
+    );
+    expect(screen.getByText("Account access revoked")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your access to Tennessee Cave Survey has been revoked/)
+    ).toBeInTheDocument();
   });
 
   it("ignores a stale StrictMode invitation list after the current request succeeds", async () => {

@@ -72,6 +72,14 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return Ok();
     }
 
+    [HttpPost("{userId:length(10)}/restore-access")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult> RestoreAccess(string userId, CancellationToken cancellationToken)
+    {
+        await Service.RestoreAccess(userId, cancellationToken);
+        return Ok();
+    }
+
     #endregion
 
     #region Permission Management

@@ -24,6 +24,7 @@ function ProfileMenu() {
   const { modeLabel, cycleMode } = useTheme();
   const {
     accountIds,
+    revokedAccountIds,
     currentAccountId,
     currentUser,
     isAuthenticated,
@@ -64,9 +65,11 @@ function ProfileMenu() {
     {
       key: "switch-account",
       icon: <SwapOutlined />,
-      label: "Switch Account",
+      label: currentAccountId ? "Switch Account" : "Accounts",
       requiresAuthentication: true,
-      isVisible: accountIds.length > 1,
+      isVisible:
+        revokedAccountIds.length > 0 ||
+        accountIds.some((account) => account.value !== currentAccountId),
       action: () => {
         setIsModalOpen(true);
       },
@@ -90,7 +93,7 @@ function ProfileMenu() {
 
   return (
     <>
-      {currentAccountId && (
+      {accountIds.length + revokedAccountIds.length > 0 && (
         <SwitchAccountComponent
           isVisible={isModalOpen}
           handleCancel={() => setIsModalOpen(false)}

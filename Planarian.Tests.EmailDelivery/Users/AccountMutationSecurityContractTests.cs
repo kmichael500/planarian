@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Users.Controllers;
 using Planarian.Modules.Users.Models;
 using Xunit;
@@ -10,6 +12,19 @@ namespace Planarian.Tests.EmailDelivery.Users;
 
 public sealed class AccountMutationSecurityContractTests
 {
+    [Theory]
+    [InlineData(nameof(AccountUserManagerController.Revoke), typeof(HttpDeleteAttribute))]
+    [InlineData(nameof(AccountUserManagerController.RestoreAccess), typeof(HttpPostAttribute))]
+    public void AccountAccessMutationsRequireAdmin(string methodName, Type httpMethodAttributeType)
+    {
+        var method = typeof(AccountUserManagerController).GetMethod(methodName)!;
+        var authorize = Assert.Single(method.GetCustomAttributes<AuthorizeAttribute>());
+
+        Assert.Equal(PermissionPolicyKey.Admin, authorize.Policy);
+        Assert.Contains(method.GetCustomAttributes(), attribute =>
+            attribute.GetType() == httpMethodAttributeType);
+    }
+
     [Fact]
     public void SettingsPasswordChangeRequiresCurrentAndNewPassword()
     {

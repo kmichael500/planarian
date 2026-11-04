@@ -1,9 +1,7 @@
-using System.Data;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -23,21 +21,21 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     private readonly EmailService _emailService;
     private readonly AccountRepository _accountRepository;
     private readonly PermissionRepository _permissionRepository;
-    private readonly UserRepository _userRepository;
+    private readonly AccountAccessService _accountAccessService;
     private readonly ILogger<AccountUserManagerService> _logger;
 
     public AccountUserManagerService(
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
-        ServerOptions serverOptions, AccountRepository accountRepository,
-        PermissionRepository permissionRepository, UserRepository userRepository,
-        ILogger<AccountUserManagerService> logger) : base(repository, requestUser)
+        AccountRepository accountRepository,
+        PermissionRepository permissionRepository,
+        AccountAccessService accountAccessService, ILogger<AccountUserManagerService> logger) : base(repository, requestUser)
     {
         _emailService = emailService;
         _accountRepository = accountRepository;
         _permissionRepository = permissionRepository;
-        _userRepository = userRepository;
+        _accountAccessService = accountAccessService;
         _logger = logger;
     }
 
@@ -65,6 +63,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
+        request.EmailAddress = request.EmailAddress?.Trim() ?? string.Empty;
         if (!request.EmailAddress.IsValidEmail())
         {
             throw ApiExceptionDictionary.BadRequest("Invalid email address.");
@@ -93,6 +92,17 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         {
             try
             {
+                // Serialize invitation creation for the same account and email.
+                await Repository.LockInvitationEmail(RequestUser.AccountId, user.EmailAddress, cancellationToken);
+                await _accountAccessService.EnsureCanInvite(user.EmailAddress);
+                var pendingUserId = await Repository.GetPendingInvitationUserId(
+                    RequestUser.AccountId, user.EmailAddress, cancellationToken);
+                if (pendingUserId != null)
+                {
+                    await dbTransaction.CommitAsync(cancellationToken);
+                    return new InviteUserResultVm { UserId = pendingUserId, AlreadyInvited = true };
+                }
+
                 Repository.Add(user);
                 Repository.Add(accountUser);
                 await Repository.SaveChangesAsync(cancellationToken);
@@ -142,30 +152,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         };
     }
 
-    public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-        {
-            throw ApiExceptionDictionary.NoAccount;
-        }
+    public Task RevokeAccess(string userId, CancellationToken cancellationToken = default) =>
+        _accountAccessService.RevokeAccess(userId, cancellationToken);
 
-        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var accessDeleted = await Repository.DeleteAccountUserAccess(userId, RequestUser.AccountId, cancellationToken);
-            if (!accessDeleted)
-            {
-                throw ApiExceptionDictionary.NotFound("User");
-            }
-
-            await dbTransaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
+    public Task RestoreAccess(string userId, CancellationToken cancellationToken = default) =>
+        _accountAccessService.RestoreAccess(userId, cancellationToken);
 
     public async Task ResendInvitation(string userId)
     {
@@ -180,20 +171,16 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        if (accountUser.InvitationAcceptedOn.HasValue)
-        {
-            throw ApiExceptionDictionary.BadRequest("User has already accepted the invitation.");
-        }
-
-        if (string.IsNullOrWhiteSpace(accountUser.InvitationCode))
-        {
-            throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");
-        }
-
         var user = await Repository.Get(userId);
         if (user == null)
         {
             throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        if (!user.IsTemporary || accountUser.AccessRevokedOn.HasValue ||
+            accountUser.InvitationAcceptedOn.HasValue || string.IsNullOrWhiteSpace(accountUser.InvitationCode))
+        {
+            throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");
         }
 
         var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
@@ -522,7 +509,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+        var userHasPermission = await Repository.GetUserPermission(userId, permissionKey);
         if (userHasPermission != null)
         {
             throw ApiExceptionDictionary.BadRequest("User already has this permission.");
@@ -551,42 +538,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             Permission = permission
         };
 
-        _userRepository.Add(entity);
-        await _userRepository.SaveChangesAsync();
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync();
     }
 
-    public async Task RemoveUserPermission(string userId, string permissionKey)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-        {
-            throw ApiExceptionDictionary.NoAccount;
-        }
+    public Task RemoveUserPermission(string userId, string permissionKey) =>
+        _accountAccessService.RemoveUserPermission(userId, permissionKey);
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
-
-        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
-        if (accountUser == null)
-        {
-            throw ApiExceptionDictionary.NotFound("User");
-        }
-
-        if (RequestUser.Id.Equals(userId))
-        {
-            throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
-        }
-
-        if (permissionKey == PermissionKey.PlanarianAdmin)
-        {
-            throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be managed from account user management.");
-        }
-
-        var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
-        if (userPermission == null)
-        {
-            throw ApiExceptionDictionary.NotFound("User Permission");
-        }
-
-        _userRepository.Delete(userPermission);
-        await _userRepository.SaveChangesAsync();
-    }
 }

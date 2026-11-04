@@ -1,15 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {
-  Modal,
-  Form,
+  Checkbox,
   Input,
   message,
-  Row,
-  Col,
   Select,
   Typography,
 } from "antd";
 import {
+  CheckSquareOutlined,
   EditOutlined,
   MailOutlined,
   RedoOutlined,
@@ -18,12 +16,10 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
-import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
+import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
@@ -35,16 +31,19 @@ import {
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { EmailHistoryModal } from "../../../Shared/Components/EmailHistoryModal/EmailHistoryModal";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
+import { AppContext } from "../../../Configuration/Context/AppContext";
+import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
+import { InvitePeopleModal } from "./InvitePeopleModal";
+import { BulkRevokeModal } from "./BulkRevokeModal";
 import "./UserManagerComponent.scss";
 
 const { Text } = Typography;
 const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
-type UserStatusFilter = "all" | "accepted" | "pending";
+type UserStatusFilter = "all" | "accepted" | "pending" | "revoked";
 type UserSortBy =
   | "fullName"
   | "emailAddress"
@@ -56,6 +55,9 @@ const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkRevokeVisible, setBulkRevokeVisible] = useState(false);
   const [searchText, setSearchText] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
@@ -69,55 +71,55 @@ const UserManagerComponent: React.FC = () => {
   const [invitationEmailHistory, setInvitationEmailHistory] = useState<
     InvitationEmailAttemptVm[]
   >([]);
-  const [form] = Form.useForm();
   const navigate = useNavigate();
+  const { currentUser } = useContext(AppContext);
+  const listRequest = useRef(0);
+  useEffect(() => {
+    setSelecting(false);
+    setSelectedIds([]);
+    setBulkRevokeVisible(false);
+    setInviteModalVisible(false);
+    setInvitationHistoryVisible(false);
+    setInvitationHistoryUser(null);
+    setInvitationEmailHistory([]);
+  }, [currentUser?.currentAccountId]);
+
   const toolbarVisibility = useScrollRevealVisibility({
     breakpointPx: USER_MANAGER_COLLAPSE_BREAKPOINT_PX,
     mode: "direct",
   });
 
   const fetchUsers = async () => {
+    const accountId = RequestRuntimeState.getCurrentAccountId();
+    const request = ++listRequest.current;
+    if (!accountId) {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const response = await AccountUserManagerService.GetAccountUsers();
-      setUsers(response);
+      const response = await AccountUserManagerService.GetAccountUsers(accountId);
+      if (request === listRequest.current &&
+          RequestRuntimeState.getCurrentAccountId() === accountId) {
+        setUsers(response);
+      }
     } catch (error) {
-      message.error("Failed to load users.");
-      console.error(error);
+      if (request === listRequest.current &&
+          RequestRuntimeState.getCurrentAccountId() === accountId) {
+        message.error("Failed to load users.");
+        console.error(error);
+      }
     } finally {
-      setLoading(false);
+      if (request === listRequest.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleInviteUser = async (values: InviteUserRequest) => {
-    try {
-      setLoading(true);
-      const result = await AccountUserManagerService.InviteUser(values);
-      if (
-        result.invitationEmailDeliveryStatus ===
-        MessageDeliveryStatus.SendFailed
-      ) {
-        message.warning(
-          "Invitation created, but the email could not be sent. You can resend it from the user list."
-        );
-      } else {
-        message.success("Invitation sent successfully.");
-      }
-      setInviteModalVisible(false);
-      form.resetFields();
-      // Navigate to userId/permissions/View relative to this page
-      navigate(`${result.userId}/permissions/${PermissionKey.View}`);
-      fetchUsers();
-    } catch (err) {
-      const error = err as ApiErrorResponse;
-      message.error(error.message);
-    }
-    setLoading(false);
-  };
+    setUsers([]);
+    void fetchUsers();
+    return () => { listRequest.current++; };
+  }, [currentUser?.currentAccountId]);
 
   const handleShowInvitationHistory = async (user: UserManagerGridVm) => {
     setInvitationHistoryUser(user);
@@ -137,17 +139,33 @@ const UserManagerComponent: React.FC = () => {
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
-  const handleRevokeAccess = async (userId: string) => {
+  const handleRevokeAccess = async (user: UserManagerGridVm) => {
     try {
       setIsRevoking(true);
-      await AccountUserManagerService.RevokeAccess(userId);
-      message.success("Access revoked.");
+      await AccountUserManagerService.RevokeAccess(user.userId);
+      message.success(
+        user.hasActiveInvitation ? "Invitation removed." : "Access revoked."
+      );
       fetchUsers();
     } catch (err) {
       const error = err as PlanarianError;
       message.error(error.message);
     }
     setIsRevoking(false);
+  };
+
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
+  const handleRestoreAccess = async (userId: string) => {
+    try {
+      setIsRestoring(true);
+      await AccountUserManagerService.RestoreAccess(userId);
+      message.success("Access restored.");
+      fetchUsers();
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+    }
+    setIsRestoring(false);
   };
 
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -164,8 +182,10 @@ const UserManagerComponent: React.FC = () => {
     setIsResending(false);
   };
 
-  const getUserStatus = (user: UserManagerGridVm): UserStatusFilter =>
-    user.invitationAcceptedOn ? "accepted" : "pending";
+  const getUserStatus = (user: UserManagerGridVm): UserStatusFilter => {
+    if (user.accessRevokedOn) return "revoked";
+    return user.hasActiveInvitation ? "pending" : "accepted";
+  };
 
   const sortOptions: SelectListItem<string>[] = [
     { display: "Invitation sent", value: "invitationSentOn" },
@@ -218,11 +238,25 @@ const UserManagerComponent: React.FC = () => {
       return sortDescending ? -comparison : comparison;
     });
 
+  const eligibleIds = filteredUsers
+    .filter((user) => !user.accessRevokedOn && user.userId !== currentUser?.id)
+    .map((user) => user.userId);
+  const selectedUsers = filteredUsers.filter((user) => selectedIds.includes(user.userId));
+  const selectedAll = eligibleIds.length > 0 &&
+    eligibleIds.every((id) => selectedIds.includes(id));
+  const selectedSome = eligibleIds.some((id) => selectedIds.includes(id));
+
+  const toggleSelected = (userId: string, checked: boolean) =>
+    setSelectedIds((previous) => checked
+      ? [...previous.filter((id) => id !== userId), userId]
+      : previous.filter((id) => id !== userId));
+
   const renderDate = (value?: string | null) =>
     value ? formatDateTime(value) : "Not recorded";
 
   const renderUserCard = (user: UserManagerGridVm) => {
     const isPending = user.hasActiveInvitation;
+    const isRevoked = !!user.accessRevokedOn;
     const actions: GridCardAction[] = [
       {
         key: "edit",
@@ -233,7 +267,7 @@ const UserManagerComponent: React.FC = () => {
       },
     ];
 
-    if (isPending) {
+    if (isPending && !isRevoked) {
       actions.push({
         key: "resend",
         label: "Resend",
@@ -243,28 +277,51 @@ const UserManagerComponent: React.FC = () => {
       });
     }
 
-    actions.push({
-      key: "remove",
-      label: "Remove",
-      render: (
-        <DeleteButtonComponent
-          alwaysShowChildren
-          permissionKey={PermissionKey.Admin}
-          loading={isRevoking}
-          type="default"
-          title={`Are you sure you want to revoke access for ${user.fullName}? You will need to re-invite them to grant access in the future.`}
-          onConfirm={() => handleRevokeAccess(user.userId)}
-          okText="Yes"
-          cancelText="No"
-        >
-          Remove
-        </DeleteButtonComponent>
-      ),
-    });
+    if (isRevoked) {
+      actions.push({
+        key: "restore",
+        label: "Restore access",
+        render: (
+          <PlanarianButton
+            alwaysShowChildren
+            icon={<RedoOutlined />}
+            permissionKey={PermissionKey.Admin}
+            loading={isRestoring}
+            type="default"
+            onClick={() => handleRestoreAccess(user.userId)}
+          >
+            Restore access
+          </PlanarianButton>
+        ),
+      });
+    } else if (user.userId !== currentUser?.id) {
+      actions.push({
+        key: "remove",
+        label: isPending ? "Remove invitation" : "Revoke access",
+        render: (
+          <DeleteButtonComponent
+            alwaysShowChildren
+            permissionKey={PermissionKey.Admin}
+            loading={isRevoking}
+            type="default"
+            title={
+              isPending
+                ? `Are you sure you want to remove the invitation for ${user.fullName}?`
+                : `Are you sure you want to revoke access for ${user.fullName}? Their existing permissions will be preserved and can be restored later.`
+            }
+            onConfirm={() => handleRevokeAccess(user)}
+            okText="Yes"
+            cancelText="No"
+          >
+            {isPending ? "Remove invitation" : "Revoke access"}
+          </DeleteButtonComponent>
+        ),
+      });
+    }
 
     return (
       <GridCard
-        actions={actions}
+        actions={selecting ? undefined : actions}
         className="user-manager-grid-card"
         stickyFooter
         stickyHeader
@@ -279,9 +336,20 @@ const UserManagerComponent: React.FC = () => {
           </span>
         }
         headerExtra={
-          isPending ? (
-            <span className="user-manager-grid-card__status">Pending</span>
-          ) : null
+          <div className="user-manager-grid-card__header-extra">
+            {isRevoked ? (
+              <span className="user-manager-grid-card__status">Access revoked</span>
+            ) : isPending ? (
+              <span className="user-manager-grid-card__status">Pending</span>
+            ) : null}
+            {selecting && !isRevoked && user.userId !== currentUser?.id && (
+              <Checkbox
+                aria-label={`Select ${user.fullName}`}
+                checked={selectedIds.includes(user.userId)}
+                onChange={(event) => toggleSelected(user.userId, event.target.checked)}
+              />
+            )}
+          </div>
         }
       >
         <div className="user-manager-grid-card__details">
@@ -297,6 +365,12 @@ const UserManagerComponent: React.FC = () => {
             <Text type="secondary">Last Active</Text>
             <span>{renderDate(user.lastActiveOn)}</span>
           </div>
+          {user.accessRevokedOn ? (
+            <div className="user-manager-grid-card__detail">
+              <Text type="secondary">Access Revoked</Text>
+              <span>{renderDate(user.accessRevokedOn)}</span>
+            </div>
+          ) : null}
           {user.invitationEmailAttemptCount > 0 ? (
             <div className="user-manager-grid-card__history">
               <PlanarianButton
@@ -323,8 +397,14 @@ const UserManagerComponent: React.FC = () => {
             <Input.Search
               className="user-manager-search"
               placeholder="Search users"
-              onSearch={(value) => setSearchText(value)}
-              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={(value) => {
+                setSearchText(value);
+                setSelectedIds([]);
+              }}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setSelectedIds([]);
+              }}
               allowClear
             />
           </div>
@@ -337,11 +417,15 @@ const UserManagerComponent: React.FC = () => {
                 <Select<UserStatusFilter>
                   className="user-manager-filter"
                   value={statusFilter}
-                  onChange={setStatusFilter}
+                  onChange={(value) => {
+                    setStatusFilter(value);
+                    setSelectedIds([]);
+                  }}
                   options={[
                     { label: "All statuses", value: "all" },
                     { label: "Accepted", value: "accepted" },
                     { label: "Pending", value: "pending" },
+                    { label: "Access revoked", value: "revoked" },
                   ]}
                 />
                 <SplitSortControl
@@ -356,19 +440,59 @@ const UserManagerComponent: React.FC = () => {
               </div>
               <div className="user-manager-invite-column">
                 <PlanarianButton
-                  className="user-manager-invite-button"
                   permissionKey={PermissionKey.Admin}
-                  icon={<UserAddOutlined />}
-                  type="primary"
+                  icon={<CheckSquareOutlined />}
+                  aria-label={selecting ? "Cancel selection" : "Select people"}
                   alwaysShowChildren
-                  onClick={() => setInviteModalVisible(true)}
+                  debounceTime={0}
+                  onClick={() => {
+                    setSelecting((previous) => !previous);
+                    setSelectedIds([]);
+                  }}
                 >
-                  Invite User
+                  {selecting ? "Cancel selection" : "Select people"}
                 </PlanarianButton>
+                {!selecting && (
+                  <PlanarianButton
+                    className="user-manager-invite-button"
+                    permissionKey={PermissionKey.Admin}
+                    icon={<UserAddOutlined />}
+                    aria-label="Invite people"
+                    type="primary"
+                    alwaysShowChildren
+                    onClick={() => setInviteModalVisible(true)}
+                  >
+                    Invite people
+                  </PlanarianButton>
+                )}
               </div>
             </div>
           </ScrollCollapseSection>
         </div>
+        {selecting && (
+          <div className="user-manager-selection-bar">
+            <Checkbox
+              indeterminate={selectedSome && !selectedAll}
+              checked={selectedAll}
+              disabled={eligibleIds.length === 0}
+              onChange={(event) => setSelectedIds(event.target.checked ? eligibleIds : [])}
+            >
+              Select all shown ({eligibleIds.length})
+            </Checkbox>
+            <span role="status">{selectedIds.length} selected</span>
+            <PlanarianButton
+              alwaysShowChildren icon={<CheckSquareOutlined />}
+              aria-label="Review access changes"
+              permissionKey={PermissionKey.Admin}
+              type="primary"
+              danger
+              disabled={selectedIds.length === 0}
+              onClick={() => setBulkRevokeVisible(true)}
+            >
+              Review access changes
+            </PlanarianButton>
+          </div>
+        )}
         <div className="user-manager-grid">
           <SpinnerCardComponent spinning={loading}>
             <CardGridComponent
@@ -396,52 +520,26 @@ const UserManagerComponent: React.FC = () => {
         onClose={() => setInvitationHistoryVisible(false)}
       />
 
-      <Modal
-        title="Invite User"
+      <InvitePeopleModal
         open={inviteModalVisible}
-        confirmLoading={loading}
-        onCancel={() => setInviteModalVisible(false)}
-        onOk={() => {
-          form
-            .validateFields()
-            .then((values) => {
-              handleInviteUser(values as InviteUserRequest);
-            })
-            .catch((info) => {
-              console.error("Validation Failed:", info);
-            });
+        existingUsers={users}
+        onClose={() => setInviteModalVisible(false)}
+        onChanged={fetchUsers}
+        onManagePermissions={(userId) => {
+          setInviteModalVisible(false);
+          navigate(`${userId}/permissions/${PermissionKey.View}`);
         }}
-      >
-        <Form layout="vertical" form={form}>
-          <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item
-                label="First Name"
-                name={nameof<InviteUserRequest>("firstName")}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item
-                label="Last Name"
-                name={nameof<InviteUserRequest>("lastName")}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            label="Email Address"
-            name={nameof<InviteUserRequest>("emailAddress")}
-            rules={[
-              { required: true, type: "email", message: "Invalid email" },
-            ]}
-          >
-            <Input type="email" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      />
+      <BulkRevokeModal
+        open={bulkRevokeVisible}
+        selected={selectedUsers}
+        onClose={() => setBulkRevokeVisible(false)}
+        onFinished={async () => {
+          await fetchUsers();
+          setSelectedIds([]);
+          setSelecting(false);
+        }}
+      />
     </>
   );
 };

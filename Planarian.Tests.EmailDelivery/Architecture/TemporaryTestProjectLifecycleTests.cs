@@ -1,3 +1,4 @@
+using Planarian.Tests.EmailDelivery.TestInfrastructure;
 using Xunit;
 
 namespace Planarian.Tests.EmailDelivery.Architecture;
@@ -7,7 +8,7 @@ public sealed class TemporaryTestProjectLifecycleTests
     [Fact]
     public void TemporaryProjectMustBeMigratedWhenCanonicalBackendTestProjectsExist()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = RepositoryPaths.Root;
         var canonicalProjects = new[]
         {
             "Planarian.Tests.Unit/Planarian.Tests.Unit.csproj",
@@ -24,13 +25,4 @@ public sealed class TemporaryTestProjectLifecycleTests
             "Planarian.Tests.EmailDelivery/README.md, then delete this project and its temporary workflow.");
     }
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))) return directory.FullName;
-        }
-
-        throw new InvalidOperationException("Could not locate the repository root for the temporary test-project guard.");
-    }
 }
