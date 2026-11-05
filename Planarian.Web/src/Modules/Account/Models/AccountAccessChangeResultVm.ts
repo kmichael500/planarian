@@ -1,6 +1,10 @@
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 
-export type AccountAccessAction = "disable" | "enable" | "revoke";
+export enum AccountAccessAction {
+  Disable = "Disable",
+  Enable = "Enable",
+  Revoke = "Revoke",
+}
 
 export interface AccountAccessChangeResultVm {
   notificationEmailDeliveryStatus?: MessageDeliveryStatus | null;

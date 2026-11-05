@@ -7,6 +7,7 @@ import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliverySta
 import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
+import { AccountAccessAction } from "../Models/AccountAccessChangeResultVm";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { UserManagerComponent } from "./UserManagerComponent";
 
@@ -297,7 +298,7 @@ describe("UserManagerComponent", () => {
       .getByRole("button", { name: "Disable access" }));
 
     await waitFor(() =>
-      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", "disable", "Access review", true)
+      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", AccountAccessAction.Disable, "Access review", true)
     );
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
@@ -328,7 +329,7 @@ describe("UserManagerComponent", () => {
 
     await waitFor(() =>
       expect(changeAccess).toHaveBeenCalledWith(
-        "user123456", "account0001", "enable",
+        "user123456", "account0001", AccountAccessAction.Enable,
         "Your access to this account has been restored. If you have any questions, please reach out to an administrator.", true
       )
     );
@@ -383,7 +384,7 @@ describe("UserManagerComponent", () => {
     const confirm = screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!;
     expect(confirm).toBeDisabled();
-    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "revoke")).toHaveLength(0);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === AccountAccessAction.Revoke)).toHaveLength(0);
 
     fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
       target: { value: "remove" },
@@ -394,7 +395,7 @@ describe("UserManagerComponent", () => {
     });
     fireEvent.click(confirm);
     await waitFor(() =>
-      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", "revoke",
+      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", AccountAccessAction.Revoke,
         expect.stringContaining("access to this account has been removed"), true));
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("Membership revoked.")).toBeInTheDocument();
@@ -429,7 +430,7 @@ describe("UserManagerComponent", () => {
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);
     await waitFor(() => expect(changeAccess).toHaveBeenCalledWith(
-      "user123456", "account0001", "revoke", undefined, false
+      "user123456", "account0001", AccountAccessAction.Revoke, undefined, false
     ));
   });
 
@@ -497,7 +498,7 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
 
-    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "revoke")).toHaveLength(0);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === AccountAccessAction.Revoke)).toHaveLength(0);
     expect(screen.getByRole("alert")).toHaveTextContent("selected account changed");
     expect(screen.getByRole("dialog", { name: "Revoke membership?" })).toBeInTheDocument();
   });
@@ -523,7 +524,7 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
     await waitFor(() => expect(changeAccess).toHaveBeenCalledWith(
-      "disab00001", "account0001", "revoke",
+      "disab00001", "account0001", AccountAccessAction.Revoke,
       expect.stringContaining("access to this account has been removed"), true));
   });
 
@@ -582,12 +583,12 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getByRole("button", { name: /Apply changes$/ }));
 
     await waitFor(() => {
-      expect(changeAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001", "disable", undefined, false);
-      expect(changeAccess).toHaveBeenCalledWith(accepted.userId, "account0001", "disable",
+      expect(changeAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001", AccountAccessAction.Disable, undefined, false);
+      expect(changeAccess).toHaveBeenCalledWith(accepted.userId, "account0001", AccountAccessAction.Disable,
         "Your access to this account has been disabled. If you have any questions or believe this was a mistake, please reach out to an administrator.", true);
     });
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
-    expect(changeAccess).not.toHaveBeenCalledWith(disabled.userId, "account0001", "disable", undefined);
+    expect(changeAccess).not.toHaveBeenCalledWith(disabled.userId, "account0001", AccountAccessAction.Disable, undefined);
     expect(screen.getByRole("button", { name: "Cancel selection" })).toBeInTheDocument();
     const results = screen.getByRole("dialog", { name: "Results" });
     fireEvent.click(within(results).getByRole("button", { name: /Close$/ }));
@@ -627,11 +628,11 @@ describe("UserManagerComponent", () => {
     });
     fireEvent.click(confirm);
     await waitFor(() => expect(changeAccess).toHaveBeenCalledTimes(2));
-    expect(changeAccess).toHaveBeenCalledWith("accept0001", "account0001", "revoke",
+    expect(changeAccess).toHaveBeenCalledWith("accept0001", "account0001", AccountAccessAction.Revoke,
       expect.stringContaining("access to this account has been removed"), true);
-    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", "revoke",
+    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", AccountAccessAction.Revoke,
       expect.stringContaining("access to this account has been removed"), true);
-    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "disable")).toHaveLength(0);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === AccountAccessAction.Disable)).toHaveLength(0);
     expect(await screen.findByText("Results")).toBeInTheDocument();
   });
 
@@ -660,9 +661,9 @@ describe("UserManagerComponent", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Enable access" }));
 
     await waitFor(() => expect(changeAccess).toHaveBeenCalledTimes(2));
-    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", "enable", undefined, false);
-    expect(changeAccess).toHaveBeenCalledWith("disab00002", "account0001", "enable", undefined, false);
-    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "disable")).toHaveLength(0);
+    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", AccountAccessAction.Enable, undefined, false);
+    expect(changeAccess).toHaveBeenCalledWith("disab00002", "account0001", AccountAccessAction.Enable, undefined, false);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === AccountAccessAction.Disable)).toHaveLength(0);
     expect(await screen.findAllByText("Access restored.")).toHaveLength(2);
   });
 

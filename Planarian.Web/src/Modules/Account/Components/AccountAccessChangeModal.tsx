@@ -22,7 +22,11 @@ interface Props {
   onFinished: () => Promise<void>;
 }
 
-type Phase = "review" | "processing" | "results";
+enum AccessChangePhase {
+  Review = "Review",
+  Processing = "Processing",
+  Results = "Results",
+}
 type Outcome = {
   user: UserManagerGridVm;
   message: string;
@@ -40,9 +44,9 @@ const outcomeFor = (
     return { user, message: "Invitation canceled." };
   }
   const label =
-    action === "enable"
+    action === AccountAccessAction.Enable
       ? "Access restored"
-      : action === "disable"
+      : action === AccountAccessAction.Disable
       ? "Access disabled"
       : "Membership revoked";
   if (deliveryStatus === MessageDeliveryStatus.SendFailed) {
@@ -65,12 +69,12 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
   const { currentAccountName } = useContext(AppContext);
   const accountName = currentAccountName || "this account";
   const defaultMessage =
-    action === "enable"
+    action === AccountAccessAction.Enable
       ? `Your access to ${accountName} has been restored. If you have any questions, please reach out to an administrator.`
       : `Your access to ${accountName} has been ${
-          action === "disable" ? "disabled" : "removed"
+          action === AccountAccessAction.Disable ? "disabled" : "removed"
         }. If you have any questions or believe this was a mistake, please reach out to an administrator.`;
-  const [phase, setPhase] = useState<Phase>("review");
+  const [phase, setPhase] = useState<AccessChangePhase>(AccessChangePhase.Review);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [processed, setProcessed] = useState(0);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -85,7 +89,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
   const pending = selected.filter((user) => user.hasActiveInvitation);
   const active = selected.filter((user) => !user.hasActiveInvitation);
   const canNotify = active.length > 0;
-  const requiresRevokeConfirmation = action === "revoke";
+  const requiresRevokeConfirmation = action === AccountAccessAction.Revoke;
   const validMessage = !sendEmail || !canNotify || !!notificationMessage.trim();
 
   useEffect(() => {
@@ -94,7 +98,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
     if (!open) return;
     if (newlyOpened) {
       openedAccountId.current = RequestRuntimeState.getCurrentAccountId();
-      setPhase("review");
+      setPhase(AccessChangePhase.Review);
       setOutcomes([]);
       setProcessed(0);
       setRetryingId(null);
@@ -107,13 +111,13 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
   }, [open, defaultMessage]);
 
   const title =
-    phase === "results"
+    phase === AccessChangePhase.Results
       ? "Results"
-      : phase === "processing"
+      : phase === AccessChangePhase.Processing
       ? "Updating memberships"
-      : action === "enable"
+      : action === AccountAccessAction.Enable
       ? "Enable access?"
-      : action === "revoke"
+      : action === AccountAccessAction.Revoke
       ? selected.length === 1
         ? "Revoke membership?"
         : "Revoke memberships?"
@@ -126,9 +130,9 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
       : "Cancel invitations?";
 
   const actionLabel =
-    action === "enable"
+    action === AccountAccessAction.Enable
       ? "Enable access"
-      : action === "revoke"
+      : action === AccountAccessAction.Revoke
       ? selected.length === 1
         ? "Revoke membership"
         : "Revoke memberships"
@@ -141,14 +145,14 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
       : "Cancel invitations";
 
   const summary =
-    action === "enable"
+    action === AccountAccessAction.Enable
       ? selected.length === 1
         ? selected[0].fullName + " will regain access to " + accountName + "."
         : selected.length +
           " members will regain access to " +
           accountName +
           "."
-      : action === "revoke"
+      : action === AccountAccessAction.Revoke
       ? selected.length === 1
         ? selected[0].fullName +
           " will be completely removed from this account. Their membership, permissions, and favorites will be deleted. They'll need a new invitation to rejoin. Previously contributed cave data will remain."
@@ -246,7 +250,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
       return;
     }
     setError("");
-    setPhase("processing");
+    setPhase(AccessChangePhase.Processing);
     const completedIds = new Set<string>();
     await runAccountBatch(
       selected,
@@ -277,7 +281,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
         })),
       ]);
     }
-    setPhase("results");
+    setPhase(AccessChangePhase.Results);
     await refresh();
   };
 
@@ -287,14 +291,14 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
   const failed = outcomes.filter((item) => item.failed).length;
   const skipped = outcomes.filter((item) => item.skipped).length;
   const displayed: Outcome[] =
-    phase === "results"
+    phase === AccessChangePhase.Results
       ? outcomes
       : selected.map((user) => ({
           user,
           message:
-            action === "enable"
+            action === AccountAccessAction.Enable
               ? "Enable access"
-              : action === "revoke"
+              : action === AccountAccessAction.Revoke
               ? "Revoke membership"
               : user.hasActiveInvitation
               ? "Cancel invitation"
@@ -306,16 +310,16 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
       open={open}
       header={title}
       onClose={() => {
-        if (phase !== "processing" && retryingId === null) onClose();
+        if (phase !== AccessChangePhase.Processing && retryingId === null) onClose();
       }}
-      dismissible={phase !== "processing" && retryingId === null}
+      dismissible={phase !== AccessChangePhase.Processing && retryingId === null}
       closeOnBackdrop={false}
       width={720}
       height="auto"
       maxHeight="90dvh"
       className="account-access-modal"
       footer={
-        phase === "processing" ? undefined : (
+        phase === AccessChangePhase.Processing ? undefined : (
           <div className="account-access-modal__footer">
             <PlanarianButton
               icon={<CloseOutlined />}
@@ -323,14 +327,14 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
               onClick={onClose}
               disabled={retryingId !== null}
             >
-              {phase === "results" ? "Close" : "Cancel"}
+              {phase === AccessChangePhase.Results ? "Close" : "Cancel"}
             </PlanarianButton>
-            {phase === "review" && (
+            {phase === AccessChangePhase.Review && (
               <PlanarianButton
                 icon={
-                  action === "enable" ? <RedoOutlined /> : <DeleteOutlined />
+                  action === AccountAccessAction.Enable ? <RedoOutlined /> : <DeleteOutlined />
                 }
-                danger={action !== "enable"}
+                danger={action !== AccountAccessAction.Enable}
                 type="primary"
                 alwaysShowChildren
                 permissionKey={PermissionKey.Admin}
@@ -349,7 +353,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
         )
       }
     >
-      {phase === "review" && (
+      {phase === AccessChangePhase.Review && (
         <>
           <Typography.Paragraph className="account-access-modal__summary">
             {summary}
@@ -395,19 +399,19 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
           )}
         </>
       )}
-      {phase === "processing" && (
+      {phase === AccessChangePhase.Processing && (
         <Typography.Text role="status">
           Updating {processed} of {selected.length} memberships…
         </Typography.Text>
       )}
-      {phase === "results" && (
+      {phase === AccessChangePhase.Results && (
         <Typography.Paragraph role="status">
           {completed} completed
           {failed ? " · " + failed + " failed" : ""}
           {skipped ? " · " + skipped + " unchanged" : ""}
         </Typography.Paragraph>
       )}
-      {(phase === "results" || (phase === "review" && selected.length > 1)) && (
+      {(phase === AccessChangePhase.Results || (phase === AccessChangePhase.Review && selected.length > 1)) && (
         <div
           className="account-access-modal__list"
           aria-label="Affected people"
@@ -424,7 +428,7 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
                 }
               >
                 {message}
-                {phase === "results" && failed && (
+                {phase === AccessChangePhase.Results && failed && (
                   <PlanarianButton
                     icon={<DeleteOutlined />}
                     type="link"

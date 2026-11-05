@@ -8,7 +8,11 @@ export interface InvitationRow extends InviteUserRequest {
   id: number;
 }
 
-export type InvitationDisposition = "ready" | "invalid" | "skipped";
+export enum InvitationDisposition {
+  Ready = "Ready",
+  Invalid = "Invalid",
+  Skipped = "Skipped",
+}
 
 export interface InvitationPreview {
   row: InvitationRow;
@@ -104,7 +108,7 @@ export function previewInvitations(
     if (!firstName || !lastName || !isValidInvitationEmail(email)) {
       return {
         row,
-        disposition: "invalid",
+        disposition: InvitationDisposition.Invalid,
         reason:
           !firstName || !lastName
             ? "First and last name are required."
@@ -114,7 +118,7 @@ export function previewInvitations(
     if (seen.has(email)) {
       return {
         row,
-        disposition: "skipped",
+        disposition: InvitationDisposition.Skipped,
         reason: "Duplicate email in this batch.",
       };
     }
@@ -124,20 +128,20 @@ export function previewInvitations(
     if (member?.accessDisabledOn) {
       return {
         row,
-        disposition: "skipped",
+        disposition: InvitationDisposition.Skipped,
         reason: "Access disabled — use Enable access.",
       };
     }
     if (member?.hasActiveInvitation) {
       return {
         row,
-        disposition: "skipped",
+        disposition: InvitationDisposition.Skipped,
         reason: "Already invited — use Resend.",
       };
     }
     if (member) {
-      return { row, disposition: "skipped", reason: "Already a member." };
+      return { row, disposition: InvitationDisposition.Skipped, reason: "Already a member." };
     }
-    return { row, disposition: "ready", reason: "Ready to invite" };
+    return { row, disposition: InvitationDisposition.Ready, reason: "Ready to invite" };
   });
 }

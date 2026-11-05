@@ -18,6 +18,7 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import {
+  InvitationDisposition,
   InvitationRow,
   MAX_BULK_INVITATIONS,
   parseInvitationRows,
@@ -28,7 +29,12 @@ import {
 import { runAccountBatch } from "./runAccountBatch";
 import "./InvitePeopleModal.scss";
 
-type Phase = "edit" | "review" | "sending" | "results";
+enum InvitationPhase {
+  Edit = "Edit",
+  Review = "Review",
+  Sending = "Sending",
+  Results = "Results",
+}
 type Outcome = {
   row: InvitationRow;
   description: string;
@@ -59,7 +65,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
   onManagePermissions,
 }) => {
   const [rows, setRows] = useState<InvitationRow[]>([emptyRow(1)]);
-  const [phase, setPhase] = useState<Phase>("edit");
+  const [phase, setPhase] = useState<InvitationPhase>(InvitationPhase.Edit);
   const [showErrors, setShowErrors] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteValue, setPasteValue] = useState("");
@@ -74,16 +80,16 @@ export const InvitePeopleModal: React.FC<Props> = ({
     () => previewInvitations(rows.filter((row) => !isEmptyInvitationRow(row)), existingUsers),
     [rows, existingUsers]
   );
-  const ready = preview.filter((item) => item.disposition === "ready");
-  const skipped = preview.filter((item) => item.disposition === "skipped");
-  const invalid = preview.filter((item) => item.disposition === "invalid");
+  const ready = preview.filter((item) => item.disposition === InvitationDisposition.Ready);
+  const skipped = preview.filter((item) => item.disposition === InvitationDisposition.Skipped);
+  const invalid = preview.filter((item) => item.disposition === InvitationDisposition.Invalid);
 
   useEffect(() => {
     if (!open) return;
     openedAccountId.current = RequestRuntimeState.getCurrentAccountId();
     nextId.current = 2;
     setRows([emptyRow(1)]);
-    setPhase("edit");
+    setPhase(InvitationPhase.Edit);
     setShowErrors(false);
     setPasteOpen(false);
     setPasteValue("");
@@ -94,7 +100,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
   }, [open]);
 
   const dismiss = () => {
-    if (phase !== "sending") onClose();
+    if (phase !== InvitationPhase.Sending) onClose();
   };
 
   const changeRow = (
@@ -164,7 +170,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
       return;
     }
     setNotice("");
-    setPhase("review");
+    setPhase(InvitationPhase.Review);
   };
 
   const outcomeForInvitation = (
@@ -285,7 +291,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
       skipped.map(({ row, reason }) => ({ row, description: reason }))
     );
     setProcessed(0);
-    setPhase("sending");
+    setPhase(InvitationPhase.Sending);
     const completedIds = new Set<number>();
 
     await runAccountBatch(
@@ -319,7 +325,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
         })),
       ]);
     }
-    setPhase("results");
+    setPhase(InvitationPhase.Results);
     try {
       await onChanged();
     } catch {
@@ -333,13 +339,13 @@ export const InvitePeopleModal: React.FC<Props> = ({
     ? "Review " + preview.length + " " + (preview.length === 1 ? "person" : "people")
     : "Review invitations";
   const title =
-    phase === "results"
+    phase === InvitationPhase.Results
       ? "Invitation results"
-      : phase === "review"
+      : phase === InvitationPhase.Review
       ? "Review invitations"
       : "Invite people";
   const displayed: Outcome[] =
-    phase === "results"
+    phase === InvitationPhase.Results
       ? outcomes
       : preview.map((item) => ({ row: item.row, description: item.reason }));
 
@@ -348,23 +354,23 @@ export const InvitePeopleModal: React.FC<Props> = ({
       open={open}
       header={title}
       onClose={dismiss}
-      dismissible={phase !== "sending"}
+      dismissible={phase !== InvitationPhase.Sending}
       closeOnBackdrop={false}
       width={800}
       height="auto"
       maxHeight="90dvh"
       className="invite-people-modal"
       footer={
-        phase === "sending" ? undefined : (
+        phase === InvitationPhase.Sending ? undefined : (
           <div className="invite-people-modal__footer">
             <PlanarianButton
               icon={<CloseOutlined />}
               alwaysShowChildren
               onClick={dismiss}
             >
-              {phase === "results" ? "Close" : "Cancel"}
+              {phase === InvitationPhase.Results ? "Close" : "Cancel"}
             </PlanarianButton>
-            {phase === "edit" && (
+            {phase === InvitationPhase.Edit && (
               <PlanarianButton
                 type="primary"
                 icon={<CheckOutlined />}
@@ -376,12 +382,12 @@ export const InvitePeopleModal: React.FC<Props> = ({
                 {reviewLabel}
               </PlanarianButton>
             )}
-            {phase === "review" && (
+            {phase === InvitationPhase.Review && (
               <>
                 <PlanarianButton
                   alwaysShowChildren
                   icon={<CloseOutlined />}
-                  onClick={() => setPhase("edit")}
+                  onClick={() => setPhase(InvitationPhase.Edit)}
                 >
                   Back to editing
                 </PlanarianButton>
@@ -401,7 +407,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                 </PlanarianButton>
               </>
             )}
-            {phase === "results" && (
+            {phase === InvitationPhase.Results && (
               <PlanarianButton
                 alwaysShowChildren
                 icon={<PlusOutlined />}
@@ -409,7 +415,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                   nextId.current = 2;
                   setRows([emptyRow(1)]);
                   setOutcomes([]);
-                  setPhase("edit");
+                  setPhase(InvitationPhase.Edit);
                   setShowErrors(false);
                 }}
               >
@@ -420,7 +426,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
         )
       }
     >
-      {phase === "edit" && (
+      {phase === InvitationPhase.Edit && (
         <>
           <Typography.Paragraph type="secondary">
             Enter first name, last name, and email for each person. You can also
@@ -429,7 +435,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
           <div className="invite-people-modal__rows">
             {rows.map((row, index) => {
               const item = preview.find((entry) => entry.row.id === row.id);
-              const highlight = showErrors && item?.disposition === "invalid";
+              const highlight = showErrors && item?.disposition === InvitationDisposition.Invalid;
               return (
                 <div key={row.id} className="invite-people-modal__row">
                   <span className="invite-people-modal__number">
@@ -474,8 +480,8 @@ export const InvitePeopleModal: React.FC<Props> = ({
                       )
                     }
                   />
-                  {item && item.disposition !== "ready" &&
-                    (showErrors || item.disposition === "skipped") && (
+                  {item && item.disposition !== InvitationDisposition.Ready &&
+                    (showErrors || item.disposition === InvitationDisposition.Skipped) && (
                       <div className="invite-people-modal__row-message" role="status">
                         {item.reason}
                       </div>
@@ -548,14 +554,14 @@ export const InvitePeopleModal: React.FC<Props> = ({
         </>
       )}
 
-      {(phase === "review" || phase === "sending" || phase === "results") && (
+      {(phase === InvitationPhase.Review || phase === InvitationPhase.Sending || phase === InvitationPhase.Results) && (
         <div className="invite-people-modal__review">
           <Typography.Paragraph>
-            {phase === "results"
+            {phase === InvitationPhase.Results
               ? `${outcomes.length} of ${preview.length} processed or skipped.`
               : `${ready.length} ready to invite · ${skipped.length} to skip.`}
           </Typography.Paragraph>
-          {phase === "sending" && (
+          {phase === InvitationPhase.Sending && (
             <Typography.Text role="status">
               Processing {processed} of {ready.length} invitations…
             </Typography.Text>
@@ -576,7 +582,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                   className={item.failed ? "invite-people-modal__failure" : ""}
                 >
                   {item.description}
-                  {phase === "results" && item.failed && (
+                  {phase === InvitationPhase.Results && item.failed && (
                     <PlanarianButton
                       type="link"
                       size="small"
@@ -594,7 +600,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                       {item.userId ? "Resend email" : "Retry invitation"}
                     </PlanarianButton>
                   )}
-                  {phase === "results" && item.userId && !item.failed && (
+                  {phase === InvitationPhase.Results && item.userId && !item.failed && (
                     <PlanarianButton
                       type="link"
                       size="small"

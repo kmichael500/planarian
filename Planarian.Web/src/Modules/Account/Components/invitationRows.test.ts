@@ -1,6 +1,7 @@
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import {
+  InvitationDisposition,
   MAX_BULK_INVITATIONS,
   parseInvitationRows,
   previewInvitations,
@@ -97,10 +98,10 @@ describe("bulk invitation parser", () => {
       []
     );
     expect(preview.map((item) => item.disposition)).toEqual([
-      "ready",
-      "skipped",
-      "invalid",
-      "invalid",
+      InvitationDisposition.Ready,
+      InvitationDisposition.Skipped,
+      InvitationDisposition.Invalid,
+      InvitationDisposition.Invalid,
     ]);
     expect(preview[1].reason).toContain("Duplicate");
   });
@@ -121,13 +122,13 @@ describe("bulk invitation parser", () => {
       people
     );
     expect(result.map((item) => item.disposition)).toEqual([
-      "skipped",
-      "skipped",
-      "skipped",
-      "ready",
+      InvitationDisposition.Skipped,
+      InvitationDisposition.Skipped,
+      InvitationDisposition.Skipped,
+      InvitationDisposition.Ready,
     ]);
     expect(result[0].reason).toContain("member");
     expect(result[1].reason).toContain("invited");
-    expect(result[2].reason).toContain("Restore");
+    expect(result[2].reason).toContain("Enable access");
   });
 });

@@ -79,7 +79,7 @@ describe("AccountAccessChangeModal", () => {
   });
   const renderModal = (
     members = people,
-    action: AccountAccessAction = "disable"
+    action: AccountAccessAction = AccountAccessAction.Disable
   ) => {
     const onFinished = jest.fn().mockResolvedValue(undefined);
     render(
@@ -102,7 +102,7 @@ describe("AccountAccessChangeModal", () => {
     });
     renderModal(
       [{ ...people[1], accessDisabledOn: "2026-10-30T12:00:00Z" }],
-      "enable"
+      AccountAccessAction.Enable
     );
     const dialog = screen.getByRole("dialog", { name: "Enable access?" });
     expect(dialog).toHaveTextContent("Active Member will regain access");
@@ -118,7 +118,7 @@ describe("AccountAccessChangeModal", () => {
       expect(changeAccess).toHaveBeenCalledWith(
         "person0002",
         "account0001",
-        "enable",
+        AccountAccessAction.Enable,
         "Welcome back.",
         true
       )
@@ -130,12 +130,12 @@ describe("AccountAccessChangeModal", () => {
     ).toBeInTheDocument();
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "disable"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Disable
       )
     ).toHaveLength(0);
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "revoke"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Revoke
       )
     ).toHaveLength(0);
   });
@@ -143,7 +143,7 @@ describe("AccountAccessChangeModal", () => {
   it("enables access without sending an email when notification is unchecked", async () => {
     renderModal(
       [{ ...people[1], accessDisabledOn: "2026-10-30T12:00:00Z" }],
-      "enable"
+      AccountAccessAction.Enable
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "Notify by email" }));
     expect(
@@ -154,7 +154,7 @@ describe("AccountAccessChangeModal", () => {
       expect(changeAccess).toHaveBeenCalledWith(
         "person0002",
         "account0001",
-        "enable",
+        AccountAccessAction.Enable,
         undefined,
         false
       )
@@ -165,7 +165,7 @@ describe("AccountAccessChangeModal", () => {
   it("refuses enable when the selected account changes before confirmation", () => {
     renderModal(
       [{ ...people[1], accessDisabledOn: "2026-10-30T12:00:00Z" }],
-      "enable"
+      AccountAccessAction.Enable
     );
     RequestRuntimeState.setCurrentAccountId("other00001");
     fireEvent.click(screen.getByRole("button", { name: "Enable access" }));
@@ -174,13 +174,13 @@ describe("AccountAccessChangeModal", () => {
     );
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "enable"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Enable
       )
     ).toHaveLength(0);
   });
 
   it("revokes a mixed batch only after explicit confirmation, preserving email semantics", async () => {
-    const onFinished = renderModal(people, "revoke");
+    const onFinished = renderModal(people, AccountAccessAction.Revoke);
     const confirm = screen.getByRole("button", { name: "Revoke memberships" });
     expect(confirm).toBeDisabled();
     expect(
@@ -210,20 +210,20 @@ describe("AccountAccessChangeModal", () => {
     expect(changeAccess).toHaveBeenCalledWith(
       "person0001",
       "account0001",
-      "revoke",
+      AccountAccessAction.Revoke,
       undefined,
       false
     );
     expect(changeAccess).toHaveBeenCalledWith(
       "person0002",
       "account0001",
-      "revoke",
+      AccountAccessAction.Revoke,
       expect.stringContaining("access to Test Survey has been removed"),
       true
     );
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "disable"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Disable
       )
     ).toHaveLength(0);
     expect(await screen.findByText("Membership revoked.")).toBeInTheDocument();
@@ -234,7 +234,7 @@ describe("AccountAccessChangeModal", () => {
     changeAccess.mockRejectedValueOnce({ message: "Last administrator." });
     renderModal(
       [{ ...people[1], accessDisabledOn: "2026-11-01T12:00:00Z" }],
-      "revoke"
+      AccountAccessAction.Revoke
     );
     fireEvent.change(
       screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }),
@@ -253,7 +253,7 @@ describe("AccountAccessChangeModal", () => {
   });
 
   it("refuses bulk revocation when the selected account changed", () => {
-    renderModal(people, "revoke");
+    renderModal(people, AccountAccessAction.Revoke);
     fireEvent.change(
       screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }),
       {
@@ -267,7 +267,7 @@ describe("AccountAccessChangeModal", () => {
     );
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "revoke"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Revoke
       )
     ).toHaveLength(0);
   });
@@ -292,14 +292,14 @@ describe("AccountAccessChangeModal", () => {
     expect(changeAccess).toHaveBeenCalledWith(
       "person0001",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       undefined,
       false
     );
     expect(changeAccess).toHaveBeenCalledWith(
       "person0002",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       defaultMessage,
       true
     );
@@ -325,7 +325,7 @@ describe("AccountAccessChangeModal", () => {
       3,
       "person0001",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       undefined,
       false
     );
@@ -343,14 +343,14 @@ describe("AccountAccessChangeModal", () => {
     expect(changeAccess).toHaveBeenCalledWith(
       "person0002",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       "Membership has ended.",
       true
     );
     expect(changeAccess).toHaveBeenCalledWith(
       "person0001",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       undefined,
       false
     );
@@ -363,7 +363,7 @@ describe("AccountAccessChangeModal", () => {
     const dialog = (accountName: string, open = true) => (
       <Permissions accountName={accountName}>
         <AccountAccessChangeModal
-          action="disable"
+          action={AccountAccessAction.Disable}
           open={open}
           selected={people}
           onClose={jest.fn()}
@@ -391,7 +391,7 @@ describe("AccountAccessChangeModal", () => {
       expect(changeAccess).toHaveBeenCalledWith(
         "person0002",
         "account0001",
-        "disable",
+        AccountAccessAction.Disable,
         "Membership review complete.",
         true
       )
@@ -415,7 +415,7 @@ describe("AccountAccessChangeModal", () => {
     ).toBeDisabled();
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "disable"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Disable
       )
     ).toHaveLength(0);
   });
@@ -447,7 +447,7 @@ describe("AccountAccessChangeModal", () => {
       1,
       "person0002",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       undefined,
       false
     );
@@ -457,7 +457,7 @@ describe("AccountAccessChangeModal", () => {
       2,
       "person0002",
       "account0001",
-      "disable",
+      AccountAccessAction.Disable,
       undefined,
       false
     );
@@ -474,7 +474,7 @@ describe("AccountAccessChangeModal", () => {
       expect(changeAccess).toHaveBeenCalledWith(
         "person0001",
         "account0001",
-        "disable",
+        AccountAccessAction.Disable,
         undefined,
         false
       )
@@ -509,7 +509,7 @@ describe("AccountAccessChangeModal", () => {
     );
     expect(
       changeAccess.mock.calls.filter(
-        ([, , requestedAction]) => requestedAction === "disable"
+        ([, , requestedAction]) => requestedAction === AccountAccessAction.Disable
       )
     ).toHaveLength(0);
   });

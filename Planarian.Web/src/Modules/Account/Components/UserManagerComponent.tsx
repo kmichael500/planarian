@@ -44,7 +44,12 @@ import "./UserManagerComponent.scss";
 const { Text } = Typography;
 const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
-type UserStatusFilter = "all" | "accepted" | "pending" | "disabled";
+enum UserStatusFilter {
+  All = "All",
+  Accepted = "Accepted",
+  Pending = "Pending",
+  Disabled = "Disabled",
+}
 type UserSortBy =
   | "fullName"
   | "emailAddress"
@@ -63,7 +68,7 @@ const UserManagerComponent: React.FC = () => {
     action: AccountAccessAction;
   } | null>(null);
   const [searchText, setSearchText] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>(UserStatusFilter.All);
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
   const [sortDescending, setSortDescending] = useState(true);
   const [invitationHistoryVisible, setInvitationHistoryVisible] =
@@ -164,8 +169,8 @@ const UserManagerComponent: React.FC = () => {
   };
 
   const getUserStatus = (user: UserManagerGridVm): UserStatusFilter => {
-    if (user.accessDisabledOn) return "disabled";
-    return user.hasActiveInvitation ? "pending" : "accepted";
+    if (user.accessDisabledOn) return UserStatusFilter.Disabled;
+    return user.hasActiveInvitation ? UserStatusFilter.Pending : UserStatusFilter.Accepted;
   };
 
   const sortOptions: SelectListItem<string>[] = [
@@ -186,7 +191,7 @@ const UserManagerComponent: React.FC = () => {
         user.emailAddress.toLowerCase().includes(searchText.toLowerCase())
     )
     .filter(
-      (user) => statusFilter === "all" || getUserStatus(user) === statusFilter
+      (user) => statusFilter === UserStatusFilter.All || getUserStatus(user) === statusFilter
     )
     .sort((a, b) => {
       let comparison = 0;
@@ -237,7 +242,7 @@ const UserManagerComponent: React.FC = () => {
 
   const reviewAccessChanges = (
     targets: UserManagerGridVm[],
-    action: AccountAccessAction = "disable"
+    action: AccountAccessAction = AccountAccessAction.Disable
   ) => {
     bulkChangesFinished.current = false;
     setAccessChange({ selected: targets, action });
@@ -276,7 +281,7 @@ const UserManagerComponent: React.FC = () => {
             icon={<RedoOutlined />}
             permissionKey={PermissionKey.Admin}
             type="default"
-            onClick={() => reviewAccessChanges([user], "enable")}
+            onClick={() => reviewAccessChanges([user], AccountAccessAction.Enable)}
           >
             Enable access
           </PlanarianButton>
@@ -284,7 +289,7 @@ const UserManagerComponent: React.FC = () => {
       });
     } else if (user.userId !== currentUser?.id) {
       actions.push({
-        key: isPending ? "remove-invitation" : "disable",
+        key: isPending ? "remove-invitation" : AccountAccessAction.Disable,
         label: isPending ? "Remove invitation" : "Disable access",
         render: (
           <PlanarianButton
@@ -376,7 +381,7 @@ const UserManagerComponent: React.FC = () => {
               type="link"
               icon={<DeleteOutlined />}
               aria-label="Revoke membership"
-              onClick={() => reviewAccessChanges([user], "revoke")}
+              onClick={() => reviewAccessChanges([user], AccountAccessAction.Revoke)}
             >
               Revoke membership
             </PlanarianButton>
@@ -419,10 +424,10 @@ const UserManagerComponent: React.FC = () => {
                     setSelectedIds([]);
                   }}
                   options={[
-                    { label: "All statuses", value: "all" },
-                    { label: "Accepted", value: "accepted" },
-                    { label: "Pending", value: "pending" },
-                    { label: "Access disabled", value: "disabled" },
+                    { label: "All statuses", value: UserStatusFilter.All },
+                    { label: "Accepted", value: UserStatusFilter.Accepted },
+                    { label: "Pending", value: UserStatusFilter.Pending },
+                    { label: "Access disabled", value: UserStatusFilter.Disabled },
                   ]}
                 />
                 <SplitSortControl
@@ -484,7 +489,7 @@ const UserManagerComponent: React.FC = () => {
               permissionKey={PermissionKey.Admin}
               disabled={selectedUsers.length === 0 ||
                 selectedUsers.some((user) => !!user.accessDisabledOn)}
-              onClick={() => reviewAccessChanges([...selectedUsers], "disable")}
+              onClick={() => reviewAccessChanges([...selectedUsers], AccountAccessAction.Disable)}
             >
               Disable access
             </PlanarianButton>
@@ -495,7 +500,7 @@ const UserManagerComponent: React.FC = () => {
               permissionKey={PermissionKey.Admin}
               disabled={selectedUsers.length === 0 ||
                 selectedUsers.some((user) => !user.accessDisabledOn || user.hasActiveInvitation)}
-              onClick={() => reviewAccessChanges([...selectedUsers], "enable")}
+              onClick={() => reviewAccessChanges([...selectedUsers], AccountAccessAction.Enable)}
             >
               Enable access
             </PlanarianButton>
@@ -506,7 +511,7 @@ const UserManagerComponent: React.FC = () => {
               permissionKey={PermissionKey.Admin}
               danger
               disabled={selectedUsers.length === 0}
-              onClick={() => reviewAccessChanges([...selectedUsers], "revoke")}
+              onClick={() => reviewAccessChanges([...selectedUsers], AccountAccessAction.Revoke)}
             >
               Revoke memberships
             </PlanarianButton>
@@ -551,7 +556,7 @@ const UserManagerComponent: React.FC = () => {
       />
       <AccountAccessChangeModal
         open={accessChange !== null}
-        action={accessChange?.action ?? "disable"}
+        action={accessChange?.action ?? AccountAccessAction.Disable}
         selected={accessChange?.selected ?? []}
         onClose={() => {
           setAccessChange(null);

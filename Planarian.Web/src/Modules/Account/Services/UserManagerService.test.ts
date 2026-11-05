@@ -1,4 +1,5 @@
 import { HttpClient } from "../../../Shared/Http/HttpClient";
+import { AccountAccessAction } from "../Models/AccountAccessChangeResultVm";
 import { AccountUserManagerService } from "./UserManagerService";
 
 describe("AccountUserManagerService invitation email history", () => {
@@ -27,7 +28,7 @@ describe("AccountUserManagerService invitation email history", () => {
 describe("AccountUserManagerService access changes", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it.each(["enable", "disable", "revoke"] as const)(
+  it.each([AccountAccessAction.Enable, AccountAccessAction.Disable, AccountAccessAction.Revoke] as const)(
     "sends a %s action to the shared endpoint with its account pinned",
     async (action) => {
       const response = {
@@ -60,14 +61,14 @@ describe("AccountUserManagerService access changes", () => {
     await AccountUserManagerService.ChangeAccess(
       "user123456",
       "account0001",
-      "enable",
+      AccountAccessAction.Enable,
       "Not to be sent",
       false
     );
 
     expect(post).toHaveBeenCalledWith(
       "api/account/user-manager/user123456/access-change",
-      { action: "enable", notificationMessage: null, sendEmail: false },
+      { action: AccountAccessAction.Enable, notificationMessage: null, sendEmail: false },
       { headers: { "x-account": "account0001" } }
     );
   });
