@@ -4,9 +4,10 @@ import {
   PlusOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { Input, Modal, Typography } from "antd";
+import { Input, Typography } from "antd";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import {
   ApiErrorResponse,
   ApiExceptionType,
@@ -336,16 +337,82 @@ export const InvitePeopleModal: React.FC<Props> = ({
       : preview.map((item) => ({ row: item.row, description: item.reason }));
 
   return (
-    <Modal
+    <PlanarianModal
       open={open}
-      title={title}
-      onCancel={dismiss}
-      maskClosable={false}
-      closable={phase !== "sending"}
-      footer={null}
+      header={title}
+      onClose={dismiss}
+      dismissible={phase !== "sending"}
+      closeOnBackdrop={false}
       width={800}
-      destroyOnClose
+      height="auto"
+      maxHeight="90dvh"
       className="invite-people-modal"
+      footer={
+        phase === "sending" ? undefined : (
+          <div className="invite-people-modal__footer">
+            <PlanarianButton
+              icon={<CloseOutlined />}
+              alwaysShowChildren
+              onClick={dismiss}
+            >
+              {phase === "results" ? "Close" : "Cancel"}
+            </PlanarianButton>
+            {phase === "edit" && (
+              <PlanarianButton
+                type="primary"
+                icon={<CheckOutlined />}
+                alwaysShowChildren
+                aria-label={`Review ${rows.length} ${
+                  rows.length === 1 ? "person" : "people"
+                }`}
+                onClick={review}
+              >
+                Review {rows.length} {rows.length === 1 ? "person" : "people"}
+              </PlanarianButton>
+            )}
+            {phase === "review" && (
+              <>
+                <PlanarianButton
+                  alwaysShowChildren
+                  icon={<CloseOutlined />}
+                  onClick={() => setPhase("edit")}
+                >
+                  Back to editing
+                </PlanarianButton>
+                <PlanarianButton
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  alwaysShowChildren
+                  permissionKey={PermissionKey.Admin}
+                  aria-label={`Send ${ready.length} ${
+                    ready.length === 1 ? "invitation" : "invitations"
+                  }`}
+                  disabled={ready.length === 0}
+                  onClick={() => void submit()}
+                >
+                  Send {ready.length}{" "}
+                  {ready.length === 1 ? "invitation" : "invitations"}
+                </PlanarianButton>
+              </>
+            )}
+            {phase === "results" && (
+              <PlanarianButton
+                alwaysShowChildren
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  nextId.current = 2;
+                  setRows([emptyRow(1)]);
+                  setOutcomes([]);
+                  setPhase("edit");
+                  setShowErrors(false);
+                }}
+              >
+                Invite more
+              </PlanarianButton>
+            )}
+          </div>
+        )
+      }
     >
       {phase === "edit" && (
         <>
@@ -540,70 +607,6 @@ export const InvitePeopleModal: React.FC<Props> = ({
           {notice}
         </Typography.Text>
       )}
-      <div className="invite-people-modal__footer">
-        {phase !== "sending" && (
-          <PlanarianButton
-            icon={<CloseOutlined />}
-            alwaysShowChildren
-            onClick={dismiss}
-          >
-            {phase === "results" ? "Close" : "Cancel"}
-          </PlanarianButton>
-        )}
-        {phase === "edit" && (
-          <PlanarianButton
-            type="primary"
-            icon={<CheckOutlined />}
-            alwaysShowChildren
-            aria-label={`Review ${rows.length} ${
-              rows.length === 1 ? "person" : "people"
-            }`}
-            onClick={review}
-          >
-            Review {rows.length} {rows.length === 1 ? "person" : "people"}
-          </PlanarianButton>
-        )}
-        {phase === "review" && (
-          <>
-            <PlanarianButton
-              alwaysShowChildren
-              icon={<CloseOutlined />}
-              onClick={() => setPhase("edit")}
-            >
-              Back to editing
-            </PlanarianButton>
-            <PlanarianButton
-              type="primary"
-              icon={<CheckOutlined />}
-              alwaysShowChildren
-              permissionKey={PermissionKey.Admin}
-              aria-label={`Send ${ready.length} ${
-                ready.length === 1 ? "invitation" : "invitations"
-              }`}
-              disabled={ready.length === 0}
-              onClick={() => void submit()}
-            >
-              Send {ready.length}{" "}
-              {ready.length === 1 ? "invitation" : "invitations"}
-            </PlanarianButton>
-          </>
-        )}
-        {phase === "results" && (
-          <PlanarianButton
-            alwaysShowChildren
-            icon={<PlusOutlined />}
-            onClick={() => {
-              nextId.current = 2;
-              setRows([emptyRow(1)]);
-              setOutcomes([]);
-              setPhase("edit");
-              setShowErrors(false);
-            }}
-          >
-            Invite more
-          </PlanarianButton>
-        )}
-      </div>
-    </Modal>
+    </PlanarianModal>
   );
 };

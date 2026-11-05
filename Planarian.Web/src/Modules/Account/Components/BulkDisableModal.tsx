@@ -1,8 +1,9 @@
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Checkbox, Input, Modal, Typography } from "antd";
+import { Checkbox, Input, Typography } from "antd";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
@@ -206,18 +207,46 @@ export const BulkDisableModal: React.FC<Props> = ({
   };
 
   return (
-    <Modal
-      title={
-        phase === "results" ? "Access change results" : "Review access changes"
-      }
+    <PlanarianModal
       open={open}
-      onCancel={dismiss}
-      maskClosable={false}
-      closable={phase !== "processing"}
-      footer={null}
-      className="invite-people-modal"
+      header={phase === "results" ? "Access change results" : "Review access changes"}
+      onClose={dismiss}
+      dismissible={phase !== "processing"}
+      closeOnBackdrop={false}
       width={650}
-      destroyOnClose
+      height="auto"
+      maxHeight="90dvh"
+      className="invite-people-modal"
+      footer={
+        phase === "processing" ? undefined : (
+          <div className="invite-people-modal__footer">
+            <PlanarianButton
+              alwaysShowChildren
+              icon={<CloseOutlined />}
+              onClick={dismiss}
+            >
+              {phase === "results" ? "Close" : "Cancel"}
+            </PlanarianButton>
+            {phase === "review" && (
+              <PlanarianButton
+                type="primary"
+                danger
+                alwaysShowChildren
+                icon={<DeleteOutlined />}
+                permissionKey={PermissionKey.Admin}
+                disabled={
+                  selected.length === 0 ||
+                  (sendEmail && active.length > 0 && !disableMessage.trim())
+                }
+                aria-label={`Confirm changes for ${selected.length}`}
+                onClick={() => void disable()}
+              >
+                Confirm changes for {selected.length}
+              </PlanarianButton>
+            )}
+          </div>
+        )
+      }
     >
       {phase !== "results" && (
         <>
@@ -324,31 +353,6 @@ export const BulkDisableModal: React.FC<Props> = ({
           {error}
         </Typography.Text>
       )}
-      <div className="invite-people-modal__footer">
-        {phase !== "processing" && (
-          <PlanarianButton
-            alwaysShowChildren
-            icon={<CloseOutlined />}
-            onClick={dismiss}
-          >
-            {phase === "results" ? "Close" : "Cancel"}
-          </PlanarianButton>
-        )}
-        {phase === "review" && (
-          <PlanarianButton
-            type="primary"
-            danger
-            alwaysShowChildren
-            icon={<DeleteOutlined />}
-            permissionKey={PermissionKey.Admin}
-            disabled={selected.length === 0 || (sendEmail && active.length > 0 && !disableMessage.trim())}
-            aria-label={`Confirm changes for ${selected.length}`}
-            onClick={() => void disable()}
-          >
-            Confirm changes for {selected.length}
-          </PlanarianButton>
-        )}
-      </div>
-    </Modal>
+    </PlanarianModal>
   );
 };

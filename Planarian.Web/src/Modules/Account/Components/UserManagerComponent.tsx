@@ -3,7 +3,6 @@ import {
   Checkbox,
   Input,
   message,
-  Modal,
   Select,
   Typography,
 } from "antd";
@@ -25,6 +24,7 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import {
@@ -593,12 +593,15 @@ const UserManagerComponent: React.FC = () => {
           navigate(`${userId}/permissions/${PermissionKey.View}`);
         }}
       />
-      <Modal
+      <PlanarianModal
         open={membershipRevocationTarget !== null}
-        title="Revoke membership?"
-        onCancel={closeMembershipRevocation}
-        closable={!revokingMembership}
-        maskClosable={!revokingMembership}
+        header="Revoke membership?"
+        onClose={closeMembershipRevocation}
+        dismissible={!revokingMembership}
+        closeOnBackdrop={!revokingMembership}
+        width={600}
+        height="auto"
+        maxHeight="90dvh"
         footer={[
           <PlanarianButton
             key="cancel"
@@ -664,7 +667,7 @@ const UserManagerComponent: React.FC = () => {
           disabled={revokingMembership}
           autoComplete="off"
         />
-      </Modal>
+      </PlanarianModal>
       <BulkDisableModal
         open={disableTargets !== null}
         selected={disableTargets ?? []}

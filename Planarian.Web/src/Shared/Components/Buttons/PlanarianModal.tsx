@@ -8,6 +8,9 @@ const { useBreakpoint } = Grid;
 interface DialogModalProps {
   open: boolean;
   onClose?: () => void;
+  dismissible?: boolean;
+  closeOnBackdrop?: boolean;
+  className?: string;
   header?: string | React.ReactNode | (string | React.ReactNode)[];
   footer?: string | React.ReactNode | (string | React.ReactNode)[];
   footerStyle?: React.CSSProperties; // New prop for footer style override
@@ -18,6 +21,7 @@ interface DialogModalProps {
   width?: string | number;
 
   height?: string | number;
+  maxHeight?: string | number;
 
   fullScreen?: boolean;
 }
@@ -25,6 +29,9 @@ interface DialogModalProps {
 export function PlanarianModal({
   open,
   onClose,
+  dismissible = true,
+  closeOnBackdrop = true,
+  className,
   header: headerItems,
   footer: footerItems,
   footerStyle,
@@ -33,9 +40,12 @@ export function PlanarianModal({
   children,
   width,
   height,
+  maxHeight,
   fullScreen = false,
 }: DialogModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const scrollPositionRef = useRef<number>(0);
 
@@ -74,7 +84,7 @@ export function PlanarianModal({
 
     setShouldRenderChildren(false);
 
-    onClose?.();
+    if (openRef.current) onClose?.();
   };
 
   useEffect(() => {
@@ -93,11 +103,7 @@ export function PlanarianModal({
       // Show the <dialog> now
       dialog.showModal();
 
-      // Wait until next frame so the dialog is definitely "open",
-      // then render children
-      requestAnimationFrame(() => {
-        setShouldRenderChildren(true);
-      });
+      setShouldRenderChildren(true);
     } else if (!open && dialog.open) {
       // Hide children right away
       setShouldRenderChildren(false);
@@ -126,16 +132,26 @@ export function PlanarianModal({
     };
   }, [onClose]);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const handleCancel = (event: Event) => {
+      if (!dismissible) event.preventDefault();
+    };
+    dialog.addEventListener("cancel", handleCancel);
+    return () => dialog.removeEventListener("cancel", handleCancel);
+  }, [dismissible]);
+
   const handleDialogClick: React.MouseEventHandler<HTMLDialogElement> = (e) => {
-    if (dialogRef.current && e.target === dialogRef.current) {
-      // The user clicked outside the content
+    if (dismissible && closeOnBackdrop && e.target === e.currentTarget) {
       onClose?.();
     }
   };
 
   return (
     <dialog
-      className="planarian-modal"
+      className={["planarian-modal", className].filter(Boolean).join(" ")}
+      aria-label={typeof leftHeaderItem === "string" ? leftHeaderItem : undefined}
       ref={dialogRef}
       onClick={handleDialogClick}
       style={{
@@ -143,13 +159,13 @@ export function PlanarianModal({
         top: finalFullScreen ? "unset" : "50%",
         left: finalFullScreen ? "unset" : "50%",
         transform: finalFullScreen ? "none" : "translate(-50%, -50%)",
-        // Use flex layout to pin header/footer and scroll the content area
-        display: "flex",
+        // A closed dialog must be hidden even in environments that lack dialog CSS support.
+        display: open ? "flex" : "none",
         flexDirection: "column",
         width: computedWidth,
         height: computedHeight,
         maxWidth: finalFullScreen ? "100%" : computedWidth,
-        maxHeight: finalFullScreen ? "100%" : computedHeight,
+        maxHeight: finalFullScreen ? "100%" : maxHeight ?? computedHeight,
         margin: 0,
         border: "none",
         borderRadius: finalFullScreen ? 0 : "8px",
@@ -197,14 +213,16 @@ export function PlanarianModal({
             {rightHeaderItems.map((item, index) => (
               <div key={index}>{item}</div>
             ))}
-            <PlanarianButton
-              icon={<CloseOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShouldRenderChildren(false);
-                dialogRef.current?.close();
-              }}
-            />
+            {dismissible && (
+              <PlanarianButton
+                icon={<CloseOutlined />}
+                aria-label="Close dialog"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dialogRef.current?.close();
+                }}
+              />
+            )}
           </Space>
         </div>
       </header>
@@ -212,6 +230,7 @@ export function PlanarianModal({
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: "auto",
           padding: "1rem",
           background: "var(--modal-background)",
