@@ -16,22 +16,28 @@ public class FeatureSettingRepository : RepositoryBase
 
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
-        return await GetFeatureSettingsQuery()
+        var featureSettings = await GetFeatureSettingsQuery()
             .Select(e => new FeatureSettingVm
             {
                 Id = e.Id,
                 Key = e.Key,
                 IsEnabled = e.IsEnabled,
-                IsDefault = e.IsDefault,
-                
+                IsDefault = e.IsDefault
             })
             .ToListAsync(cancellationToken: cancellationToken);
+
+        return featureSettings
+            .GroupBy(e => e.Key)
+            .Select(group => group.OrderByDescending(e => e.IsDefault).First())
+            .ToList();
     }
 
     public async Task<FeatureSetting?> GetFeatureSetting(FeatureKey key, CancellationToken cancellationToken)
     {
         var featureSetting = await GetFeatureSettingsQuery()
-            .FirstOrDefaultAsync(e => e.Key == key, cancellationToken);
+            .Where(e => e.Key == key)
+            .OrderByDescending(e => e.IsDefault)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return featureSetting;
     }
