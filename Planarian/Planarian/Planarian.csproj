@@ -36,6 +36,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="../../Templates/Emails/GenericEmailTemplate.html" LogicalName="Planarian.Emails.GenericEmailTemplate.html" />
         <DesignTimeServicesReference Include="Planarian.Migrations.DesignTime.PlanarianDesignTimeServices, Planarian.Migrations" />
     </ItemGroup>
 

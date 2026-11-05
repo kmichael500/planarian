@@ -253,7 +253,6 @@ builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
-builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 builder.Services.AddSingleton<HydrologyMemoryCache>();
 
@@ -274,7 +273,6 @@ builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped(typeof(TagRepository<>));
 builder.Services.AddScoped<UserRepository>();
-builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<MessageLogRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped(typeof(AccountRepository<>));

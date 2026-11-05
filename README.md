@@ -142,6 +142,22 @@ If you want to work on the codebase locally:
 5. Run the backend from Visual Studio or your normal .NET workflow.
 6. Copy `Planarian.Web/.env.example` to the ignored `Planarian.Web/.env` and start the frontend with `npm start`. The normal local topology is `https://localhost:3000` → `https://localhost:7111`; this is required because authentication and antiforgery cookies are `Secure` and `SameSite=Lax`. Do not commit certificate/key material; react-scripts can generate a local development certificate, or configure `SSL_CRT_FILE` and `SSL_KEY_FILE` locally.
 
+## Email sender configuration
+
+Email templates are compiled locally from MJML and shipped with the API. The
+API does not compile MJML at runtime or retrieve email templates from the
+database. All transactional messages are sent as Planarian from
+notifications@{Email:FromDomain} when the optional Email:FromDomain setting
+is configured; otherwise the address defaults to notifications@{Email:Domain}.
+Email:Domain remains the Mailgun sending domain used for delivery tracking.
+Azure App Configuration can set Email:FromDomain using the Development and
+Production labels. The chosen From domain must be authorized for sending
+through Mailgun and have appropriate email authentication configured.
+
+The pending v33 migration drops MessageTypes, including its existing sender
+configuration and obsolete MJML/HTML fields. Its rollback recreates an empty
+table, not the deleted rows. MessageLogs and MessageLogEvents remain intact.
+
 ## Account-access disabling deployment and rollback
 
 Apply migration `v33` before deploying the account-access disabling API. An older API ignores

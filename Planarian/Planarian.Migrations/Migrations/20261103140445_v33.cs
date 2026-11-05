@@ -23,6 +23,9 @@ namespace Planarian.Migrations.Migrations
                 type: "character varying(1000)",
                 maxLength: 1000,
                 nullable: true);
+
+            migrationBuilder.DropTable(
+                name: "MessageTypes");
         }
 
         /// <inheritdoc />
@@ -38,6 +41,50 @@ namespace Planarian.Migrations.Migrations
                 END
                 $planarian$;
                 """);
+
+            migrationBuilder.CreateTable(
+                name: "MessageTypes",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Description = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    Subject = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    FromName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    FromEmail = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    Mjml = table.Column<string>(type: "text", nullable: true),
+                    Html = table.Column<string>(type: "text", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MessageTypes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MessageTypes_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_MessageTypes_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageTypes_CreatedByUserId",
+                table: "MessageTypes",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageTypes_ModifiedByUserId",
+                table: "MessageTypes",
+                column: "ModifiedByUserId");
 
             migrationBuilder.DropColumn(
                 name: "AccessDisabledMessage",

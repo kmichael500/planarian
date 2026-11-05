@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -72,12 +73,12 @@ public sealed class EmailServiceResilienceTests
     {
         var requestUser = new RequestUser(dbContext);
         return new EmailService(
-            new MessageTypeRepository(dbContext, requestUser, null!),
             requestUser,
             null!,
             new ClientUrlBuilder(origin),
             new MessageLogRepository(dbContext, requestUser),
             new EmailOptions { Domain = "mg.example.com" },
+            new ServerOptions { SupportName = "Example Support", SupportEmail = "help@example.com" },
             null!,
             NullLogger<EmailService>.Instance);
     }

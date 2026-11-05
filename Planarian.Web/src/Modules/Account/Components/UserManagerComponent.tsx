@@ -341,7 +341,7 @@ const UserManagerComponent: React.FC = () => {
       });
     } else if (user.userId !== currentUser?.id) {
       actions.push({
-        key: "remove",
+        key: isPending ? "remove-invitation" : "disable",
         label: isPending ? "Remove invitation" : "Disable access",
         render: (
           <PlanarianButton

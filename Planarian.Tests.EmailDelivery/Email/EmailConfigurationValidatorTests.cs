@@ -20,6 +20,18 @@ public sealed class EmailConfigurationValidatorTests
     }
 
     [Fact]
+    public void HostedDeploymentWithMailgunConfigurationIsValid()
+    {
+        var options = new EmailOptions
+        {
+            Domain = "mg.example.org",
+            WebhookSigningKey = "signing-key"
+        };
+
+        EmailConfigurationValidator.Validate(options, isHostedDeployment: true);
+    }
+
+    [Fact]
     public void LocalDevelopmentMayOmitWebhookSigningKey()
     {
         var options = new EmailOptions { Domain = "mg.example.com" };

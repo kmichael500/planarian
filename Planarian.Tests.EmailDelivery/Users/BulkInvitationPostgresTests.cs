@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.FileProviders;
@@ -25,7 +26,6 @@ public sealed class BulkInvitationPostgresTests
     private const string AccountId = "bulkacc001";
     private const string OtherAccountId = "bulkacc002";
     private const string AdministratorId = "admin00001";
-    private static readonly HttpClient TestHttpClient = new();
 
     [Fact]
     public async Task RepeatedInvitationReturnsExistingPendingIdentityWithoutAnotherUser()
@@ -145,13 +145,6 @@ public sealed class BulkInvitationPostgresTests
                     new User("Member", "Example", "member@example.test") { Id = memberId },
                     new User("Pending", "Example", "pending@example.test")
                         { Id = pendingId, IsTemporary = true });
-                seed.MessageTypes.Add(new MessageType
-                {
-                    Key = "GenericEmail", Type = "Email",
-                    Description = "Isolated generic email template",
-                    FromName = "Planarian", FromEmail = "planarian@example.test",
-                    Html = "<h1>{{header}}</h1>{{#each messages}}<p>{{this}}</p>{{/each}}"
-                });
                 await seed.SaveChangesAsync();
                 actor.AccountId = AccountId;
                 seed.AccountUsers.AddRange(
@@ -195,6 +188,8 @@ public sealed class BulkInvitationPostgresTests
                 m.Purpose == MessagePurpose.AccountAccessDisabled).ToListAsync());
             Assert.Equal("member@example.test", email.ToEmailAddress);
             Assert.Equal(MessageDeliveryStatus.SendFailed, email.DeliveryStatus);
+            Assert.Equal("Planarian", email.FromName);
+            Assert.Equal("notifications@example.test", email.FromEmailAddress);
             using var substitutions = System.Text.Json.JsonDocument.Parse(email.Substitutions);
             var paragraphs = substitutions.RootElement.GetProperty("messages")
                 .EnumerateArray().Select(element => element.GetString()).ToList();
@@ -256,13 +251,6 @@ public sealed class BulkInvitationPostgresTests
                 var actor = new RequestUser(seed) { Id = AdministratorId };
                 seed.RequestUser = actor;
                 seed.Users.Add(new User("Member", "Example", "member@example.test") { Id = memberId });
-                seed.MessageTypes.Add(new MessageType
-                {
-                    Key = "GenericEmail", Type = "Email",
-                    Description = "Isolated generic email template",
-                    FromName = "Planarian", FromEmail = "planarian@example.test",
-                    Html = "<h1>{{header}}</h1>{{#each messages}}<p>{{this}}</p>{{/each}}"
-                });
                 await seed.SaveChangesAsync();
                 actor.AccountId = AccountId;
                 seed.AccountUsers.Add(new AccountUser
@@ -345,22 +333,58 @@ public sealed class BulkInvitationPostgresTests
         });
     }
 
+    [Theory]
+    [InlineData(null, "notifications@example.test")]
+    [InlineData("planarian.xyz", "notifications@planarian.xyz")]
+    public async Task PasswordChangeEmailUsesFromDomainOverrideAndConfiguredSupport(string? fromDomain, string expectedFromEmail)
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            await using var context = IsolatedPostgresDatabase.NewContext(connectionString);
+            var actor = new RequestUser(context) { Id = AdministratorId, AccountId = AccountId };
+            context.RequestUser = actor;
+
+            await CreateEmailService(context, actor, fromDomain).SendPasswordChangedEmail(
+                "member@example.test", "Example Member");
+
+            var log = Assert.Single(await context.MessageLogs.AsNoTracking().ToListAsync());
+            Assert.Equal(MessagePurpose.PasswordChanged, log.Purpose);
+            Assert.Equal("Planarian", log.FromName);
+            Assert.Equal(expectedFromEmail, log.FromEmailAddress);
+            using var substitutions = System.Text.Json.JsonDocument.Parse(log.Substitutions);
+            var message = Assert.Single(substitutions.RootElement.GetProperty("messages")
+                .EnumerateArray()).GetString();
+            Assert.Equal("Your password was changed. If you did not make this change, please contact Example Support & Assistance immediately at help@example.org.", message);
+            Assert.False(substitutions.RootElement.TryGetProperty("supportEmail", out _));
+            Assert.False(substitutions.RootElement.TryGetProperty("supportName", out _));
+        });
+    }
+
     private static AccountUserManagerService CreateManager(PlanarianDbContext context, RequestUser actor)
     {
         var users = new UserRepository(context, actor);
         var accounts = new AccountRepository(context, actor);
-        var emailOptions = new EmailOptions { Domain = "example.test" };
-        var emailService = new EmailService(
-            new MessageTypeRepository(context, actor, new MjmlService(TestHttpClient, emailOptions)),
-            actor, new NeverSendEmailFactory(),
-            new ClientUrlBuilder(new TestClientRequestOrigin()),
-            new MessageLogRepository(context, actor),
-            emailOptions, new TestHostEnvironment(), NullLogger<EmailService>.Instance);
         return new AccountUserManagerService(
-            users, actor, emailService, accounts,
+            users, actor, CreateEmailService(context, actor), accounts,
             new PermissionRepository(context, actor),
             new AccountAccessService(users, accounts, actor),
             NullLogger<AccountUserManagerService>.Instance);
+    }
+
+    private static EmailService CreateEmailService(PlanarianDbContext context, RequestUser actor,
+        string? fromDomain = null)
+    {
+        var options = new EmailOptions { Domain = "example.test", FromDomain = fromDomain };
+        var serverOptions = new ServerOptions
+        {
+            SupportName = "Example Support & Assistance",
+            SupportEmail = "help@example.org"
+        };
+        return new EmailService(
+            actor, new NeverSendEmailFactory(), new ClientUrlBuilder(new TestClientRequestOrigin()),
+            new MessageLogRepository(context, actor), options, serverOptions,
+            new TestHostEnvironment(), NullLogger<EmailService>.Instance);
     }
 
     private static async Task<Planarian.Modules.Account.Model.InviteUserResultVm> Invite(

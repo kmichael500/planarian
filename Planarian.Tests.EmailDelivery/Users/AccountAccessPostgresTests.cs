@@ -75,7 +75,7 @@ public sealed class AccountAccessPostgresTests
             await SeedTwoAdministrators(connectionString);
             var beforeDelete = new ConcurrentMembershipRevocationBarrier();
 
-            async Task<bool> Remove(string actorId, string targetId)
+            async Task<bool> RevokeMembership(string actorId, string targetId)
             {
                 await using var context = IsolatedPostgresDatabase.NewContext(connectionString, beforeDelete);
                 try
@@ -90,8 +90,8 @@ public sealed class AccountAccessPostgresTests
             }
 
             var results = await Task.WhenAll(
-                Remove(FirstAdminId, SecondAdminId),
-                Remove(SecondAdminId, FirstAdminId));
+                RevokeMembership(FirstAdminId, SecondAdminId),
+                RevokeMembership(SecondAdminId, FirstAdminId));
 
             Assert.Equal(2, beforeDelete.ArrivalCount);
             Assert.Single(results.Where(success => success));
