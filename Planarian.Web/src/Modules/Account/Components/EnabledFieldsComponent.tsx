@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext } from "react";
 import { Form, Checkbox, Col, Row, message } from "antd";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
@@ -79,24 +79,19 @@ export const EnabledFieldsComponent = ({
   };
 
   const filteredFields = featureSettings
-    .filter((feature) =>
-      filterType === "cave"
+    .filter((feature) => {
+      if (!Object.prototype.hasOwnProperty.call(displayNameMap, feature.key)) {
+        return false;
+      }
+
+      return filterType === "cave"
         ? feature.key.startsWith("EnabledFieldCave")
-        : feature.key.startsWith("EnabledFieldEntrance")
-    )
+        : feature.key.startsWith("EnabledFieldEntrance");
+    })
     .sort((a, b) => displayNameMap[a.key].localeCompare(displayNameMap[b.key]));
 
   return (
-    <Form
-      form={form}
-      initialValues={featureSettings.reduce<FeatureFormValues>(
-        (acc, feature) => {
-          acc[feature.key] = feature.isEnabled;
-          return acc;
-        },
-        {}
-      )}
-    >
+    <Form form={form}>
       <Row gutter={[8, 8]}>
         {filteredFields.map((feature) => (
           <Col key={feature.id} xs={24} sm={12} md={12} lg={12} xl={8}>

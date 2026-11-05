@@ -1,14 +1,16 @@
 import React, { ReactNode, useState } from "react";
-import { Modal, Input, message, Typography } from "antd";
+import { Modal, Input, Typography } from "antd";
 import {
   DeleteOutlined,
   CheckCircleOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
 import { PlanarianButton } from "../Buttons/PlanarianButtton";
-import { DeleteButtonComponent } from "../Buttons/DeleteButtonComponent";
 
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
+
+const normalizeConfirmationPhrase = (value: string) =>
+  value.trim().toLowerCase();
 
 interface ConfirmationModalComponentProps {
   onConfirm?: () => Promise<void> | void;
@@ -28,7 +30,7 @@ const ConfirmationModalComponent = ({
   onCancel,
   confirmationWord,
   title = "Are you sure?",
-  modalMessage = "Type the word below to confirm:",
+  modalMessage,
   okText = "Ok",
   cancelText = "Cancel",
   children,
@@ -39,8 +41,12 @@ const ConfirmationModalComponent = ({
   const [inputValue, setInputValue] = useState("");
   const [open, setVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const isConfirmed =
+    normalizeConfirmationPhrase(inputValue) ===
+    normalizeConfirmationPhrase(confirmationWord);
+
   const handleOk = async () => {
-    if (inputValue === confirmationWord) {
+    if (isConfirmed) {
       setIsLoading(true);
 
       if (onConfirm) {
@@ -61,15 +67,16 @@ const ConfirmationModalComponent = ({
     setVisible(false);
   };
 
-  const isConfirmed = inputValue === confirmationWord;
-
   const renderConfirmationWord = () => {
     const chars = confirmationWord.split("");
-    const inputChars = inputValue.split("");
+    const inputChars = inputValue.trim().split("");
     return chars.map((char, index) => {
       let color = "inherit";
       if (index < inputChars.length) {
-        color = char === inputChars[index] ? "green" : "red";
+        color =
+          char.toLowerCase() === inputChars[index].toLowerCase()
+            ? "green"
+            : "red";
       }
       if (isConfirmed) {
         color = "green";
@@ -121,8 +128,10 @@ const ConfirmationModalComponent = ({
       {isLoading && onOkClickRender}
       {(!isLoading || (isLoading && !onOkClickRender)) && (
         <>
-          <Paragraph>{modalMessage}</Paragraph>
-          <Paragraph>Please type the word below to confirm:</Paragraph>
+          {modalMessage !== undefined && modalMessage !== null && (
+            <Paragraph>{modalMessage}</Paragraph>
+          )}
+          <Paragraph>Type the full phrase shown below to confirm.</Paragraph>
           <div style={{ textAlign: "center" }}>
             <Paragraph
               strong

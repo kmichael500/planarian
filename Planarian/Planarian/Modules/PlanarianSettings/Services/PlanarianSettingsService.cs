@@ -9,6 +9,35 @@ namespace Planarian.Modules.PlanarianSettings.Services;
 
 public class PlanarianSettingsService : ServiceBase<PlanarianSettingsRepository>
 {
+    private static readonly (FeatureKey Key, bool IsEnabled)[] InitialAccountFeatureSettings =
+    {
+        (FeatureKey.EnabledFieldCaveAlternateNames, true),
+        (FeatureKey.EnabledFieldCaveLengthFeet, true),
+        (FeatureKey.EnabledFieldCaveDepthFeet, true),
+        (FeatureKey.EnabledFieldCaveMaxPitDepthFeet, true),
+        (FeatureKey.EnabledFieldCaveNumberOfPits, true),
+        (FeatureKey.EnabledFieldCaveReportedOn, true),
+        (FeatureKey.EnabledFieldCaveReportedByNameTags, true),
+        (FeatureKey.EnabledFieldCaveGeologyTags, true),
+        (FeatureKey.EnabledFieldCaveGeologicAgeTags, false),
+        (FeatureKey.EnabledFieldCavePhysiographicProvinceTags, true),
+        (FeatureKey.EnabledFieldCaveBiologyTags, true),
+        (FeatureKey.EnabledFieldCaveArcheologyTags, true),
+        (FeatureKey.EnabledFieldCaveMapStatusTags, true),
+        (FeatureKey.EnabledFieldCaveCartographerNameTags, true),
+        (FeatureKey.EnabledFieldCaveOtherTags, true),
+        (FeatureKey.EnabledFieldCaveNarrative, true),
+        (FeatureKey.EnabledFieldEntranceName, true),
+        (FeatureKey.EnabledFieldEntranceReportedOn, true),
+        (FeatureKey.EnabledFieldEntranceReportedByNameTags, true),
+        (FeatureKey.EnabledFieldEntrancePitDepth, true),
+        (FeatureKey.EnabledFieldEntranceStatusTags, true),
+        (FeatureKey.EnabledFieldEntranceFieldIndicationTags, true),
+        (FeatureKey.EnabledFieldEntranceHydrologyTags, true),
+        (FeatureKey.EnabledFieldEntranceDescription, true),
+        (FeatureKey.EnabledFieldEntranceOtherTags, true)
+    };
+
     public PlanarianSettingsService(PlanarianSettingsRepository repository, RequestUser requestUser) : base(repository,
         requestUser)
     {
@@ -52,14 +81,8 @@ public class PlanarianSettingsService : ServiceBase<PlanarianSettingsRepository>
             ExportEnabled = account.ExportEnabled
         };
 
-        foreach (var key in Enum.GetValues<FeatureKey>())
+        foreach (var (key, isEnabled) in InitialAccountFeatureSettings)
         {
-            var isEnabled = key switch
-            {
-                FeatureKey.EnabledFieldCaveGeologicAgeTags => false,
-                _ => true
-            };
-
             entity.FeatureSettings.Add(new FeatureSetting
             {
                 AccountId = entity.Id,
