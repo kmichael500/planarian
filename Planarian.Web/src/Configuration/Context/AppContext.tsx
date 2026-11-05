@@ -413,12 +413,17 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       })();
     });
 
+    return unregister;
+  }, [applySessionState, clearSessionState, isCurrentSession, loadSession, navigate]);
+
+  // Re-registering the handler (for example after navigation) is not a logout.
+  // Only unmounting this provider invalidates its pending session work.
+  useEffect(() => {
     return () => {
       ++sessionGeneration.current;
-      unregister();
       AuthenticationService.ResetUnauthorizedHandling();
     };
-  }, [applySessionState, clearSessionState, isCurrentSession, loadSession, navigate]);
+  }, []);
 
   useEffect(() => {
     void refreshSession().catch(() => {});

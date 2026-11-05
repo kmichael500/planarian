@@ -1,14 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { message } from "antd";
 import React, { useContext } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
 import { FeatureKey, FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { ProtectedRoutesComponent } from "../../Modules/Authentication/Components/ProtectedRoutesComponent";
 import { UserService } from "../../Modules/User/UserService";
 import { RequestRuntimeState } from "../../Shared/Http/RequestRuntimeState";
 import { ApiExceptionType } from "../../Shared/Models/ApiErrorResponse";
 import { AppService, AppInitializeVm } from "../../Shared/Services/AppService";
+import { AppRederect } from "../Routing/App.routing.redirect";
+import { ClientRoutes } from "../Routing/ClientRoutes.generated";
 import { AppContext, AppProvider } from "./AppContext";
 
 const active = (id: string): AppInitializeVm => ({
@@ -75,6 +78,24 @@ const SessionProbe = () => {
   );
 };
 
+const AccountRoutes = () => {
+  const { isInitialized } = useContext(AppContext);
+  if (!isInitialized) return null;
+
+  return (
+    <Routes>
+      <Route path="/" element={<AppRederect />} />
+      <Route element={<ProtectedRoutesComponent requiresAccount />}>
+        <Route path="/caves/:caveId" element={<span>Protected cave</span>} />
+      </Route>
+      <Route
+        path={ClientRoutes.invitationList.path}
+        element={<span>Account selection</span>}
+      />
+    </Routes>
+  );
+};
+
 describe("AppProvider disabled account recovery", () => {
   beforeEach(() => {
     AuthenticationService.ClearRuntimeSession();
@@ -119,6 +140,43 @@ describe("AppProvider disabled account recovery", () => {
     expect(RequestRuntimeState.getCurrentAccountId()).toBeNull();
     expect(AuthenticationService.GetStoredAccountId("testuser01")).toBe("disabled001");
     expect(initialize).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("finishes account recovery when the protected-route redirect occurs during bootstrap", async () => {
+    const recovery = deferred<AppInitializeVm>();
+    const initialize = jest.spyOn(AppService, "InitializeApp")
+      .mockResolvedValueOnce(active("disabled001"))
+      .mockImplementationOnce(() => recovery.promise);
+
+    render(
+      <MemoryRouter initialEntries={["/caves/old-cave"]}>
+        <AppProvider>
+          <SessionProbe />
+          <AccountRoutes />
+        </AppProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText("Protected cave")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
+
+    await waitFor(() => expect(initialize).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("pathname")).toHaveTextContent(ClientRoutes.invitationList.path)
+    );
+    expect(screen.getByTestId("loading")).toHaveTextContent("true");
+
+    await act(async () => {
+      recovery.resolve(availableWithDisabled);
+      await recovery.promise;
+    });
+
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    expect(screen.getByTestId("initialized")).toHaveTextContent("true");
+    expect(screen.getByTestId("account")).toHaveTextContent("none");
+    expect(screen.getByTestId("available")).toHaveTextContent("active0001");
+    expect(screen.getByText("Account selection")).toBeInTheDocument();
   });
 
   it("remains accountless on reload until the user selects an available account", async () => {
