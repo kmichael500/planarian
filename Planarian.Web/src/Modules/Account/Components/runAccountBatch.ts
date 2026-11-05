@@ -3,7 +3,7 @@ export async function runAccountBatch<T, R>(
   operation: (item: T) => Promise<R>,
   isCurrentAccount: () => boolean,
   onResult: (item: T, result: { value?: R; error?: unknown }) => void,
-  concurrency = 2
+  concurrency = 1
 ): Promise<void> {
   let next = 0;
 

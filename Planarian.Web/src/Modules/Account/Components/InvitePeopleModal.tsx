@@ -305,7 +305,8 @@ export const InvitePeopleModal: React.FC<Props> = ({
         const outcome = outcomeForInvitation(row, result);
         setOutcomes((current) => [...current, outcome]);
         setProcessed((current) => current + 1);
-      }
+      },
+      2
     );
 
     const unprocessed = ready.filter(({ row }) => !completedIds.has(row.id));

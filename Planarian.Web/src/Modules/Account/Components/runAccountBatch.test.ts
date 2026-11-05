@@ -26,7 +26,8 @@ describe("bounded account batch", () => {
       [1, 2, 3, 4],
       operation,
       () => true,
-      (number, result) => results.push([number, result.value])
+      (number, result) => results.push([number, result.value]),
+      2
     );
     expect(calls).toEqual([1, 2]);
     first.resolve(1);
@@ -52,7 +53,8 @@ describe("bounded account batch", () => {
       () => stillCurrent,
       (number) => {
         results.push(number);
-      }
+      },
+      2
     );
     expect(operation).toHaveBeenCalledTimes(2);
     stillCurrent = false;
@@ -61,6 +63,25 @@ describe("bounded account batch", () => {
     await batch;
     expect(operation).toHaveBeenCalledTimes(2);
     expect(results.sort()).toEqual([1, 2]);
+  });
+
+  it("sequences account-access mutations by default so they cannot conflict with each other", async () => {
+    const first = deferred<number>();
+    const calls: number[] = [];
+    const batch = runAccountBatch(
+      [1, 2],
+      (number) => {
+        calls.push(number);
+        return number === 1 ? first.promise : Promise.resolve(number);
+      },
+      () => true,
+      () => undefined
+    );
+
+    expect(calls).toEqual([1]);
+    first.resolve(1);
+    await batch;
+    expect(calls).toEqual([1, 2]);
   });
 
   it("records a failed mutation without blocking the remaining people", async () => {
