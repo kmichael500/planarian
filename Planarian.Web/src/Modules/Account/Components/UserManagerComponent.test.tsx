@@ -320,7 +320,7 @@ describe("UserManagerComponent", () => {
       screen.queryByRole("button", { name: "Disable access" })
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Enable access/ }));
     const dialog = screen.getByRole("dialog", { name: "Enable access?" });
     expect(within(dialog).getByRole("textbox", { name: "Message" }))
       .toHaveValue("Your access to this account has been restored. If you have any questions, please reach out to an administrator.");
@@ -350,7 +350,7 @@ describe("UserManagerComponent", () => {
 
     renderManager();
     await screen.findByText("Invited User");
-    fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Enable access/ }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Enable access?" }))
       .getByRole("button", { name: "Enable access" }));
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));

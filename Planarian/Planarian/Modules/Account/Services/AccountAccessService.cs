@@ -31,7 +31,7 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
         var membership = await _accountRepository.GetAccountUser(existingUser.Id, RequestUser.AccountId);
         if (membership?.AccessDisabledOn.HasValue == true)
             throw ApiExceptionDictionary.Conflict(
-                "This user already belongs to the account with disabled access. Restore access instead of inviting them again.");
+                "This user already belongs to the account with disabled access. Enable access instead of inviting them again.");
 
         if (membership != null)
             throw ApiExceptionDictionary.UserAlreadyInAccount;
@@ -133,16 +133,19 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw ApiExceptionDictionary.NoAccount;
 
-        var membership = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        var membership = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId,
+            asNoTracking: true);
         if (membership == null)
             throw ApiExceptionDictionary.NotFound("User");
 
         if (!membership.AccessDisabledOn.HasValue)
             return false;
 
-        membership.AccessDisabledOn = null;
-        membership.AccessDisabledMessage = null;
-        await _accountRepository.SaveChangesAsync(cancellationToken);
+        // A stale enable must not clear a newer suspension issued after this read.
+        if (!await _accountRepository.RestoreAccessIfUnchanged(
+                userId, RequestUser.AccountId, membership.AccessDisabledOn.Value, cancellationToken))
+            throw ApiExceptionDictionary.Conflict("Account access changed concurrently. Please try again.");
+
         return true;
     }
 

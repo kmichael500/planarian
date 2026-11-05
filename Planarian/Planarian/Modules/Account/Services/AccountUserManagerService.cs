@@ -183,6 +183,10 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                 throw ApiExceptionDictionary.BadRequest("Invalid account access action.");
         }
 
+        _logger.LogInformation(
+            "Account access {Action} processed for user {TargetUserId} in account {AccountId} by {ActorUserId}.",
+            request.Action, userId, RequestUser.AccountId, RequestUser.Id);
+
         if (!shouldNotify || !request.SendEmail)
             return new AccountAccessChangeResultVm();
 

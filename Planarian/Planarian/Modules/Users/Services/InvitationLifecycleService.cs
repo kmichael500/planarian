@@ -46,15 +46,18 @@ public sealed class InvitationLifecycleService : ServiceBase<UserRepository>
         };
         Repository.Add(accountUser);
 
+        // Only transfer grants from the account whose invitation is being claimed.
+        // A temporary user can otherwise retain unrelated account grants in the same navigation collections.
+        var accountId = invitation.AccountUser.AccountId;
         if (invitation.CavePermissions != null)
         {
-            foreach (var permission in invitation.CavePermissions)
+            foreach (var permission in invitation.CavePermissions.Where(p => p.AccountId == accountId))
                 permission.User = existingUser;
         }
 
         if (invitation.UserPermissions != null)
         {
-            foreach (var permission in invitation.UserPermissions)
+            foreach (var permission in invitation.UserPermissions.Where(p => p.AccountId == accountId))
                 permission.User = existingUser;
         }
 

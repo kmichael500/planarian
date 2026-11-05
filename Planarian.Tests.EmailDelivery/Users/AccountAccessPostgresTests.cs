@@ -149,6 +149,46 @@ public sealed class AccountAccessPostgresTests
         });
     }
 
+    [Fact]
+    public async Task StaleRestorationCannotClearANewerSuspension()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedTwoAdministrators(connectionString);
+            DateTime originalDisabledOn;
+            await using (var disable = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                await CreateService(disable, FirstAdminId).DisableAccess(
+                    SecondAdminId, disableMessage: "Original suspension");
+                originalDisabledOn = (await disable.AccountUsers.AsNoTracking().SingleAsync(m =>
+                    m.AccountId == AccountId && m.UserId == SecondAdminId)).AccessDisabledOn!.Value;
+            }
+
+            await using (var restore = IsolatedPostgresDatabase.NewContext(connectionString))
+                await CreateService(restore, FirstAdminId).RestoreAccess(SecondAdminId);
+
+            await using (var reDisable = IsolatedPostgresDatabase.NewContext(connectionString))
+                await CreateService(reDisable, FirstAdminId).DisableAccess(
+                    SecondAdminId, disableMessage: "Newer suspension");
+
+            await using (var stale = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(stale) { Id = FirstAdminId, AccountId = AccountId };
+                stale.RequestUser = actor;
+                var repository = new AccountRepository(stale, actor);
+                Assert.False(await repository.RestoreAccessIfUnchanged(
+                    SecondAdminId, AccountId, originalDisabledOn));
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            var membership = await verify.AccountUsers.SingleAsync(m =>
+                m.AccountId == AccountId && m.UserId == SecondAdminId);
+            Assert.NotNull(membership.AccessDisabledOn);
+            Assert.NotEqual(originalDisabledOn, membership.AccessDisabledOn!.Value);
+            Assert.Equal("Newer suspension", membership.AccessDisabledMessage);
+        });
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

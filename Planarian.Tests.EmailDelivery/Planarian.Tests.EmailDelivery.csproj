@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- TODO: Temporary branch-local project. See README.md and TemporaryTestProjectLifecycleTests.cs. -->
+  <!-- Temporary branch-local project; see README.md for consolidation instructions. -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>

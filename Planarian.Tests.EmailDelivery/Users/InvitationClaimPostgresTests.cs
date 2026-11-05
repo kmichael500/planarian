@@ -92,6 +92,63 @@ public sealed class InvitationClaimPostgresTests
     }
 
     [Fact]
+    public async Task ClaimTransfersOnlyTheInvitedAccountsPermissions()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedInvitation(connectionString, alreadyMember: false);
+            const string otherAccountId = "claim00002";
+
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                seed.RequestUser = new RequestUser(seed)
+                {
+                    Id = MemberId, AccountId = otherAccountId
+                };
+                seed.Accounts.Add(new Account { Id = otherAccountId, Name = "Second invitation account" });
+                seed.AccountUsers.Add(new AccountUser
+                {
+                    AccountId = otherAccountId, UserId = InvitationUserId,
+                    InvitationCode = "otherinv01"
+                });
+                seed.UserPermissions.Add(new UserPermission
+                {
+                    UserId = InvitationUserId, AccountId = otherAccountId, PermissionId = PermissionId
+                });
+                seed.CavePermissions.Add(new CavePermission
+                {
+                    UserId = InvitationUserId, AccountId = otherAccountId, PermissionId = PermissionId
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await Claim(connectionString, selectedAccountId: null);
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            Assert.True(await verify.AccountUsers.AnyAsync(m =>
+                m.AccountId == AccountId && m.UserId == MemberId));
+            Assert.True(await verify.AccountUsers.AnyAsync(m =>
+                m.AccountId == otherAccountId && m.UserId == InvitationUserId &&
+                m.InvitationCode == "otherinv01"));
+            Assert.True(await verify.Users.AnyAsync(u => u.Id == InvitationUserId));
+
+            Assert.True(await verify.UserPermissions.AnyAsync(p =>
+                p.AccountId == AccountId && p.UserId == MemberId));
+            Assert.True(await verify.CavePermissions.AnyAsync(p =>
+                p.AccountId == AccountId && p.UserId == MemberId));
+
+            Assert.True(await verify.UserPermissions.AnyAsync(p =>
+                p.AccountId == otherAccountId && p.UserId == InvitationUserId));
+            Assert.True(await verify.CavePermissions.AnyAsync(p =>
+                p.AccountId == otherAccountId && p.UserId == InvitationUserId));
+            Assert.False(await verify.UserPermissions.AnyAsync(p =>
+                p.AccountId == otherAccountId && p.UserId == MemberId));
+            Assert.False(await verify.CavePermissions.AnyAsync(p =>
+                p.AccountId == otherAccountId && p.UserId == MemberId));
+        });
+    }
+
+    [Fact]
     public async Task DisabledMemberCannotUseInvitationToRestoreAccessOrRemoveItsHistory()
     {
         await IsolatedPostgresDatabase.Run(async connectionString =>

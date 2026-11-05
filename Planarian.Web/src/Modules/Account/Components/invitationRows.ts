@@ -125,7 +125,7 @@ export function previewInvitations(
       return {
         row,
         disposition: "skipped",
-        reason: "Access disabled — use Restore access.",
+        reason: "Access disabled — use Enable access.",
       };
     }
     if (member?.hasActiveInvitation) {

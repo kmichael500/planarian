@@ -189,7 +189,7 @@ public class EmailService : ServiceBase
             MessagePurpose.AccountAccessRestored =>
                 ($"Your access to {accountName} has been restored", "Account access restored"),
             MessagePurpose.AccountMembershipRevoked =>
-                ($"Your membership in {accountName} has been revoked", "Membership revoked"),
+                ($"Your access to {accountName} has been removed", "Account access removed"),
             _ => throw new ArgumentOutOfRangeException(nameof(purpose))
         };
 

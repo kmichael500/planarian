@@ -290,9 +290,9 @@ public sealed class BulkInvitationPostgresTests
             Assert.Equal(MessagePurpose.AccountMembershipRevoked, email.Purpose);
             Assert.Equal("GenericEmail", email.TemplateKey);
             Assert.Equal(MessageDeliveryStatus.SendFailed, email.DeliveryStatus);
-            Assert.Contains("has been revoked", email.Subject);
+            Assert.Contains("has been removed", email.Subject);
             using var substitutions = System.Text.Json.JsonDocument.Parse(email.Substitutions);
-            Assert.Equal("Membership revoked",
+            Assert.Equal("Account access removed",
                 substitutions.RootElement.GetProperty("header").GetString());
             Assert.Equal(explanation,
                 Assert.Single(substitutions.RootElement.GetProperty("messages").EnumerateArray())

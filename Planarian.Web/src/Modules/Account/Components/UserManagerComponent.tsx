@@ -269,7 +269,7 @@ const UserManagerComponent: React.FC = () => {
     if (isDisabled) {
       actions.push({
         key: "restore",
-        label: "Restore access",
+        label: "Enable access",
         render: (
           <PlanarianButton
             alwaysShowChildren
@@ -278,7 +278,7 @@ const UserManagerComponent: React.FC = () => {
             type="default"
             onClick={() => reviewAccessChanges([user], "enable")}
           >
-            Restore access
+            Enable access
           </PlanarianButton>
         ),
       });

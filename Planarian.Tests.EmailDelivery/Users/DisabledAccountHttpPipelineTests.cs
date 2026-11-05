@@ -42,6 +42,7 @@ public sealed class DisabledAccountHttpPipelineTests
     private const string OwnerId = "owner00001";
     private const string SharedUserId = "member0001";
     private const string SingleAccountUserId = "member0002";
+    private const string ViewerId = "viewer0001";
     private const string AdminPermissionId = "admperm001";
 
     [Fact]
@@ -60,6 +61,8 @@ public sealed class DisabledAccountHttpPipelineTests
                 "Shared Member", SharedUserId, AccountA));
             var singleAccountToken = tokenService.BuildToken(new UserToken(
                 "Single Member", SingleAccountUserId, AccountA));
+            var viewerToken = tokenService.BuildToken(new UserToken(
+                "Viewer", ViewerId, AccountA));
 
             // Use production middleware in a narrow HTTP host without starting unrelated services.
             var builder = WebApplication.CreateBuilder();
@@ -188,6 +191,9 @@ public sealed class DisabledAccountHttpPipelineTests
                 sharedToken, AccountA);
             await AssertStatus(HttpStatusCode.OK, HttpMethod.Post, "/probe/mutate",
                 sharedToken, AccountA);
+            // Exercise the real administrator endpoint rather than just its annotation.
+            await AssertStatus(HttpStatusCode.Forbidden, HttpMethod.Post,
+                $"/api/account/user-manager/{SharedUserId}/access-change", viewerToken, AccountA);
             var segments = sharedToken.Split('.');
             segments[2] = new string('A', segments[2].Length);
             await AssertStatus(HttpStatusCode.Unauthorized, HttpMethod.Get, "/probe/caves",
@@ -291,7 +297,8 @@ public sealed class DisabledAccountHttpPipelineTests
         context.Users.AddRange(
             new User("Account", "Owner", "owner@example.test") { Id = OwnerId },
             new User("Shared", "Member", "shared@example.test") { Id = SharedUserId },
-            new User("Single", "Member", "single@example.test") { Id = SingleAccountUserId });
+            new User("Single", "Member", "single@example.test") { Id = SingleAccountUserId },
+            new User("Read", "Only", "viewer@example.test") { Id = ViewerId });
         await context.SaveChangesAsync();
 
         actor.AccountId = AccountA;
@@ -302,6 +309,8 @@ public sealed class DisabledAccountHttpPipelineTests
             new AccountUser { AccountId = AccountA, UserId = SharedUserId,
                 InvitationAcceptedOn = DateTime.UtcNow },
             new AccountUser { AccountId = AccountA, UserId = SingleAccountUserId,
+                InvitationAcceptedOn = DateTime.UtcNow },
+            new AccountUser { AccountId = AccountA, UserId = ViewerId,
                 InvitationAcceptedOn = DateTime.UtcNow });
         context.Permissions.Add(new Permission
         {

@@ -933,11 +933,30 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     #endregion
 
-    public async Task<AccountUser?> GetAccountUser(string userId, string accountId)
+    public async Task<AccountUser?> GetAccountUser(string userId, string accountId,
+        bool asNoTracking = false)
     {
-        return await DbContext.AccountUsers
-            .Where(e => e.UserId == userId && e.AccountId == accountId)
-            .FirstOrDefaultAsyncEF();
+        var memberships = DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == accountId);
+        return await (asNoTracking ? memberships.AsNoTracking() : memberships).FirstOrDefaultAsyncEF();
+    }
+
+    public async Task<bool> RestoreAccessIfUnchanged(string userId, string accountId,
+        DateTime expectedDisabledOn, CancellationToken cancellationToken = default)
+    {
+        // ExecuteUpdate bypasses SaveChangesInterceptor, so preserve its modification metadata.
+        var modifiedOn = (DateTime?)DateTime.UtcNow;
+        var modifiedByUserId = string.IsNullOrWhiteSpace(RequestUser.Id) ? null : RequestUser.Id;
+        var updated = await DbContext.AccountUsers
+            .Where(m => m.UserId == userId && m.AccountId == accountId &&
+                        m.AccessDisabledOn == expectedDisabledOn)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(m => m.AccessDisabledOn, (DateTime?)null)
+                .SetProperty(m => m.AccessDisabledMessage, (string?)null)
+                .SetProperty(m => m.ModifiedOn, modifiedOn)
+                .SetProperty(m => m.ModifiedByUserId, modifiedByUserId), cancellationToken);
+
+        return updated == 1;
     }
 
     public Task<IDbContextTransaction> BeginAccountAccessTransactionAsync(CancellationToken cancellationToken)

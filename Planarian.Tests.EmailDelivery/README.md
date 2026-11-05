@@ -6,8 +6,7 @@
 
 After `feature/cave-revisions-completion` merges and
 `Planarian.Tests.Unit` and `Planarian.Tests.Integration` are available in
-`main`, move these tests into their canonical projects. The temporary
-`TemporaryTestProjectLifecycleTests` fails when either project appears.
+`main`, move these tests into their canonical projects. Move the tests when those projects are available; this is a maintenance step rather than an application test.
 
 1. Move unit and architecture-contract tests into `Planarian.Tests.Unit`.
 2. Move `AccountAccessPostgresTests`, `DisabledAccountHttpPipelineTests`,

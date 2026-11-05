@@ -24,7 +24,7 @@ public static class ApiExceptionDictionary
     public static ApiException InvalidAccountSelection => new(
         StatusCodes.Status403Forbidden,
         ApiExceptionType.InvalidAccountSelection,
-        "The selected account is unavailable or access has been revoked.");
+        "The selected account is unavailable or you no longer have access.");
 
     public static ApiException NotFound(string type)
     {
