@@ -185,7 +185,13 @@ describe("AccountAccessChangeModal", () => {
     expect(confirm).toBeDisabled();
     expect(
       screen.getByRole("dialog", { name: "Revoke memberships?" })
-    ).toHaveTextContent("account permissions and favorites");
+    ).toHaveTextContent("members will be completely removed from this account");
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "Their memberships, permissions, and favorites will be deleted."
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "Previously contributed cave data will remain."
+    );
     const message = screen.getByRole("textbox", { name: "Message" });
     expect(message).toHaveValue(
       "Your access to Test Survey has been removed. If you have any questions or believe this was a mistake, please reach out to an administrator."
@@ -270,6 +276,9 @@ describe("AccountAccessChangeModal", () => {
     const onFinished = renderModal();
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Active Member will lose access"
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "their membership, permissions, and favorites will be preserved"
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Pending Person's invitation will be canceled."

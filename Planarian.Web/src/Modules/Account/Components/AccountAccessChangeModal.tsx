@@ -151,15 +151,16 @@ export const AccountAccessChangeModal: React.FC<Props> = ({
       : action === "revoke"
       ? selected.length === 1
         ? selected[0].fullName +
-          "'s membership, favorites and account permissions will be removed. They'll need a new invitation to rejoin."
+          " will be completely removed from this account. Their membership, permissions, and favorites will be deleted. They'll need a new invitation to rejoin. Previously contributed cave data will remain."
         : selected.length +
-          " memberships, including account permissions and favorites, will be removed. A new invitation is required to rejoin."
+          " members will be completely removed from this account. Their memberships, permissions, and favorites will be deleted. They'll need new invitations to rejoin. Previously contributed cave data will remain."
       : [
           active.length === 1
             ? active[0].fullName +
-              " will lose access until an administrator restores it."
+              " will lose access, but their membership, permissions, and favorites will be preserved. Access can be restored without a new invitation."
             : active.length > 1
-            ? active.length + " members will lose access until restored."
+            ? active.length +
+              " members will lose access, but their memberships, permissions, and favorites will be preserved. Access can be restored without new invitations."
             : "",
           pending.length === 1
             ? pending[0].fullName + "'s invitation will be canceled."

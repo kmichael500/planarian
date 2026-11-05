@@ -83,6 +83,7 @@ public class EmailService : ServiceBase
                 .SetText(substitutions.ToPlainText(websiteUrl))
                 .SetSubject(subject)
                 .AddToAddress(toEmailAddress, toName)
+                .SetTrackingClicks(false)
                 .AddCustomArgument(EmailDeliveryMetadata.MessageIdArgument, providerCorrelationId)
                 .AddCustomArgument(EmailDeliveryMetadata.EnvironmentArgument, _hostEnvironment.EnvironmentName);
 

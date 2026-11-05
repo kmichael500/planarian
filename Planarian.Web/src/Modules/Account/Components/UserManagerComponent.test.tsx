@@ -376,8 +376,10 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
     expect(dialog).toHaveTextContent("Invited User");
-    expect(dialog).toHaveTextContent("favorites and account permissions");
+    expect(dialog).toHaveTextContent("will be completely removed from this account");
+    expect(dialog).toHaveTextContent("membership, permissions, and favorites will be deleted");
     expect(dialog).toHaveTextContent("new invitation to rejoin");
+    expect(dialog).toHaveTextContent("Previously contributed cave data will remain");
     const confirm = screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!;
     expect(confirm).toBeDisabled();
