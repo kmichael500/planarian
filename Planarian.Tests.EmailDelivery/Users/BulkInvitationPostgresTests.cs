@@ -9,6 +9,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Users.Models;
@@ -166,15 +167,19 @@ public sealed class BulkInvitationPostgresTests
                 var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
                 action.RequestUser = actor;
                 var manager = CreateManager(action, actor);
+                var invalidAction = await Assert.ThrowsAsync<ApiException>(() =>
+                    manager.ChangeAccess(memberId, AccessChange((AccountAccessChangeAction)999, "Invalid action")));
+                Assert.Equal(400, invalidAction.StatusCode);
+
                 var missingMessage = await Assert.ThrowsAsync<ApiException>(() =>
-                    manager.DisableAccess(memberId));
+                    manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Disable)));
                 Assert.Equal(400, missingMessage.StatusCode);
 
-                var disabled = await manager.DisableAccess(memberId, explanation);
+                var disabled = await manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Disable, explanation));
                 Assert.Equal(MessageDeliveryStatus.SendFailed, disabled.NotificationEmailDeliveryStatus);
-                var canceled = await manager.DisableAccess(pendingId, "Never email a pending invitee");
+                var canceled = await manager.ChangeAccess(pendingId, AccessChange(AccountAccessChangeAction.Disable, "Never email a pending invitee"));
                 Assert.Null(canceled.NotificationEmailDeliveryStatus);
-                var repeated = await manager.DisableAccess(memberId, "Do not resend email");
+                var repeated = await manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Disable, "Do not resend email"));
                 Assert.Null(repeated.NotificationEmailDeliveryStatus);
             }
 
@@ -224,8 +229,8 @@ public sealed class BulkInvitationPostgresTests
             {
                 var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
                 action.RequestUser = actor;
-                var result = await CreateManager(action, actor).DisableAccess(
-                    memberId, sendEmail: false);
+                var result = await CreateManager(action, actor).ChangeAccess(
+                    memberId, AccessChange(AccountAccessChangeAction.Disable, sendEmail: false));
                 Assert.Null(result.NotificationEmailDeliveryStatus);
             }
 
@@ -266,15 +271,14 @@ public sealed class BulkInvitationPostgresTests
                 action.RequestUser = actor;
                 var manager = CreateManager(action, actor);
                 var missing = await Assert.ThrowsAsync<ApiException>(() =>
-                    manager.RevokeMembership(memberId, sendEmail: true));
+                    manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Revoke)));
                 Assert.Equal(400, missing.StatusCode);
                 var tooLong = await Assert.ThrowsAsync<ApiException>(() =>
-                    manager.RevokeMembership(memberId, notificationMessage: new string('x', 1001),
-                        sendEmail: true));
+                    manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Revoke, new string('x', 1001))));
                 Assert.Equal(400, tooLong.StatusCode);
 
-                var result = await manager.RevokeMembership(memberId,
-                    notificationMessage: "  " + explanation + "  ", sendEmail: true);
+                var result = await manager.ChangeAccess(memberId,
+                    AccessChange(AccountAccessChangeAction.Revoke, "  " + explanation + "  "));
                 Assert.Equal(MessageDeliveryStatus.SendFailed, result.NotificationEmailDeliveryStatus);
             }
 
@@ -321,8 +325,8 @@ public sealed class BulkInvitationPostgresTests
             {
                 var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
                 action.RequestUser = actor;
-                var result = await CreateManager(action, actor).RevokeMembership(
-                    memberId, sendEmail: false);
+                var result = await CreateManager(action, actor).ChangeAccess(
+                    memberId, AccessChange(AccountAccessChangeAction.Revoke, sendEmail: false));
                 Assert.Null(result.NotificationEmailDeliveryStatus);
             }
 
@@ -330,6 +334,77 @@ public sealed class BulkInvitationPostgresTests
             Assert.False(await verify.AccountUsers.AnyAsync(m =>
                 m.AccountId == AccountId && m.UserId == memberId));
             Assert.Empty(await verify.MessageLogs.ToListAsync());
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RestoringAccessPersistsEvenWhenNotificationFailsAndDoesNotResendOnRetry(bool sendEmail)
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            const string memberId = "member0001";
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(seed) { Id = AdministratorId };
+                seed.RequestUser = actor;
+                seed.Users.Add(new User("Member", "Example", "member@example.test") { Id = memberId });
+                await seed.SaveChangesAsync();
+                actor.AccountId = AccountId;
+                seed.AccountUsers.Add(new AccountUser
+                {
+                    AccountId = AccountId, UserId = memberId,
+                    InvitationAcceptedOn = DateTime.UtcNow,
+                    AccessDisabledOn = DateTime.UtcNow,
+                    AccessDisabledMessage = "Membership expired."
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var action = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
+                action.RequestUser = actor;
+                var manager = CreateManager(action, actor);
+                if (sendEmail)
+                {
+                    var error = await Assert.ThrowsAsync<ApiException>(() =>
+                        manager.ChangeAccess(memberId, AccessChange(AccountAccessChangeAction.Enable, "  ")));
+                    Assert.Equal(400, error.StatusCode);
+                }
+
+                var result = await manager.ChangeAccess(memberId,
+                    AccessChange(AccountAccessChangeAction.Enable, sendEmail ? "  Welcome back.  " : null, sendEmail));
+                Assert.Equal(sendEmail ? MessageDeliveryStatus.SendFailed : null,
+                    result.NotificationEmailDeliveryStatus);
+
+                var repeated = await manager.ChangeAccess(memberId,
+                    AccessChange(AccountAccessChangeAction.Enable, "Welcome back."));
+                Assert.Null(repeated.NotificationEmailDeliveryStatus);
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            var membership = await verify.AccountUsers.SingleAsync(m =>
+                m.AccountId == AccountId && m.UserId == memberId);
+            Assert.Null(membership.AccessDisabledOn);
+            Assert.Null(membership.AccessDisabledMessage);
+            var logs = await verify.MessageLogs.ToListAsync();
+            if (sendEmail)
+            {
+                var email = Assert.Single(logs);
+                Assert.Equal(MessagePurpose.AccountAccessRestored, email.Purpose);
+                Assert.Equal(MessageDeliveryStatus.SendFailed, email.DeliveryStatus);
+                Assert.Contains("has been restored", email.Subject);
+                using var substitutions = System.Text.Json.JsonDocument.Parse(email.Substitutions);
+                Assert.Equal("Account access restored",
+                    substitutions.RootElement.GetProperty("header").GetString());
+                Assert.Equal("Welcome back.", Assert.Single(
+                    substitutions.RootElement.GetProperty("messages").EnumerateArray()).GetString());
+            }
+            else
+                Assert.Empty(logs);
         });
     }
 
@@ -360,6 +435,14 @@ public sealed class BulkInvitationPostgresTests
             Assert.False(substitutions.RootElement.TryGetProperty("supportName", out _));
         });
     }
+
+    private static AccountAccessChangeRequest AccessChange(AccountAccessChangeAction action,
+        string? message = null, bool sendEmail = true) => new()
+    {
+        Action = action,
+        NotificationMessage = message,
+        SendEmail = sendEmail
+    };
 
     private static AccountUserManagerService CreateManager(PlanarianDbContext context, RequestUser actor)
     {

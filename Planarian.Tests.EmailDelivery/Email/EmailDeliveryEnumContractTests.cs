@@ -10,7 +10,7 @@ public sealed class EmailDeliveryEnumContractTests
     {
         AssertEnumNames<MessagePurpose>(
             "Generic", "EmailConfirmation", "PasswordReset", "AccountInvitation", "PasswordChanged",
-            "AccountAccessDisabled", "AccountMembershipRevoked");
+            "AccountAccessDisabled", "AccountMembershipRevoked", "AccountAccessRestored");
     }
 
     [Fact]

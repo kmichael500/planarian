@@ -8,5 +8,6 @@ public enum MessagePurpose
     AccountInvitation,
     PasswordChanged,
     AccountAccessDisabled,
-    AccountMembershipRevoked
+    AccountMembershipRevoked,
+    AccountAccessRestored
 }

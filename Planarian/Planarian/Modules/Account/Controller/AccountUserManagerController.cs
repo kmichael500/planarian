@@ -65,36 +65,15 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return new JsonResult(result);
     }
 
-    [HttpPost("{userId:length(10)}/disable-access")]
+    [HttpPost("{userId:length(10)}/access-change")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<DisableAccessResultVm>> DisableAccess(string userId,
-        [FromBody] DisableAccessRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountAccessChangeResultVm>> ChangeAccess(string userId,
+        [FromBody] AccountAccessChangeRequest request, CancellationToken cancellationToken)
     {
         if (request == null)
-            throw ApiExceptionDictionary.BadRequest("A notification request is required.");
+            throw ApiExceptionDictionary.BadRequest("An access change request is required.");
 
-        return new JsonResult(await Service.DisableAccess(userId, request.DisableMessage, cancellationToken,
-            request.SendEmail));
-    }
-
-    [HttpPost("{userId:length(10)}/revoke-membership")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<RevokeMembershipResultVm>> RevokeMembership(string userId,
-        [FromBody] RevokeMembershipRequest request, CancellationToken cancellationToken)
-    {
-        if (request == null)
-            throw ApiExceptionDictionary.BadRequest("A notification request is required.");
-
-        return new JsonResult(await Service.RevokeMembership(userId, cancellationToken,
-            request.NotificationMessage, request.SendEmail));
-    }
-
-    [HttpPost("{userId:length(10)}/restore-access")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> RestoreAccess(string userId, CancellationToken cancellationToken)
-    {
-        await Service.RestoreAccess(userId, cancellationToken);
-        return Ok();
+        return new JsonResult(await Service.ChangeAccess(userId, request, cancellationToken));
     }
 
     #endregion

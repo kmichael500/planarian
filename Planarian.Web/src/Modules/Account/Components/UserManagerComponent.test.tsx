@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { message } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -101,9 +101,7 @@ describe("UserManagerComponent", () => {
   let getHistory: jest.SpyInstance;
   let inviteUser: jest.SpyInstance;
   let resendInvitation: jest.SpyInstance;
-  let disableAccess: jest.SpyInstance;
-  let restoreAccess: jest.SpyInstance;
-  let revokeMembership: jest.SpyInstance;
+  let changeAccess: jest.SpyInstance;
   let warningSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -124,14 +122,8 @@ describe("UserManagerComponent", () => {
     resendInvitation = jest
       .spyOn(AccountUserManagerService, "ResendInvitation")
       .mockResolvedValue();
-    disableAccess = jest
-      .spyOn(AccountUserManagerService, "DisableAccess")
-      .mockResolvedValue({});
-    restoreAccess = jest
-      .spyOn(AccountUserManagerService, "RestoreAccess")
-      .mockResolvedValue();
-    revokeMembership = jest
-      .spyOn(AccountUserManagerService, "RevokeMembership")
+    changeAccess = jest
+      .spyOn(AccountUserManagerService, "ChangeAccess")
       .mockResolvedValue({});
     warningSpy = jest
       .spyOn(message, "warning")
@@ -204,7 +196,7 @@ describe("UserManagerComponent", () => {
         emailAddress: "new@example.com",
       }, "account0001")
     );
-    await waitFor(() => expect(screen.getByText(/email failed\. Use Resend/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/email could not be sent\. Use Resend/)).toBeInTheDocument());
     expect(warningSpy).not.toHaveBeenCalled();
   });
 
@@ -298,13 +290,14 @@ describe("UserManagerComponent", () => {
     await screen.findByText("Invited User");
 
     fireEvent.click(screen.getByRole("button", { name: "Disable access" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Message to users" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
       target: { value: "  Access review  " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Confirm changes for 1" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Disable access?" }))
+      .getByRole("button", { name: "Disable access" }));
 
     await waitFor(() =>
-      expect(disableAccess).toHaveBeenCalledWith("user123456", "account0001", "Access review", true)
+      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", "disable", "Access review", true)
     );
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
@@ -328,11 +321,47 @@ describe("UserManagerComponent", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
+    const dialog = screen.getByRole("dialog", { name: "Enable access?" });
+    expect(within(dialog).getByRole("textbox", { name: "Message" }))
+      .toHaveValue("Your access to this account has been restored. If you have any questions, please reach out to an administrator.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Enable access" }));
 
     await waitFor(() =>
-      expect(restoreAccess).toHaveBeenCalledWith("user123456")
+      expect(changeAccess).toHaveBeenCalledWith(
+        "user123456", "account0001", "enable",
+        "Your access to this account has been restored. If you have any questions, please reach out to an administrator.", true
+      )
     );
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps existing cards visible during a background refresh", async () => {
+    const disabled = {
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+      accessDisabledOn: "2026-09-28T18:00:00Z",
+    };
+    let finishRefresh!: (users: UserManagerGridVm[]) => void;
+    const refresh = new Promise<UserManagerGridVm[]>((resolve) => {
+      finishRefresh = resolve;
+    });
+    getUsers.mockReset().mockResolvedValueOnce([disabled]).mockReturnValueOnce(refresh);
+
+    renderManager();
+    await screen.findByText("Invited User");
+    fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Enable access?" }))
+      .getByRole("button", { name: "Enable access" }));
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
+
+    expect(screen.getAllByText("Invited User").length).toBeGreaterThan(0);
+    expect(document.querySelector(".planarian-spinner-card")).not.toBeInTheDocument();
+
+    finishRefresh([{ ...disabled, accessDisabledOn: null }]);
+    await waitFor(() =>
+      expect(screen.queryByText("Access disabled")).not.toBeInTheDocument()
+    );
   });
 
   it("requires explicit confirmation before revoking the membership of an accepted member", async () => {
@@ -347,13 +376,12 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
     expect(dialog).toHaveTextContent("Invited User");
-    expect(dialog).toHaveTextContent("saved favorites");
-    expect(dialog).toHaveTextContent("Rejoining will require a new invitation");
-    expect(dialog).toHaveTextContent("cannot be undone");
+    expect(dialog).toHaveTextContent("favorites and account permissions");
+    expect(dialog).toHaveTextContent("new invitation to rejoin");
     const confirm = screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!;
     expect(confirm).toBeDisabled();
-    expect(revokeMembership).not.toHaveBeenCalled();
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "revoke")).toHaveLength(0);
 
     fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
       target: { value: "remove" },
@@ -364,11 +392,11 @@ describe("UserManagerComponent", () => {
     });
     fireEvent.click(confirm);
     await waitFor(() =>
-      expect(revokeMembership).toHaveBeenCalledWith("user123456", "account0001",
-        expect.stringContaining("revoked your membership"), true));
+      expect(changeAccess).toHaveBeenCalledWith("user123456", "account0001", "revoke",
+        expect.stringContaining("access to this account has been removed"), true));
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
-      .not.toBeInTheDocument();
+    expect(await screen.findByText("Membership revoked.")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Results" })).toBeInTheDocument();
   });
 
   it("requires a message only if membership revocation emails are enabled", async () => {
@@ -381,11 +409,11 @@ describe("UserManagerComponent", () => {
     await screen.findByText("Invited User");
     fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
-    const notification = screen.getByRole("checkbox", { name: "Send notification email" });
+    const notification = screen.getByRole("checkbox", { name: "Notify by email" });
     expect(notification).toBeChecked();
 
-    const emailMessage = screen.getByRole("textbox", { name: "Message to user" }) as HTMLTextAreaElement;
-    expect(emailMessage.value).toContain("revoked your membership");
+    const emailMessage = screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement;
+    expect(emailMessage.value).toContain("access to this account has been removed");
     expect(emailMessage.value).not.toContain("favorites");
     fireEvent.change(emailMessage, { target: { value: "  " } });
     fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
@@ -395,16 +423,16 @@ describe("UserManagerComponent", () => {
       .find(button => dialog.contains(button))!;
     expect(confirm).toBeDisabled();
     fireEvent.click(notification);
-    expect(screen.queryByRole("textbox", { name: "Message to user" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Message" })).not.toBeInTheDocument();
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);
-    await waitFor(() => expect(revokeMembership).toHaveBeenCalledWith(
-      "user123456", "account0001", undefined, false
+    await waitFor(() => expect(changeAccess).toHaveBeenCalledWith(
+      "user123456", "account0001", "revoke", undefined, false
     ));
   });
 
   it("reports email failure separately from completed membership revocation", async () => {
-    revokeMembership.mockResolvedValue({
+    changeAccess.mockResolvedValue({
       notificationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
     });
     getUsers.mockResolvedValue([{
@@ -421,11 +449,10 @@ describe("UserManagerComponent", () => {
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
-    await waitFor(() => expect(warningSpy)
-      .toHaveBeenCalledWith("Membership revoked, but notification email failed."));
+    expect(await screen.findByText("Membership revoked, but the email couldn't be sent."))
+      .toBeInTheDocument();
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
-      .not.toBeInTheDocument());
+    expect(screen.getByRole("dialog", { name: "Results" })).toBeInTheDocument();
   });
 
   it("never claims an email was submitted when removal has no delivery status", async () => {
@@ -446,12 +473,7 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
 
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith(
-      "Membership revoked from this account."
-    ));
-    expect(successSpy).not.toHaveBeenCalledWith(
-      "Membership revoked. Notification email submitted."
-    );
+    expect(await screen.findByText("Membership revoked.")).toBeInTheDocument();
   });
 
   it("never submits membership revocation for a different selected account", async () => {
@@ -473,10 +495,9 @@ describe("UserManagerComponent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
 
-    expect(revokeMembership).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("selected account changed"));
-    expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
-      .not.toBeInTheDocument();
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "revoke")).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("selected account changed");
+    expect(screen.getByRole("dialog", { name: "Revoke membership?" })).toBeInTheDocument();
   });
 
   it("allows membership revocation after disabling but not for a pending invitation", async () => {
@@ -499,13 +520,13 @@ describe("UserManagerComponent", () => {
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
-    await waitFor(() => expect(revokeMembership).toHaveBeenCalledWith(
-      "disab00001", "account0001",
-      expect.stringContaining("revoked your membership"), true));
+    await waitFor(() => expect(changeAccess).toHaveBeenCalledWith(
+      "disab00001", "account0001", "revoke",
+      expect.stringContaining("access to this account has been removed"), true));
   });
 
   it("keeps membership revocation confirmation available when deletion fails", async () => {
-    revokeMembership.mockRejectedValue({ message: "Cannot revoke the membership of the last administrator." });
+    changeAccess.mockRejectedValue({ message: "Cannot revoke the membership of the last administrator." });
     getUsers.mockResolvedValue([{
       ...pendingUser,
       hasActiveInvitation: false,
@@ -520,10 +541,10 @@ describe("UserManagerComponent", () => {
     const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
     fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
       .find(button => dialog.contains(button))!);
-    await waitFor(() => expect(errorSpy)
-      .toHaveBeenCalledWith("Cannot revoke the membership of the last administrator."));
+    expect(await screen.findByText("Cannot revoke the membership of the last administrator."))
+      .toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
-    expect(getUsers).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 
   it("selects only eligible visible people and confirms a mixed disabling batch", async () => {
@@ -547,21 +568,100 @@ describe("UserManagerComponent", () => {
     await screen.findByText("Accepted Member");
 
     fireEvent.click(screen.getByRole("button", { name: /Select people$/ }));
-    expect(screen.queryByRole("checkbox", { name: "Select Disabled Member" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Disabled Member" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: /Select all shown/ }));
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disable selected access" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Disabled Member" }));
     expect(screen.getByText("2 selected")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Review access changes$/ }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("1 active member to disable");
-    expect(screen.getByRole("dialog")).toHaveTextContent("1 pending invitation to remove");
-    fireEvent.click(screen.getByRole("button", { name: /Confirm changes for 2$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable selected access" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Accepted Member will lose access");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Invited User's invitation will be canceled.");
+    fireEvent.click(screen.getByRole("button", { name: /Apply changes$/ }));
 
     await waitFor(() => {
-      expect(disableAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001", undefined, false);
-      expect(disableAccess).toHaveBeenCalledWith(accepted.userId, "account0001",
-        "An administrator has disabled your access to this account on Planarian. An administrator can restore your access.", true);
+      expect(changeAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001", "disable", undefined, false);
+      expect(changeAccess).toHaveBeenCalledWith(accepted.userId, "account0001", "disable",
+        "Your access to this account has been disabled. If you have any questions or believe this was a mistake, please reach out to an administrator.", true);
     });
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
-    expect(disableAccess).not.toHaveBeenCalledWith(disabled.userId, "account0001", undefined);
+    expect(changeAccess).not.toHaveBeenCalledWith(disabled.userId, "account0001", "disable", undefined);
+    expect(screen.getByRole("button", { name: "Cancel selection" })).toBeInTheDocument();
+    const results = screen.getByRole("dialog", { name: "Results" });
+    fireEvent.click(within(results).getByRole("button", { name: /Close$/ }));
+    expect(screen.queryByRole("button", { name: "Cancel selection" })).not.toBeInTheDocument();
+  });
+
+  it("offers bulk revocation for active and disabled memberships", async () => {
+    const accepted = {
+      ...pendingUser,
+      userId: "accept0001",
+      emailAddress: "accepted@example.com",
+      fullName: "Accepted Member",
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-10-01T12:00:00Z",
+    };
+    const disabled = {
+      ...accepted,
+      userId: "disab00001",
+      emailAddress: "disabled@example.com",
+      fullName: "Disabled Member",
+      accessDisabledOn: "2026-10-30T12:00:00Z",
+    };
+    getUsers.mockResolvedValue([accepted, disabled]);
+    renderManager();
+    await screen.findByText("Disabled Member");
+
+    fireEvent.click(screen.getByRole("button", { name: "Select people" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select all shown/ }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disable selected access" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Revoke selected memberships" }));
+    const dialog = screen.getByRole("dialog", { name: "Revoke memberships?" });
+    const confirm = within(dialog).getByRole("button", { name: "Revoke memberships" });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(changeAccess).toHaveBeenCalledTimes(2));
+    expect(changeAccess).toHaveBeenCalledWith("accept0001", "account0001", "revoke",
+      expect.stringContaining("access to this account has been removed"), true);
+    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", "revoke",
+      expect.stringContaining("access to this account has been removed"), true);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "disable")).toHaveLength(0);
+    expect(await screen.findByText("Results")).toBeInTheDocument();
+  });
+
+  it("enables selected disabled accounts through the same batch dialog, optionally without email", async () => {
+    const disabledUsers: UserManagerGridVm[] = ["disab00001", "disab00002"].map((userId) => ({
+      ...pendingUser,
+      userId,
+      fullName: userId === "disab00001" ? "First Disabled" : "Second Disabled",
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+      accessDisabledOn: "2026-09-28T18:00:00Z",
+    }));
+    getUsers.mockResolvedValue(disabledUsers);
+    renderManager();
+    await screen.findByText("First Disabled");
+
+    fireEvent.click(screen.getByRole("button", { name: "Select people" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select all shown/ }));
+    expect(screen.getByRole("button", { name: "Disable selected access" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Enable selected access" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Enable access?" });
+    expect(dialog).toHaveTextContent("2 members will regain access");
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Notify by email" }));
+    expect(within(dialog).queryByRole("textbox", { name: "Message" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Enable access" }));
+
+    await waitFor(() => expect(changeAccess).toHaveBeenCalledTimes(2));
+    expect(changeAccess).toHaveBeenCalledWith("disab00001", "account0001", "enable", undefined, false);
+    expect(changeAccess).toHaveBeenCalledWith("disab00002", "account0001", "enable", undefined, false);
+    expect(changeAccess.mock.calls.filter(([, , requestedAction]) => requestedAction === "disable")).toHaveLength(0);
+    expect(await screen.findAllByText("Access restored.")).toHaveLength(2);
   });
 
   it("refreshes users on account changes and discards late responses from the previous tenant", async () => {

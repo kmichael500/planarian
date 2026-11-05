@@ -121,7 +121,7 @@ describe("InvitePeopleModal", () => {
       "account0001"
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(screen.getAllByText("Invitation submitted.")).toHaveLength(2);
+    expect(screen.getAllByText("Invitation created.")).toHaveLength(2);
   });
 
   it("previews existing members as skips rather than sending to them", async () => {
@@ -170,7 +170,7 @@ describe("InvitePeopleModal", () => {
     expect(
       await screen.findByText("Already invited — use Resend.")
     ).toBeInTheDocument();
-    expect(screen.queryByText("Invitation submitted.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invitation created.")).not.toBeInTheDocument();
   });
 
   it("resends mail after an invitation was created but the provider failed", async () => {
@@ -195,7 +195,7 @@ describe("InvitePeopleModal", () => {
     );
     expect(invite).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByText("Invitation resubmitted.")
+      await screen.findByText("Email resend requested.")
     ).toBeInTheDocument();
   });
 
@@ -229,7 +229,7 @@ describe("InvitePeopleModal", () => {
       "account0001"
     );
     await waitFor(() =>
-      expect(screen.getAllByText("Invitation submitted.")).toHaveLength(2)
+      expect(screen.getAllByText("Invitation created.")).toHaveLength(2)
     );
   });
 
@@ -266,12 +266,34 @@ describe("InvitePeopleModal", () => {
     expect(invite).not.toHaveBeenCalled();
   });
 
-  it("requires names and email and prevents incomplete requests", () => {
+  it("allows empty rows, ignores them at review, and validates only entered rows", () => {
     renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+    expect(screen.getByRole("textbox", { name: "First name for person 3" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review invitations" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review invitations" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter at least one person.");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "First name for person 2" }), {
+      target: { value: "Jane" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Review 1 person" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Correct the highlighted entries"
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Complete the highlighted rows");
+    expect(screen.getByRole("textbox", { name: "Last name for person 2" }))
+      .toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Last name for person 2" }), {
+      target: { value: "Smith" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Email for person 2" }), {
+      target: { value: "jane@example.test" },
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Last name for person 2" }))
+      .not.toHaveAttribute("aria-invalid", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Review 1 person" }));
+    expect(screen.getByText("1 ready to invite · 0 to skip.")).toBeInTheDocument();
     expect(invite).not.toHaveBeenCalled();
   });
 });

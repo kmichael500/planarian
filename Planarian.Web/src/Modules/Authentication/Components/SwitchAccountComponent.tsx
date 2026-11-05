@@ -34,7 +34,7 @@ const SwitchAccountComponent = ({
 
   const handleSwitch = (accountId: string) => {
     onCancel();
-    switchAccount(accountId);
+    switchAccount(accountId, currentAccountId ? undefined : "/caves");
   };
 
   return (

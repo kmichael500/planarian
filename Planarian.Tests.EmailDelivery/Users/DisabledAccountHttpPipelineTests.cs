@@ -221,13 +221,9 @@ public sealed class DisabledAccountHttpPipelineTests
                 (HttpMethod.Get, "/api/files/file000001/view", typeof(FileController),
                     nameof(FileController.ViewFile)),
                 (HttpMethod.Post,
-                    $"/api/account/user-manager/{SharedUserId}/restore-access",
+                    $"/api/account/user-manager/{SharedUserId}/access-change",
                     typeof(AccountUserManagerController),
-                    nameof(AccountUserManagerController.RestoreAccess)),
-                (HttpMethod.Post,
-                    $"/api/account/user-manager/{SharedUserId}/revoke-membership",
-                    typeof(AccountUserManagerController),
-                    nameof(AccountUserManagerController.RevokeMembership))
+                    nameof(AccountUserManagerController.ChangeAccess))
             };
             foreach (var (method, path, controller, action) in controllerRequests)
             {

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json;
+using Planarian.Shared.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -14,9 +16,7 @@ namespace Planarian.Tests.EmailDelivery.Users;
 public sealed class AccountMutationSecurityContractTests
 {
     [Theory]
-    [InlineData(nameof(AccountUserManagerController.DisableAccess), typeof(HttpPostAttribute))]
-    [InlineData(nameof(AccountUserManagerController.RestoreAccess), typeof(HttpPostAttribute))]
-    [InlineData(nameof(AccountUserManagerController.RevokeMembership), typeof(HttpPostAttribute))]
+    [InlineData(nameof(AccountUserManagerController.ChangeAccess), typeof(HttpPostAttribute))]
     public void AccountAccessMutationsRequireAdmin(string methodName, Type httpMethodAttributeType)
     {
         var method = typeof(AccountUserManagerController).GetMethod(methodName)!;
@@ -30,8 +30,25 @@ public sealed class AccountMutationSecurityContractTests
     [Fact]
     public void AccountAccessNotificationsAreEnabledByDefault()
     {
-        Assert.True(new DisableAccessRequest().SendEmail);
-        Assert.True(new RevokeMembershipRequest().SendEmail);
+        Assert.True(new AccountAccessChangeRequest().SendEmail);
+    }
+
+    [Theory]
+    [InlineData("disable", AccountAccessChangeAction.Disable)]
+    [InlineData("enable", AccountAccessChangeAction.Enable)]
+    [InlineData("revoke", AccountAccessChangeAction.Revoke)]
+    public void AccountAccessRequestAcceptsClientActionValues(string action, AccountAccessChangeAction expected)
+    {
+        var request = JsonSerializer.Deserialize<AccountAccessChangeRequest>(
+            "{\"action\":\"" + action + "\",\"sendEmail\":false}", PlanarianJsonOptions.Default);
+
+        Assert.NotNull(request);
+        Assert.Equal(expected, request.Action);
+        Assert.False(request.SendEmail);
+
+        var serialized = JsonSerializer.Serialize(request, PlanarianJsonOptions.Default);
+        using var document = JsonDocument.Parse(serialized);
+        Assert.Equal(JsonValueKind.String, document.RootElement.GetProperty("action").ValueKind);
     }
 
     [Fact]

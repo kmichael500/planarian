@@ -13,7 +13,7 @@ interface DialogModalProps {
   className?: string;
   header?: string | React.ReactNode | (string | React.ReactNode)[];
   footer?: string | React.ReactNode | (string | React.ReactNode)[];
-  footerStyle?: React.CSSProperties; // New prop for footer style override
+  footerStyle?: React.CSSProperties;
   headerStyle?: React.CSSProperties;
   contentStyle?: React.CSSProperties;
   children?: React.ReactNode;
@@ -56,6 +56,7 @@ export function PlanarianModal({
   const finalFullScreen = !screens.md || fullScreen;
 
   const computedWidth = finalFullScreen ? "100vw" : width || "80%";
+  const contentSized = !finalFullScreen && height === "auto";
   const computedHeight = finalFullScreen
     ? "var(--planarian-viewport-height)"
     : height || "80%";
@@ -159,11 +160,10 @@ export function PlanarianModal({
         top: finalFullScreen ? "unset" : "50%",
         left: finalFullScreen ? "unset" : "50%",
         transform: finalFullScreen ? "none" : "translate(-50%, -50%)",
-        // A closed dialog must be hidden even in environments that lack dialog CSS support.
-        display: open ? "flex" : "none",
-        flexDirection: "column",
+        display: open ? (contentSized ? "block" : "flex") : "none",
+        flexDirection: contentSized ? undefined : "column",
         width: computedWidth,
-        height: computedHeight,
+        height: contentSized ? "fit-content" : computedHeight,
         maxWidth: finalFullScreen ? "100%" : computedWidth,
         maxHeight: finalFullScreen ? "100%" : maxHeight ?? computedHeight,
         margin: 0,
@@ -229,8 +229,11 @@ export function PlanarianModal({
 
       <div
         style={{
-          flex: 1,
+          flex: contentSized ? undefined : "1 1 auto",
           minHeight: 0,
+          maxHeight: contentSized
+            ? "calc(" + (maxHeight || "90dvh") + " - 140px)"
+            : undefined,
           overflowY: "auto",
           padding: "1rem",
           background: "var(--modal-background)",

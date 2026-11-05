@@ -128,7 +128,7 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
         }
     }
 
-    public async Task RestoreAccess(string userId, CancellationToken cancellationToken = default)
+    public async Task<bool> RestoreAccess(string userId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw ApiExceptionDictionary.NoAccount;
@@ -138,11 +138,12 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
 
         if (!membership.AccessDisabledOn.HasValue)
-            return;
+            return false;
 
         membership.AccessDisabledOn = null;
         membership.AccessDisabledMessage = null;
         await _accountRepository.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task RemoveUserPermission(string userId, string permissionKey,

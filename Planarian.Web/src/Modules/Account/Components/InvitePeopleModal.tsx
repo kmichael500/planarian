@@ -22,6 +22,8 @@ import {
   MAX_BULK_INVITATIONS,
   parseInvitationRows,
   previewInvitations,
+  isEmptyInvitationRow,
+  isValidInvitationEmail,
 } from "./invitationRows";
 import { runAccountBatch } from "./runAccountBatch";
 import "./InvitePeopleModal.scss";
@@ -69,7 +71,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
   const openedAccountId = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const preview = useMemo(
-    () => previewInvitations(rows, existingUsers),
+    () => previewInvitations(rows.filter((row) => !isEmptyInvitationRow(row)), existingUsers),
     [rows, existingUsers]
   );
   const ready = preview.filter((item) => item.disposition === "ready");
@@ -103,32 +105,29 @@ export const InvitePeopleModal: React.FC<Props> = ({
     setRows((current) =>
       current.map((row) => (row.id === id ? { ...row, [field]: value } : row))
     );
+    setNotice("");
   };
 
   const appendRows = (
-    values: { firstName: string; lastName: string; emailAddress: string }[]
+    values: { firstName: string; lastName: string; emailAddress: string }[],
+    replaceBlankRow = false
   ) => {
-    const hasSingleEmpty =
-      rows.length === 1 &&
-      !rows[0].firstName.trim() &&
-      !rows[0].lastName.trim() &&
-      !rows[0].emailAddress.trim();
-    const currentCount = hasSingleEmpty ? 0 : rows.length;
-    if (currentCount + values.length > MAX_BULK_INVITATIONS) {
-      setNotice(`A batch can contain at most ${MAX_BULK_INVITATIONS} people.`);
+    const replaceFirst = replaceBlankRow && rows.length === 1 &&
+      isEmptyInvitationRow(rows[0]);
+    if (rows.length - Number(replaceFirst) + values.length > MAX_BULK_INVITATIONS) {
+      setNotice("A batch can contain at most " + MAX_BULK_INVITATIONS + " people.");
       return false;
     }
     const created = values.map((row) => ({ ...row, id: nextId.current++ }));
-    setRows((current) => (hasSingleEmpty ? created : [...current, ...created]));
+    setRows((current) => replaceFirst ? created : [...current, ...created]);
     setNotice("");
-    setShowErrors(false);
     return true;
   };
 
   const importText = (source: string) => {
     try {
       const parsed = parseInvitationRows(source);
-      if (appendRows(parsed)) {
+      if (appendRows(parsed, true)) {
         setPasteOpen(false);
         setPasteValue("");
       }
@@ -156,8 +155,12 @@ export const InvitePeopleModal: React.FC<Props> = ({
 
   const review = () => {
     setShowErrors(true);
+    if (preview.length === 0) {
+      setNotice("Enter at least one person.");
+      return;
+    }
     if (invalid.length > 0) {
-      setNotice("Correct the highlighted entries before reviewing.");
+      setNotice("Complete the highlighted rows before reviewing.");
       return;
     }
     setNotice("");
@@ -203,14 +206,14 @@ export const InvitePeopleModal: React.FC<Props> = ({
       return {
         row,
         userId: result.value.userId,
-        description: "Invitation created, but email failed. Use Resend.",
+        description: "Invitation created, but the email could not be sent. Use Resend.",
         failed: true,
       };
     }
     return {
       row,
       userId: result.value?.userId,
-      description: "Invitation submitted.",
+      description: "Invitation created.",
     };
   };
 
@@ -235,7 +238,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
         next = {
           ...outcome,
           failed: false,
-          description: "Invitation resubmitted.",
+          description: "Email resend requested.",
         };
       } else {
         const value = await AccountUserManagerService.InviteUser(
@@ -325,6 +328,9 @@ export const InvitePeopleModal: React.FC<Props> = ({
     }
   };
 
+  const reviewLabel = preview.length
+    ? "Review " + preview.length + " " + (preview.length === 1 ? "person" : "people")
+    : "Review invitations";
   const title =
     phase === "results"
       ? "Invitation results"
@@ -362,12 +368,11 @@ export const InvitePeopleModal: React.FC<Props> = ({
                 type="primary"
                 icon={<CheckOutlined />}
                 alwaysShowChildren
-                aria-label={`Review ${rows.length} ${
-                  rows.length === 1 ? "person" : "people"
-                }`}
+                aria-label={reviewLabel}
                 onClick={review}
+                debounceTime={0}
               >
-                Review {rows.length} {rows.length === 1 ? "person" : "people"}
+                {reviewLabel}
               </PlanarianButton>
             )}
             {phase === "review" && (
@@ -422,7 +427,8 @@ export const InvitePeopleModal: React.FC<Props> = ({
           </Typography.Paragraph>
           <div className="invite-people-modal__rows">
             {rows.map((row, index) => {
-              const item = preview[index];
+              const item = preview.find((entry) => entry.row.id === row.id);
+              const highlight = showErrors && item?.disposition === "invalid";
               return (
                 <div key={row.id} className="invite-people-modal__row">
                   <span className="invite-people-modal__number">
@@ -432,6 +438,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                     aria-label={`First name for person ${index + 1}`}
                     placeholder="First name"
                     value={row.firstName}
+                    aria-invalid={highlight && !row.firstName.trim()}
                     onChange={(event) =>
                       changeRow(row.id, "firstName", event.target.value)
                     }
@@ -440,6 +447,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                     aria-label={`Last name for person ${index + 1}`}
                     placeholder="Last name"
                     value={row.lastName}
+                    aria-invalid={highlight && !row.lastName.trim()}
                     onChange={(event) =>
                       changeRow(row.id, "lastName", event.target.value)
                     }
@@ -449,6 +457,7 @@ export const InvitePeopleModal: React.FC<Props> = ({
                     type="email"
                     placeholder="Email address"
                     value={row.emailAddress}
+                    aria-invalid={highlight && !isValidInvitationEmail(row.emailAddress.trim())}
                     onChange={(event) =>
                       changeRow(row.id, "emailAddress", event.target.value)
                     }
@@ -464,12 +473,9 @@ export const InvitePeopleModal: React.FC<Props> = ({
                       )
                     }
                   />
-                  {item.disposition !== "ready" &&
+                  {item && item.disposition !== "ready" &&
                     (showErrors || item.disposition === "skipped") && (
-                      <div
-                        className="invite-people-modal__row-message"
-                        role="status"
-                      >
+                      <div className="invite-people-modal__row-message" role="status">
                         {item.reason}
                       </div>
                     )}
@@ -481,8 +487,10 @@ export const InvitePeopleModal: React.FC<Props> = ({
             <PlanarianButton
               alwaysShowChildren
               icon={<PlusOutlined />}
+              aria-label="Add person"
               disabled={rows.length >= MAX_BULK_INVITATIONS}
               onClick={() => appendRows([emptyRow(0)])}
+              debounceTime={0}
             >
               Add person
             </PlanarianButton>

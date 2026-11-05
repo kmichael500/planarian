@@ -23,7 +23,7 @@ import { SelectListItem } from "../../Shared/Models/SelectListItem";
 import { hasPermission } from "../../Shared/Permissioning/PermissionHelpers";
 import { useLocation, useNavigate } from "react-router-dom";
 import { RequestRuntimeState } from "../../Shared/Http/RequestRuntimeState";
-import { message, notification } from "antd";
+import { message } from "antd";
 import { defaultAppContentStyle } from "../Layout/AppContentLayout";
 
 interface FeaturePermissions {
@@ -108,7 +108,6 @@ interface AppProviderProps {
 export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [notificationApi, notificationHolder] = notification.useNotification();
   const [headerTitleState, setHeaderTitleState] = useState({
     pathname: location.pathname,
     value: emptyHeaderTitle,
@@ -126,7 +125,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountIds, setAccountIds] = useState<SelectListItem<string>[]>([]);
   const [disabledAccountIds, setDisabledAccountIds] = useState<DisabledAccountVm[]>([]);
-  const notifiedDisabledAccounts = useRef(new Set<string>());
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
@@ -165,7 +163,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setCurrentAccountId(null);
     setAccountIds([]);
     setDisabledAccountIds([]);
-    notifiedDisabledAccounts.current.clear();
     setPermissionKeys([]);
     setPermissions(defaultFeaturePermissions);
     setPendingInvitationCount(0);
@@ -196,6 +193,19 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       const storedAccountId = AuthenticationService.GetStoredAccountId(
         appOptions.currentUser.id
       );
+
+      // Preserve the disabled selection until the user chooses another account.
+      if (
+        storedAccountId &&
+        appOptions.disabledAccountIds?.some((account) => account.value === storedAccountId)
+      ) {
+        return {
+          ...appOptions,
+          currentUser: { ...appOptions.currentUser, currentAccountId: null },
+          permissions: [],
+        };
+      }
+
       const hasStoredAccount =
         storedAccountId != null &&
         appOptions.accountIds.some((account) => account.value === storedAccountId);
@@ -267,22 +277,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       }
       setInitializedError(null);
       setIsInitialized(true);
-      if (isAuthenticated) {
-        for (const account of disabled) {
-          const noticeKey = `${account.value}:${account.disableMessage ?? ""}`;
-          if (notifiedDisabledAccounts.current.has(noticeKey)) continue;
-          notifiedDisabledAccounts.current.add(noticeKey);
-          notificationApi.warning({
-            message: `Access disabled: ${account.display}`,
-            description: account.disableMessage ||
-              "An account administrator has disabled your access.",
-            duration: appOptions.accountIds.length === 0 ? 0 : 12,
-            placement: "topRight",
-          });
-        }
-      }
     },
-    [isCurrentSession, notificationApi, refreshPendingInvitations]
+    [isCurrentSession, refreshPendingInvitations]
   );
 
   const refreshSession = useCallback(
@@ -345,7 +341,9 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     const unregister = AuthenticationService.RegisterUnauthorizedHandler((reason) => {
       const generation = ++sessionGeneration.current;
       const wasAuthenticated = AuthenticationService.IsAuthenticated();
-      AuthenticationService.ResetAccountId();
+      if (reason === "unauthorized" || !wasAuthenticated) {
+        AuthenticationService.ResetAccountId();
+      }
       RequestRuntimeState.setCurrentAccountId(null);
       setCurrentAccountId(null);
       setPermissionKeys([]);
@@ -379,7 +377,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       void (async () => {
         setIsLoading(true);
         try {
-          const appOptions = await loadSession(null);
+          const appOptions = await loadSession();
           if (!isCurrentSession(generation)) return;
           if (!appOptions.currentUser) {
             redirectToLogin();
@@ -483,7 +481,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         refreshPendingInvitations,
       }}
     >
-      {notificationHolder}
       {props.children}
     </AppContext.Provider>
   );

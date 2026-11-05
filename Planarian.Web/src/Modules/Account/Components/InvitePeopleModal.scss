@@ -4,9 +4,15 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: min(55vh, 520px);
-    overflow-y: auto;
+    min-width: 0;
     padding: 4px 2px;
+  }
+
+  &__rows,
+  &__review-list {
+    max-height: min(48dvh, 430px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   &__row {
@@ -18,6 +24,10 @@
     .ant-input {
       min-width: 0;
       min-height: 40px;
+    }
+
+    .ant-input[aria-invalid="true"] {
+      border-color: var(--danger-color, #c83b3b);
     }
   }
 
@@ -38,11 +48,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  &__tools {
     margin-top: 14px;
   }
 
   &__footer {
     justify-content: flex-end;
+    width: 100%;
   }
 
   &__count {

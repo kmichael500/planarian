@@ -80,7 +80,11 @@ export function parseInvitationRows(text: string): InviteUserRequest[] {
   });
 }
 
-const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+export const isEmptyInvitationRow = (row: InvitationRow) =>
+  !row.firstName.trim() && !row.lastName.trim() && !row.emailAddress.trim();
+
+export const isValidInvitationEmail = (email: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 export function previewInvitations(
   rows: InvitationRow[],
@@ -97,7 +101,7 @@ export function previewInvitations(
     const lastName = row.lastName.trim();
     const email = row.emailAddress.trim().toLowerCase();
 
-    if (!firstName || !lastName || !validEmail(email)) {
+    if (!firstName || !lastName || !isValidInvitationEmail(email)) {
       return {
         row,
         disposition: "invalid",

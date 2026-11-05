@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { message, notification } from "antd";
+import { message } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
@@ -23,6 +23,13 @@ const active = (id: string): AppInitializeVm => ({
   permissions: [],
 });
 
+const availableWithDisabled = {
+  ...active("active0001"),
+  disabledAccountIds: [
+    { display: "Disabled account", value: "disabled001", disableMessage: "Your annual membership expired." },
+  ],
+};
+
 const NoAccount = {
   ...active("active0001"),
   currentUser: { id: "testuser01", fullName: "Test User", currentAccountId: null },
@@ -44,12 +51,13 @@ const feature = (id: string): FeatureSettingVm => ({
 });
 
 const SessionProbe = () => {
-  const { currentAccountId, isAuthenticated, isInitialized, isLoading, initializedError,
+  const { currentAccountId, accountIds, isAuthenticated, isInitialized, isLoading, initializedError,
     permissions, refreshSession, pendingInvitationCount } = useContext(AppContext);
   const location = useLocation();
   return (
     <>
       <span data-testid="account">{currentAccountId ?? "none"}</span>
+      <span data-testid="available">{accountIds.map((account) => account.value).join(",")}</span>
       <span data-testid="authenticated">{String(isAuthenticated)}</span>
       <span data-testid="initialized">{String(isInitialized)}</span>
       <span data-testid="loading">{String(isLoading)}</span>
@@ -68,8 +76,6 @@ const SessionProbe = () => {
 };
 
 describe("AppProvider disabled account recovery", () => {
-  let notifyWarning: jest.Mock;
-
   beforeEach(() => {
     AuthenticationService.ClearRuntimeSession();
     AuthenticationService.ResetUnauthorizedHandling();
@@ -78,11 +84,6 @@ describe("AppProvider disabled account recovery", () => {
     jest.spyOn(AccountService, "GetFeatureSettings").mockResolvedValue([]);
     jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
     jest.spyOn(message, "warning").mockImplementation(() => undefined as never);
-    notifyWarning = jest.fn();
-    jest.spyOn(notification, "useNotification").mockReturnValue([
-      { warning: notifyWarning } as unknown as ReturnType<typeof notification.useNotification>[0],
-      <span data-testid="disabling-notification-holder" />,
-    ]);
   });
 
   afterEach(() => {
@@ -91,16 +92,13 @@ describe("AppProvider disabled account recovery", () => {
     AuthenticationService.ResetUnauthorizedHandling();
   });
 
-  it("switches to an available account without invalidating the user's login", async () => {
+  it("does not switch to another account after the selected membership is disabled", async () => {
     let requestAccountDuringRefresh: string | null = "not-cleared";
     const initialize = jest.spyOn(AppService, "InitializeApp")
       .mockResolvedValueOnce(active("disabled001"))
       .mockImplementationOnce(async () => {
         requestAccountDuringRefresh = RequestRuntimeState.getCurrentAccountId();
-        return {
-          ...active("active0001"),
-          disabledAccountIds: [{ display: "Former account", value: "disabled001" }],
-        };
+        return availableWithDisabled;
       });
 
     render(
@@ -111,12 +109,53 @@ describe("AppProvider disabled account recovery", () => {
     await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("disabled001"));
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
-    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("active0001"));
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(screen.getByTestId("account")).toHaveTextContent("none");
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    expect(screen.getByTestId("available")).toHaveTextContent("active0001");
     expect(screen.getByTestId("pathname")).toHaveTextContent("/");
+    expect(screen.getByTestId("features")).toBeEmptyDOMElement();
     expect(requestAccountDuringRefresh).toBeNull();
-    expect(initialize).toHaveBeenLastCalledWith(null);
-    expect(notifyWarning).toHaveBeenCalledWith(expect.objectContaining({ message: "Access disabled: Former account" }));
+    expect(RequestRuntimeState.getCurrentAccountId()).toBeNull();
+    expect(AuthenticationService.GetStoredAccountId("testuser01")).toBe("disabled001");
+    expect(initialize).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("remains accountless on reload until the user selects an available account", async () => {
+    AuthenticationService.SetStoredAccountId("testuser01", "disabled001");
+    const initialize = jest.spyOn(AppService, "InitializeApp")
+      .mockResolvedValueOnce(availableWithDisabled)
+      .mockResolvedValueOnce(active("alternate1"));
+    const featureSettings = jest.spyOn(AccountService, "GetFeatureSettings");
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppProvider><SessionProbe /></AppProvider>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(screen.getByTestId("account")).toHaveTextContent("none");
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    expect(screen.getByTestId("available")).toHaveTextContent("active0001");
+    expect(featureSettings).not.toHaveBeenCalled();
+    expect(initialize).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select another account" }));
+    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("alternate1"));
+    expect(AuthenticationService.GetStoredAccountId("testuser01")).toBe("alternate1");
+    expect(initialize).toHaveBeenLastCalledWith("alternate1");
+  });
+
+  it("keeps normal default account selection when no disabled account was selected", async () => {
+    jest.spyOn(AppService, "InitializeApp").mockResolvedValue(availableWithDisabled);
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppProvider><SessionProbe /></AppProvider>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(screen.getByTestId("account")).toHaveTextContent("active0001");
+    expect(AuthenticationService.GetStoredAccountId("testuser01")).toBe("active0001");
   });
 
   it("keeps an authenticated user with no remaining account on the accountless route", async () => {
@@ -134,35 +173,31 @@ describe("AppProvider disabled account recovery", () => {
     await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("none"));
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     expect(screen.getByTestId("pathname")).toHaveTextContent("/");
-    expect(initialize).toHaveBeenLastCalledWith(null);
+    expect(initialize).toHaveBeenLastCalledWith(undefined);
   });
 
-  it("shows a persistent login notice when all account access was disabled", async () => {
-    jest.spyOn(AppService, "InitializeApp").mockResolvedValue(NoAccount);
+  it("does not interrupt a different active account when another membership is disabled", async () => {
+    AuthenticationService.SetStoredAccountId("testuser01", "active0001");
+    const initialize = jest.spyOn(AppService, "InitializeApp")
+      .mockResolvedValue(availableWithDisabled);
+
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={["/caves"]}>
         <AppProvider><SessionProbe /></AppProvider>
       </MemoryRouter>
     );
-    await waitFor(() => expect(notifyWarning).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: "Access disabled: Disabled account",
-        description: "Your annual membership expired.",
-        duration: 0,
-      })
-    ));
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
-    expect(screen.getByTestId("account")).toHaveTextContent("none");
-    expect(screen.getByTestId("disabling-notification-holder")).toBeInTheDocument();
+    expect(screen.getByTestId("account")).toHaveTextContent("active0001");
+    expect(screen.getByTestId("pathname")).toHaveTextContent("/caves");
+    expect(initialize).toHaveBeenCalledTimes(1);
+    expect(message.warning).not.toHaveBeenCalled();
   });
 
-  it("keeps a valid session when account settings and invitation lookups fail", async () => {
+  it("keeps a valid accountless session when invitation lookup fails", async () => {
     jest.spyOn(AppService, "InitializeApp")
       .mockResolvedValueOnce(active("disabled001"))
-      .mockResolvedValueOnce(active("active0001"));
-    jest.spyOn(AccountService, "GetFeatureSettings")
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Settings unavailable"));
+      .mockResolvedValueOnce(availableWithDisabled);
     jest.spyOn(UserService, "GetPendingInvitations")
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Invitations unavailable"));
@@ -175,7 +210,7 @@ describe("AppProvider disabled account recovery", () => {
     await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
 
-    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("active0001"));
+    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("none"));
     await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     expect(screen.getByTestId("pathname")).toHaveTextContent("/");
@@ -241,10 +276,9 @@ describe("AppProvider disabled account recovery", () => {
     const oldSettings = deferred<FeatureSettingVm[]>();
     jest.spyOn(AppService, "InitializeApp")
       .mockResolvedValueOnce(active("disabled001"))
-      .mockResolvedValueOnce(active("active0001"));
+      .mockResolvedValueOnce(availableWithDisabled);
     jest.spyOn(AccountService, "GetFeatureSettings")
-      .mockImplementationOnce(() => oldSettings.promise)
-      .mockResolvedValueOnce([feature("new-account-setting")]);
+      .mockImplementationOnce(() => oldSettings.promise);
 
     render(
       <MemoryRouter initialEntries={["/caves"]}>
@@ -254,16 +288,16 @@ describe("AppProvider disabled account recovery", () => {
     await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("disabled001"));
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
-    await waitFor(() => expect(screen.getByTestId("features"))
-      .toHaveTextContent("new-account-setting"));
+    await waitFor(() => expect(screen.getByTestId("account"))
+      .toHaveTextContent("none"));
+    expect(screen.getByTestId("features")).toBeEmptyDOMElement();
 
     await act(async () => {
       oldSettings.resolve([feature("stale-account-setting")]);
       await oldSettings.promise;
     });
 
-    expect(screen.getByTestId("account")).toHaveTextContent("active0001");
-    expect(screen.getByTestId("features")).toHaveTextContent("new-account-setting");
-    expect(screen.getByTestId("features")).not.toHaveTextContent("stale-account-setting");
+    expect(screen.getByTestId("account")).toHaveTextContent("none");
+    expect(screen.getByTestId("features")).toBeEmptyDOMElement();
   });
 });

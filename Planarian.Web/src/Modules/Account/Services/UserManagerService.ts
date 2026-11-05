@@ -4,8 +4,10 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { PermissionType } from "../../Authentication/Models/PermissionType";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { InviteUserResultVm } from "../Models/InviteUserResultVm";
-import { DisableAccessResultVm } from "../Models/DisableAccessResultVm";
-import { RevokeMembershipResultVm } from "../Models/RevokeMembershipResultVm";
+import {
+  AccountAccessAction,
+  AccountAccessChangeResultVm,
+} from "../Models/AccountAccessChangeResultVm";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
@@ -18,8 +20,10 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 const baseUrl = "api/account/user-manager";
 const AccountUserManagerService = {
   async GetAccountUsers(accountId?: string): Promise<UserManagerGridVm[]> {
-    const response = await HttpClient.get<UserManagerGridVm[]>(baseUrl,
-      accountId ? { headers: { "x-account": accountId } } : undefined);
+    const response = await HttpClient.get<UserManagerGridVm[]>(
+      baseUrl,
+      accountId ? { headers: { "x-account": accountId } } : undefined
+    );
     return response.data;
   },
   async GetUserById(userId: string): Promise<UserManagerGridVm> {
@@ -28,43 +32,46 @@ const AccountUserManagerService = {
     );
     return response.data;
   },
-  async InviteUser(request: InviteUserRequest, accountId?: string): Promise<InviteUserResultVm> {
-    return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request,
-      accountId ? { headers: { "x-account": accountId } } : undefined)).data;
+  async InviteUser(
+    request: InviteUserRequest,
+    accountId?: string
+  ): Promise<InviteUserResultVm> {
+    return (
+      await HttpClient.post<InviteUserResultVm>(
+        `${baseUrl}`,
+        request,
+        accountId ? { headers: { "x-account": accountId } } : undefined
+      )
+    ).data;
   },
-  async DisableAccess(
+  async ChangeAccess(
     userId: string,
-    accountId?: string,
-    disableMessage?: string,
+    accountId: string,
+    action: AccountAccessAction,
+    notificationMessage?: string,
     sendEmail = true
-  ): Promise<DisableAccessResultVm> {
-    const response = await HttpClient.post<DisableAccessResultVm>(
-      `${baseUrl}/${userId}/disable-access`,
-      { disableMessage: sendEmail ? disableMessage || null : null, sendEmail },
-      accountId ? { headers: { "x-account": accountId } } : undefined
+  ): Promise<AccountAccessChangeResultVm> {
+    const response = await HttpClient.post<AccountAccessChangeResultVm>(
+      `${baseUrl}/${userId}/access-change`,
+      {
+        action,
+        notificationMessage: sendEmail ? notificationMessage || null : null,
+        sendEmail,
+      },
+      { headers: { "x-account": accountId } }
     );
     return response.data;
   },
-  async RevokeMembership(
-    userId: string,
-    accountId?: string,
-    notificationMessage?: string,
-    sendEmail = true
-  ): Promise<RevokeMembershipResultVm> {
-    return (await HttpClient.post<RevokeMembershipResultVm>(
-      `${baseUrl}/${userId}/revoke-membership`,
-      { notificationMessage: sendEmail ? notificationMessage || null : null, sendEmail },
-      accountId ? { headers: { "x-account": accountId } } : undefined
-    )).data;
-  },
-  async RestoreAccess(userId: string): Promise<void> {
-    await HttpClient.post(`${baseUrl}/${userId}/restore-access`, {});
-  },
   async ResendInvitation(userId: string, accountId?: string): Promise<void> {
-    await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {},
-      accountId ? { headers: { "x-account": accountId } } : undefined);
+    await HttpClient.post(
+      `${baseUrl}/${userId}/resend-invitation`,
+      {},
+      accountId ? { headers: { "x-account": accountId } } : undefined
+    );
   },
-  async GetInvitationEmailHistory(userId: string): Promise<InvitationEmailAttemptVm[]> {
+  async GetInvitationEmailHistory(
+    userId: string
+  ): Promise<InvitationEmailAttemptVm[]> {
     return (
       await HttpClient.get<InvitationEmailAttemptVm[]>(
         `${baseUrl}/${userId}/invitation-email-history`

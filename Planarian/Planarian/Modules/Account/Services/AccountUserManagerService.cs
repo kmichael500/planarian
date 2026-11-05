@@ -152,67 +152,65 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         };
     }
 
-    public async Task<DisableAccessResultVm> DisableAccess(string userId, string? disableMessage = null,
-        CancellationToken cancellationToken = default, bool sendEmail = true)
+    public async Task<AccountAccessChangeResultVm> ChangeAccess(string userId,
+        AccountAccessChangeRequest request, CancellationToken cancellationToken = default)
     {
-        disableMessage = sendEmail ? disableMessage?.Trim() : null;
-        var accountId = RequestUser.AccountId;
-        var shouldNotify = await _accountAccessService.DisableAccess(
-            userId, cancellationToken, disableMessage, sendEmail);
-        if (!shouldNotify || !sendEmail)
-            return new DisableAccessResultVm();
+        if (!Enum.IsDefined(request.Action))
+            throw ApiExceptionDictionary.BadRequest("Invalid account access action.");
 
-        try
-        {
-            var user = await Repository.Get(userId);
-            var accountName = await _accountRepository.GetAccountName(accountId!);
-            if (user == null)
-                throw new InvalidOperationException("Disabled user could not be found for notification.");
-
-            var result = await _emailService.SendAccountAccessDisabledEmail(
-                user, accountName, disableMessage, CancellationToken.None);
-            return new DisableAccessResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "Unable to send account-access disabling notification for {UserId}.",
-                userId);
-            return new DisableAccessResultVm { NotificationEmailDeliveryStatus = MessageDeliveryStatus.SendFailed };
-        }
-    }
-
-    public Task RestoreAccess(string userId, CancellationToken cancellationToken = default) =>
-        _accountAccessService.RestoreAccess(userId, cancellationToken);
-
-    public async Task<RevokeMembershipResultVm> RevokeMembership(string userId,
-        CancellationToken cancellationToken = default, string? notificationMessage = null, bool sendEmail = true)
-    {
-        notificationMessage = sendEmail ? notificationMessage?.Trim() : null;
-        if (sendEmail && string.IsNullOrWhiteSpace(notificationMessage))
-            throw ApiExceptionDictionary.BadRequest("A notification message is required when sending email.");
+        var notificationMessage = request.SendEmail ? request.NotificationMessage?.Trim() : null;
         if (notificationMessage?.Length > 1000)
             throw ApiExceptionDictionary.BadRequest("The notification message must be 1,000 characters or fewer.");
+        if (request.SendEmail && request.Action != AccountAccessChangeAction.Disable &&
+            string.IsNullOrWhiteSpace(notificationMessage))
+            throw ApiExceptionDictionary.BadRequest("A notification message is required when sending email.");
 
-        await _accountAccessService.RevokeMembership(userId, cancellationToken);
-        if (!sendEmail)
-            return new RevokeMembershipResultVm();
+        bool shouldNotify;
+        switch (request.Action)
+        {
+            case AccountAccessChangeAction.Disable:
+                shouldNotify = await _accountAccessService.DisableAccess(
+                    userId, cancellationToken, notificationMessage, request.SendEmail);
+                break;
+            case AccountAccessChangeAction.Enable:
+                shouldNotify = await _accountAccessService.RestoreAccess(userId, cancellationToken);
+                break;
+            case AccountAccessChangeAction.Revoke:
+                await _accountAccessService.RevokeMembership(userId, cancellationToken);
+                shouldNotify = true;
+                break;
+            default:
+                throw ApiExceptionDictionary.BadRequest("Invalid account access action.");
+        }
+
+        if (!shouldNotify || !request.SendEmail)
+            return new AccountAccessChangeResultVm();
 
         try
         {
             var recipient = await Repository.Get(userId);
-            if (recipient?.IsTemporary != false)
-                return new RevokeMembershipResultVm();
+            if (request.Action == AccountAccessChangeAction.Revoke && recipient?.IsTemporary != false)
+                return new AccountAccessChangeResultVm();
+            if (recipient == null)
+                throw new InvalidOperationException("Changed user could not be found for notification.");
 
             var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId!);
-            var result = await _emailService.SendAccountMembershipRevokedEmail(
-                recipient, accountName, notificationMessage, CancellationToken.None);
-            return new RevokeMembershipResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
+            var purpose = request.Action switch
+            {
+                AccountAccessChangeAction.Disable => MessagePurpose.AccountAccessDisabled,
+                AccountAccessChangeAction.Enable => MessagePurpose.AccountAccessRestored,
+                AccountAccessChangeAction.Revoke => MessagePurpose.AccountMembershipRevoked,
+                _ => throw new ArgumentOutOfRangeException(nameof(request.Action))
+            };
+            var result = await _emailService.SendAccountAccessChangeEmail(
+                recipient, accountName, notificationMessage, purpose, CancellationToken.None);
+            return new AccountAccessChangeResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Unable to send membership revocation notification for {UserId}.",
-                userId);
-            return new RevokeMembershipResultVm
+            _logger.LogError(exception,
+                "Unable to send {Action} account-access notification for {UserId}.", request.Action, userId);
+            return new AccountAccessChangeResultVm
             {
                 NotificationEmailDeliveryStatus = MessageDeliveryStatus.SendFailed
             };

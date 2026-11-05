@@ -1,0 +1,65 @@
+.account-access-modal {
+  &__summary {
+    margin-bottom: 12px;
+  }
+
+  &__notification,
+  &__confirmation {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    max-height: min(32dvh, 300px);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__person {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    overflow-wrap: anywhere;
+    padding: 8px 2px;
+
+    > span {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    small {
+      color: var(--muted-text-color);
+    }
+  }
+
+  &__failure {
+    color: var(--danger-color, #c83b3b);
+  }
+
+  &__footer {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  @media (max-width: 640px) {
+    &__person {
+      flex-direction: column;
+      gap: 4px;
+    }
+    &__list {
+      max-height: min(40dvh, 340px);
+    }
+  }
+}
