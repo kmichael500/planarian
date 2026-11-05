@@ -146,7 +146,6 @@ public sealed class InvitationClaimPostgresTests
 
             await using (var context = IsolatedPostgresDatabase.NewContext(connectionString))
             {
-                // The decline endpoint is anonymous; no account or user is selected.
                 var actor = new RequestUser(context);
                 context.RequestUser = actor;
                 await new InvitationLifecycleService(new UserRepository(context, actor), actor)

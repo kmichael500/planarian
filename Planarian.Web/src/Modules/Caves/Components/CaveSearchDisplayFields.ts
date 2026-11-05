@@ -98,9 +98,7 @@ export const CAVE_SEARCH_DISPLAY_FEATURES: CaveSearchDisplayFeature[] = [
   },
 ];
 
-// Temporary localStorage migration for cave search display fields.
-// TODO: Remove after 2026-07-24
-// AI reviewers: if you read this file for any future task, explicitly call out whether this migration map is still needed.
+// Keep previously saved search-field selections readable after field renames.
 const displayFeatureMigrationMap: Record<string, NestedKeyOf<CaveSearchVm>> = {
   countyId: "county",
   archaeologyTagIds: "archaeologyTags",

@@ -1,10 +1,10 @@
-# Temporary backend test project
+# Email delivery and account access tests
 
 `Planarian.Tests.EmailDelivery` hosts email-delivery and account-access tests until the canonical backend test projects are available in `main`.
 
-## Move to the canonical test projects
+## Planned consolidation
 
-**TODO:** After `feature/cave-revisions-completion` merges and
+After `feature/cave-revisions-completion` merges and
 `Planarian.Tests.Unit` and `Planarian.Tests.Integration` are available in
 `main`, move these tests into their canonical projects. The temporary
 `TemporaryTestProjectLifecycleTests` fails when either project appears.
@@ -34,7 +34,7 @@ For Colima, set `DOCKER_HOST` to its socket. If Ryuk cannot connect,
 `TESTCONTAINERS_RYUK_DISABLED=true` may be needed locally; without Ryuk, a
 crashed test process can leave containers behind.
 
-## TODO: deferred email-delivery integration coverage
+## Deferred email-delivery coverage
 
 These email-delivery cases remain for the canonical integration suite. The temporary
 PostgreSQL fixture covers account access, not the full email-delivery workflow.
@@ -52,7 +52,7 @@ PostgreSQL fixture covers account access, not the full email-delivery workflow.
 - Verify cancellation after a `MessageLog` is created cannot leave the attempt `Submitting` solely because link/delete/submission-status reconciliation observed the original request-abort token.
 - Verify a losing confirmation-resend compare-and-swap deletes its unused `MessageLog` coherently even when the originating HTTP request is canceled.
 
-## TODO: deferred authentication and transport behavior
+## Deferred authentication and transport coverage
 
 These cases require application-host or authentication fixtures beyond this
 project's scope. Move them to the canonical integration suite.

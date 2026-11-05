@@ -1,33 +1,15 @@
-# Planarian email template
+# Transactional email template
 
-`GenericEmailTemplate.mjml` is the source for all Planarian transactional emails.
-`GenericEmailTemplate.html` is generated from it and embedded in the backend build.
-The API uses the compiled HTML directly. All generic emails are sent from
-Planarian (notifications@{Email:FromDomain}) when the optional sender-domain
-override is configured, otherwise notifications@{Email:Domain}.
-
-From this directory:
+Edit `GenericEmailTemplate.mjml`, then regenerate the checked-in `GenericEmailTemplate.html`:
 
 ```sh
 npm ci
 npm run build
 npm run check
-npm run preview
 ```
 
-`build` regenerates the checked-in HTML. `check` validates MJML, checks
-the generated HTML is current, and renders seven sample messages through
-Handlebars. `preview` also captures desktop and mobile screenshots when
-Chrome is available (set `CHROME_PATH` for another executable). Previews are
-written to a temporary directory, not the repository.
+`npm run check` validates the template and sample messages. `npm run preview` also renders desktop and mobile screenshots when Chrome is available. Previews are written outside the repository.
 
-The API applies substitutions using Handlebars.Net; the local preview script
-uses JavaScript Handlebars. The backend tests verify the embedded HTML with
-Handlebars.Net as well. Neither preview nor test sends email.
+The API embeds the generated HTML and fills it with Handlebars substitutions. Template changes require a new API deployment.
 
-The generic template is deployed with the API, not through a database edit.
-Changing its source requires running `build` and deploying the new API.
-
-Password-change notifications include Server:SupportName and
-Server:SupportEmail directly in the message sentence. Organization-access
-notices preserve the administrator-provided message and do not add support details.
+The sender is `Planarian` at `notifications@{Email:FromDomain}` when the optional override is set, or `notifications@{Email:Domain}` otherwise.

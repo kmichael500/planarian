@@ -96,6 +96,7 @@ That gives them a useful starting point for finding caves that might have leads 
 - Import cave and entrance CSVs with a dry run before changes are applied, then review inserts, updates, and deletes before processing
 - Manage county codes, tags, and other account-level settings
 - Create downloadable account archives and manage recent backups
+- Invite users, disable or restore account access, and revoke memberships
 
 ## Permissions
 
@@ -116,7 +117,7 @@ Planarian supports multiple survey accounts with separate permissions and settin
 - County-level access
 - Individual cave access
 
-Account admins can invite users through the app. Invited users can accept or decline invitations and switch between accounts where they have access.
+Users can be invited by managers or admins through the app, accept or decline pending invitations, and switch between survey accounts with the same login if they have access to more than one.
 
 ## Misc
 
@@ -141,66 +142,6 @@ If you want to work on the codebase locally:
 4. Open `Planarian/Planarian.sln`.
 5. Run the backend from Visual Studio or your normal .NET workflow.
 6. Copy `Planarian.Web/.env.example` to the ignored `Planarian.Web/.env` and start the frontend with `npm start`. The normal local topology is `https://localhost:3000` → `https://localhost:7111`; this is required because authentication and antiforgery cookies are `Secure` and `SameSite=Lax`. Do not commit certificate/key material; react-scripts can generate a local development certificate, or configure `SSL_CRT_FILE` and `SSL_KEY_FILE` locally.
-
-## Email sender configuration
-
-Email templates are compiled locally from MJML and shipped with the API. The
-API does not compile MJML at runtime or retrieve email templates from the
-database. All transactional messages are sent as Planarian from
-notifications@{Email:FromDomain} when the optional Email:FromDomain setting
-is configured; otherwise the address defaults to notifications@{Email:Domain}.
-Email:Domain remains the Mailgun sending domain used for delivery tracking.
-Azure App Configuration can set Email:FromDomain using the Development and
-Production labels. The chosen From domain must be authorized for sending
-through Mailgun and have appropriate email authentication configured.
-
-The pending v33 migration drops MessageTypes, including its existing sender
-configuration and obsolete MJML/HTML fields. Its rollback recreates an empty
-table, not the deleted rows. MessageLogs and MessageLogEvents remain intact.
-
-## Account-access disabling deployment and rollback
-
-Apply migration `v33` before deploying the account-access disabling API. An older API ignores
-`AccountUsers.AccessDisabledOn`: **do not roll back the application to a version without
-disabling enforcement while disabled memberships exist**, even if the column remains.
-The `v33` down migration rejects a downgrade when it encounters disabled memberships;
-that database guard cannot protect against an application-only rollback. Resolve those
-memberships deliberately before deploying an older API or removing the column.
-
-An authenticated **non-initialization** API request with an unavailable `x-account`
-selection returns HTTP 403 with error code `InvalidAccountSelection`; the frontend
-reloads available accounts without invalidating the login. The `/api/app/initialize`
-endpoint intentionally accepts stale selections and returns an available account when
-possible. HTTP 401 is reserved for an expired or invalid login.
-
-## Bulk invitations, access disabling, and membership revocation
-
-Account admins can invite up to 50 people at once using editable rows, spreadsheet
-paste, or CSV import. Every invitation requires first name, last name, and email.
-The review screen skips existing members, pending invitations, and disabled members.
-Duplicate submissions to the same account/email reuse the pending invitation.
-
-The user manager also supports selecting visible people to disable access or remove
-pending invitations. Disabling preserves memberships and permissions for restoration;
-removing a pending invitation deletes its unused temporary access. Each request retains
-its own authorization and last-administrator checks. The review screen reports
-individual outcomes and supports retrying failures. When disabling access for
-accepted members, the dialog offers an enabled-by-default notification checkbox
-and a prefilled, editable email message (up to 1,000 characters). When email is
-enabled, the API requires a nonblank message; when disabled, no message or email
-is recorded. The message, when supplied, is trimmed, stored on the membership,
-included in the generic notification email, and displayed in disabled-account
-notices. Notification failure does not roll back the access change. Canceling
-a pending invitation sends no email, and restoring access clears the message.
-Administrators can revoke membership for accepted or disabled members after typing
-`REVOKE` in a separate confirmation. Notification email is enabled by default;
-its editable message is required only when sending. Revocation deletes the
-account's membership, permissions, and favorites, but preserves the user's login,
-other account memberships, shared cave data, and email-delivery history. An email
-failure does not undo revocation. Access-disabling emails say "disabled" and
-membership-revocation emails say "revoked"; both use the generic email template
-without mentioning favorites in the default message. The last-administrator
-safeguard applies to both actions.
 
 ## Deployment origin configuration
 
