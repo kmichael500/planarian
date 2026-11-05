@@ -33,6 +33,7 @@ namespace Planarian.Migrations.Migrations
         {
             // Older application versions ignore this column and would restore disabled access.
             migrationBuilder.Sql("""
+                LOCK TABLE "AccountUsers" IN ACCESS EXCLUSIVE MODE;
                 DO $planarian$
                 BEGIN
                     IF EXISTS (SELECT 1 FROM "AccountUsers" WHERE "AccessDisabledOn" IS NOT NULL) THEN
