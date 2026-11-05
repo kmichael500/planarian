@@ -17,6 +17,10 @@
   background: var(--hover-surface-color) !important;
 }
 
+.planarian-account-option[aria-disabled="true"] {
+  padding: 12px 16px;
+}
+
 .planarian-account-choice {
   min-height: 44px;
   height: auto;
@@ -31,8 +35,34 @@
   background: var(--hover-surface-color) !important;
 }
 
+.planarian-account-disabled-content {
+  min-width: 0;
+  width: 100%;
+}
+
+.planarian-account-disabled-header {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.planarian-account-disabled-status {
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+}
+
 .planarian-account-disabled-message {
-  margin: 6px 0 0;
+  line-height: 1.5;
+  margin: 8px 0 0 !important;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .planarian-account-disabled-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
 }

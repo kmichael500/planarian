@@ -65,29 +65,39 @@ const SwitchAccountComponent = ({
             dataSource={accountList}
             renderItem={(item) => {
               const isDisabled = item.isDisabled;
+              const disableMessage =
+                item.disableMessage?.trim() ||
+                `Your access to ${item.display} has been disabled. If you have any questions or believe this was a mistake, please reach out to an administrator.`;
               return (
                 <List.Item
                   className="planarian-account-option"
                   key={item.value}
                   aria-disabled={isDisabled || undefined}
                   style={{
-                    opacity: isDisabled ? 0.65 : 1,
-                    padding: isDisabled ? "10px" : 0,
+                    padding: isDisabled ? undefined : 0,
                     border: "1px solid #d9d9d9",
                     borderRadius: "4px",
                     marginBottom: "10px",
                   }}
                 >
                   {isDisabled ? (
-                    <>
-                      <span>{item.display}</span>
-                      <Typography.Text type="danger">Access disabled</Typography.Text>
-                      {item.disableMessage && (
-                        <Typography.Paragraph className="planarian-account-disabled-message">
-                          {item.disableMessage}
-                        </Typography.Paragraph>
-                      )}
-                    </>
+                    <div className="planarian-account-disabled-content">
+                      <div className="planarian-account-disabled-header">
+                        <Typography.Text strong>{item.display}</Typography.Text>
+                        <Typography.Text
+                          className="planarian-account-disabled-status"
+                          type="danger"
+                        >
+                          Access disabled
+                        </Typography.Text>
+                      </div>
+                      <Typography.Paragraph
+                        className="planarian-account-disabled-message"
+                        type="secondary"
+                      >
+                        {disableMessage}
+                      </Typography.Paragraph>
+                    </div>
                   ) : (
                     <PlanarianButton
                       icon={null}

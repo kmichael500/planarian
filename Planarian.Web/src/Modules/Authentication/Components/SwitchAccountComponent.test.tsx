@@ -111,6 +111,11 @@ it("opens the selected account when switching from the accountless Invitations p
   render(<SwitchAccountComponent isVisible handleCancel={() => {}} />, {
     wrapper: Wrapper,
   });
+  expect(
+    screen.getByText(
+      "Your access to Disabled account has been disabled. If you have any questions or believe this was a mistake, please reach out to an administrator."
+    )
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Other active account" }));
   expect(switchAccount).toHaveBeenCalledWith("active0001", "/caves");
 });
