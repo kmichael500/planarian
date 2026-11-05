@@ -1,4 +1,8 @@
-import { HttpClient, registerUnauthorizedHandler } from "../../../Shared/Http/HttpClient";
+import {
+  AuthenticationFailureReason,
+  HttpClient,
+  registerUnauthorizedHandler,
+} from "../../../Shared/Http/HttpClient";
 import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 
@@ -13,7 +17,7 @@ interface SessionSnapshot {
   currentUser: SessionCurrentUserSnapshot | null;
 }
 
-type UnauthorizedHandler = () => void;
+type UnauthorizedHandler = (reason: AuthenticationFailureReason) => void;
 
 const currentIdStorageKey = (userId: string) => `currentAccountId-${userId}`;
 
@@ -31,13 +35,13 @@ let sessionSnapshot: SessionSnapshot = {
 let directUnauthorizedHandler: UnauthorizedHandler | null = null;
 let isHandlingUnauthorized = false;
 
-const invokeUnauthorizedHandler = () => {
+const invokeUnauthorizedHandler = (reason: AuthenticationFailureReason) => {
   if (isHandlingUnauthorized) {
     return;
   }
 
   isHandlingUnauthorized = true;
-  directUnauthorizedHandler?.();
+  directUnauthorizedHandler?.(reason);
 };
 
 const AuthenticationService = {
@@ -85,8 +89,8 @@ const AuthenticationService = {
       unregisterHttpHandler();
     };
   },
-  HandleUnauthorized(): void {
-    invokeUnauthorizedHandler();
+  HandleUnauthorized(reason: AuthenticationFailureReason = "unauthorized"): void {
+    invokeUnauthorizedHandler(reason);
   },
   ResetUnauthorizedHandling(): void {
     isHandlingUnauthorized = false;

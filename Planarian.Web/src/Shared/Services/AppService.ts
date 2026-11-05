@@ -13,26 +13,31 @@ let AppOptions: AppOptionsVm = {
   supportEmail: "",
 };
 
-
 const AppService = {
   async InitializeApp(
     selectedAccountId?: string | null
   ): Promise<AppInitializeVm> {
-    const response = await HttpClient.get<AppInitializeVm>(`${baseUrl}/initialize`, {
-      headers: !isNullOrWhiteSpace(selectedAccountId)
-        ? { "x-account": selectedAccountId }
-        : undefined,
-    });
-
-    AppOptions = {
-      apiBaseUrl: response.data.apiBaseUrl,
-      signalrBaseUrl: response.data.signalrBaseUrl,
-      supportName: response.data.supportName,
-      supportEmail: response.data.supportEmail,
-    };
-    RequestRuntimeState.setAntiforgeryRequestToken(response.data.antiforgeryRequestToken);
+    const response = await HttpClient.get<AppInitializeVm>(
+      `${baseUrl}/initialize`,
+      {
+        headers: !isNullOrWhiteSpace(selectedAccountId)
+          ? { "x-account": selectedAccountId }
+          : undefined,
+      }
+    );
 
     return response.data;
+  },
+  ApplyInitializationOptions(options: AppInitializeVm): void {
+    AppOptions = {
+      apiBaseUrl: options.apiBaseUrl,
+      signalrBaseUrl: options.signalrBaseUrl,
+      supportName: options.supportName,
+      supportEmail: options.supportEmail,
+    };
+    RequestRuntimeState.setAntiforgeryRequestToken(
+      options.antiforgeryRequestToken
+    );
   },
   GetAntiforgeryRequestToken(): string | null {
     return RequestRuntimeState.getAntiforgeryRequestToken();
@@ -70,8 +75,13 @@ export interface AppOptionsVm {
   supportEmail: string;
 }
 
+export interface DisabledAccountVm extends SelectListItem<string> {
+  disableMessage?: string | null;
+}
+
 export interface AppInitializeVm extends AppOptionsVm {
   accountIds: SelectListItem<string>[];
+  disabledAccountIds?: DisabledAccountVm[];
   permissions: PermissionKey[];
   currentUser: AppInitializeCurrentUserVm | null;
   antiforgeryRequestToken: string | null;

@@ -6,7 +6,6 @@ public class EmailOptions : MailGunOptions
 {
     public const string Key = "Email";
 
-    public string MjmlApplicationId { get; set; } = null!;
-    public string MjmlSecretKey { get; set; } = null!;
+    public string? FromDomain { get; set; }
     public string? WebhookSigningKey { get; set; }
 }

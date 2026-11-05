@@ -158,6 +158,13 @@
   padding: 0;
 }
 
+.user-manager-grid-card__membership-revoke.ant-btn {
+  align-self: flex-start;
+  height: auto;
+  margin-top: 8px;
+  padding: 0;
+}
+
 .user-manager-search {
   flex: 1 1 220px;
   min-width: 160px;
@@ -214,10 +221,11 @@
   display: flex;
   flex: 0 0 auto;
   justify-content: flex-end;
+  gap: 8px;
   min-width: 0;
 }
 
-.user-manager-invite-button.ant-btn {
+.user-manager-invite-column > .ant-btn {
   height: 44px;
 }
 
@@ -282,5 +290,57 @@
 
   .user-manager-invite-button.ant-btn {
     width: 100%;
+  }
+}
+
+.user-manager-grid-card__header-extra {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.user-manager-selection-bar {
+  align-items: center;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 8px;
+
+  > span {
+    color: var(--muted-text-color);
+    margin-left: auto;
+  }
+}
+
+.user-manager-selection-bar .ant-checkbox-wrapper {
+  align-items: center;
+  min-height: 44px;
+}
+
+.user-manager-selection-bar > .ant-btn {
+  height: 44px;
+}
+
+.user-manager-grid-card {
+  min-height: 300px;
+}
+
+@media (max-width: 760px) {
+  .user-manager-selection-bar {
+    gap: 8px;
+
+    > span {
+      margin-left: 0;
+    }
+
+    > .ant-btn {
+      flex: 1 1 auto;
+      min-height: 44px;
+    }
   }
 }

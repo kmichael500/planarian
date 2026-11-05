@@ -1,0 +1,141 @@
+.invite-people-modal {
+  &__rows,
+  &__review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 2px;
+  }
+
+  &__rows,
+  &__review-list {
+    max-height: min(48dvh, 430px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__row {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.45fr) 36px;
+
+    .ant-input {
+      min-width: 0;
+      min-height: 40px;
+    }
+
+    .ant-input[aria-invalid="true"] {
+      border-color: var(--danger-color, #c83b3b);
+    }
+  }
+
+  &__number {
+    color: var(--muted-text-color);
+    text-align: center;
+  }
+
+  &__row-message {
+    color: var(--muted-text-color);
+    font-size: 0.82rem;
+    grid-column: 2 / -1;
+  }
+
+  &__tools,
+  &__footer {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__tools {
+    margin-top: 14px;
+  }
+
+  &__footer {
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  &__count {
+    color: var(--muted-text-color);
+    font-size: 0.82rem;
+    margin-left: auto;
+  }
+
+  &__file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &__paste {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  &__review-item {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    overflow-wrap: anywhere;
+    padding: 10px 4px;
+
+    > span {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    small {
+      color: var(--muted-text-color);
+    }
+  }
+
+  &__failure {
+    color: var(--danger-color, #c83b3b);
+  }
+
+  @media (max-width: 640px) {
+    &__row {
+      grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 36px;
+
+      .ant-input:nth-of-type(3) {
+        grid-column: 2 / 4;
+      }
+    }
+
+    &__review-item {
+      flex-direction: column;
+      gap: 4px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    &__row {
+      grid-template-columns: 20px minmax(0, 1fr) 36px;
+
+      .ant-input,
+      .ant-input:nth-of-type(3) {
+        grid-column: 2;
+      }
+
+      .ant-btn {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      &-message {
+        grid-column: 2 / -1;
+      }
+    }
+  }
+}

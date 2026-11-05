@@ -237,11 +237,13 @@ builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
+builder.Services.AddScoped<InvitationLifecycleService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
+builder.Services.AddScoped<AccountAccessService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -251,7 +253,6 @@ builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
-builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 builder.Services.AddSingleton<HydrologyMemoryCache>();
 
@@ -272,7 +273,6 @@ builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped(typeof(TagRepository<>));
 builder.Services.AddScoped<UserRepository>();
-builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<MessageLogRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped(typeof(AccountRepository<>));
@@ -530,15 +530,14 @@ app.UseCors(x =>
 );
 
 app.UseAuthentication();
+// Handle account-selection failures raised by RequestUserMiddleware as well as API errors.
+app.UseMiddleware<HttpResponseExceptionMiddleware>();
 app.UseMiddleware<RequestUserMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
 
 app.MapHub<NotificationHub>("/api/notificationHub", options => { });
-
-
-app.UseMiddleware<HttpResponseExceptionMiddleware>();
 
 app.MapControllers();
 

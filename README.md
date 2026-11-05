@@ -96,6 +96,7 @@ That gives them a useful starting point for finding caves that might have leads 
 - Import cave and entrance CSVs with a dry run before changes are applied, then review inserts, updates, and deletes before processing
 - Manage county codes, tags, and other account-level settings
 - Create downloadable account archives and manage recent backups
+- Invite users, disable or restore account access, and revoke memberships
 
 ## Permissions
 

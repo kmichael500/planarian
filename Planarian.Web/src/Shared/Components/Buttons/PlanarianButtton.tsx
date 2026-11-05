@@ -40,14 +40,14 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
   const [debouncing, setDebouncing] = useState(false);
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (debouncing) return;
-    if (onClick) {
-      onClick(e);
+    if (debounceTime <= 0) {
+      onClick?.(e);
+      return;
     }
+    if (debouncing) return;
+    onClick?.(e);
     setDebouncing(true);
-    setTimeout(() => {
-      setDebouncing(false);
-    }, debounceTime);
+    setTimeout(() => setDebouncing(false), debounceTime);
   };
 
   // Define breakpoints order (from smallest to largest)

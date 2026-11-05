@@ -1,9 +1,7 @@
-using System.Data;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -23,21 +21,21 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     private readonly EmailService _emailService;
     private readonly AccountRepository _accountRepository;
     private readonly PermissionRepository _permissionRepository;
-    private readonly UserRepository _userRepository;
+    private readonly AccountAccessService _accountAccessService;
     private readonly ILogger<AccountUserManagerService> _logger;
 
     public AccountUserManagerService(
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
-        ServerOptions serverOptions, AccountRepository accountRepository,
-        PermissionRepository permissionRepository, UserRepository userRepository,
-        ILogger<AccountUserManagerService> logger) : base(repository, requestUser)
+        AccountRepository accountRepository,
+        PermissionRepository permissionRepository,
+        AccountAccessService accountAccessService, ILogger<AccountUserManagerService> logger) : base(repository, requestUser)
     {
         _emailService = emailService;
         _accountRepository = accountRepository;
         _permissionRepository = permissionRepository;
-        _userRepository = userRepository;
+        _accountAccessService = accountAccessService;
         _logger = logger;
     }
 
@@ -65,6 +63,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
+        request.EmailAddress = request.EmailAddress?.Trim() ?? string.Empty;
         if (!request.EmailAddress.IsValidEmail())
         {
             throw ApiExceptionDictionary.BadRequest("Invalid email address.");
@@ -93,6 +92,17 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         {
             try
             {
+                // Serialize invitation creation for the same account and email.
+                await Repository.LockInvitationEmail(RequestUser.AccountId, user.EmailAddress, cancellationToken);
+                await _accountAccessService.EnsureCanInvite(user.EmailAddress);
+                var pendingUserId = await Repository.GetPendingInvitationUserId(
+                    RequestUser.AccountId, user.EmailAddress, cancellationToken);
+                if (pendingUserId != null)
+                {
+                    await dbTransaction.CommitAsync(cancellationToken);
+                    return new InviteUserResultVm { UserId = pendingUserId, AlreadyInvited = true };
+                }
+
                 Repository.Add(user);
                 Repository.Add(accountUser);
                 await Repository.SaveChangesAsync(cancellationToken);
@@ -142,28 +152,72 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         };
     }
 
-    public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
+    public async Task<AccountAccessChangeResultVm> ChangeAccess(string userId,
+        AccountAccessChangeRequest request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        if (!Enum.IsDefined(request.Action))
+            throw ApiExceptionDictionary.BadRequest("Invalid account access action.");
+
+        var notificationMessage = request.SendEmail ? request.NotificationMessage?.Trim() : null;
+        if (notificationMessage?.Length > 1000)
+            throw ApiExceptionDictionary.BadRequest("The notification message must be 1,000 characters or fewer.");
+        if (request.SendEmail && request.Action != AccountAccessChangeAction.Disable &&
+            string.IsNullOrWhiteSpace(notificationMessage))
+            throw ApiExceptionDictionary.BadRequest("A notification message is required when sending email.");
+
+        bool shouldNotify;
+        switch (request.Action)
         {
-            throw ApiExceptionDictionary.NoAccount;
+            case AccountAccessChangeAction.Disable:
+                shouldNotify = await _accountAccessService.DisableAccess(
+                    userId, cancellationToken, notificationMessage, request.SendEmail);
+                break;
+            case AccountAccessChangeAction.Enable:
+                shouldNotify = await _accountAccessService.RestoreAccess(userId, cancellationToken);
+                break;
+            case AccountAccessChangeAction.Revoke:
+                await _accountAccessService.RevokeMembership(userId, cancellationToken);
+                shouldNotify = true;
+                break;
+            default:
+                throw ApiExceptionDictionary.BadRequest("Invalid account access action.");
         }
 
-        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        _logger.LogInformation(
+            "Account access {Action} processed for user {TargetUserId} in account {AccountId} by {ActorUserId}.",
+            request.Action, userId, RequestUser.AccountId, RequestUser.Id);
+
+        if (!shouldNotify || !request.SendEmail)
+            return new AccountAccessChangeResultVm();
+
         try
         {
-            var accessDeleted = await Repository.DeleteAccountUserAccess(userId, RequestUser.AccountId, cancellationToken);
-            if (!accessDeleted)
-            {
-                throw ApiExceptionDictionary.NotFound("User");
-            }
+            var recipient = await Repository.Get(userId);
+            if (request.Action == AccountAccessChangeAction.Revoke && recipient?.IsTemporary != false)
+                return new AccountAccessChangeResultVm();
+            if (recipient == null)
+                throw new InvalidOperationException("Changed user could not be found for notification.");
 
-            await dbTransaction.CommitAsync(cancellationToken);
+            var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId!);
+            var purpose = request.Action switch
+            {
+                AccountAccessChangeAction.Disable => MessagePurpose.AccountAccessDisabled,
+                AccountAccessChangeAction.Enable => MessagePurpose.AccountAccessRestored,
+                AccountAccessChangeAction.Revoke => MessagePurpose.AccountMembershipRevoked,
+                _ => throw new ArgumentOutOfRangeException(nameof(request.Action))
+            };
+            var result = await _emailService.SendAccountAccessChangeEmail(
+                recipient, accountName, notificationMessage, purpose, CancellationToken.None);
+            return new AccountAccessChangeResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
+            _logger.LogError(exception,
+                "Unable to send {Action} account-access notification for {UserId}.", request.Action, userId);
+            return new AccountAccessChangeResultVm
+            {
+                NotificationEmailDeliveryStatus = MessageDeliveryStatus.SendFailed
+            };
         }
     }
 
@@ -180,20 +234,16 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        if (accountUser.InvitationAcceptedOn.HasValue)
-        {
-            throw ApiExceptionDictionary.BadRequest("User has already accepted the invitation.");
-        }
-
-        if (string.IsNullOrWhiteSpace(accountUser.InvitationCode))
-        {
-            throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");
-        }
-
         var user = await Repository.Get(userId);
         if (user == null)
         {
             throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        if (!user.IsTemporary || accountUser.AccessDisabledOn.HasValue ||
+            accountUser.InvitationAcceptedOn.HasValue || string.IsNullOrWhiteSpace(accountUser.InvitationCode))
+        {
+            throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");
         }
 
         var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
@@ -522,7 +572,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+        var userHasPermission = await Repository.GetUserPermission(userId, permissionKey);
         if (userHasPermission != null)
         {
             throw ApiExceptionDictionary.BadRequest("User already has this permission.");
@@ -551,42 +601,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             Permission = permission
         };
 
-        _userRepository.Add(entity);
-        await _userRepository.SaveChangesAsync();
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync();
     }
 
-    public async Task RemoveUserPermission(string userId, string permissionKey)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-        {
-            throw ApiExceptionDictionary.NoAccount;
-        }
+    public Task RemoveUserPermission(string userId, string permissionKey) =>
+        _accountAccessService.RemoveUserPermission(userId, permissionKey);
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
-
-        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
-        if (accountUser == null)
-        {
-            throw ApiExceptionDictionary.NotFound("User");
-        }
-
-        if (RequestUser.Id.Equals(userId))
-        {
-            throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
-        }
-
-        if (permissionKey == PermissionKey.PlanarianAdmin)
-        {
-            throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be managed from account user management.");
-        }
-
-        var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
-        if (userPermission == null)
-        {
-            throw ApiExceptionDictionary.NotFound("User Permission");
-        }
-
-        _userRepository.Delete(userPermission);
-        await _userRepository.SaveChangesAsync();
-    }
 }

@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "node render.mjs build",
+    "check": "node render.mjs check",
+    "preview": "node render.mjs preview"
+  },
+  "devDependencies": {
+    "handlebars": "4.7.10",
+    "mjml": "5.4.1",
+    "puppeteer-core": "25.16.0"
+  }
+}

@@ -22,6 +22,7 @@ public enum ApiExceptionType
     EmailFailedToSend = 301,
     NoAccount = 302,
     EntranceRequired = 303,
+    InvalidAccountSelection = 304,
     InvalidImport = 400,
     NullValue = 401,
     SessionCancelled = 402,

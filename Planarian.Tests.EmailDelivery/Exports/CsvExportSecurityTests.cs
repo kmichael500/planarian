@@ -4,6 +4,7 @@ using System.Text;
 using CsvHelper;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Archive.Services;
+using Planarian.Tests.EmailDelivery.TestInfrastructure;
 using Xunit;
 
 namespace Planarian.Tests.EmailDelivery.Exports;
@@ -13,7 +14,7 @@ public sealed class CsvExportSecurityTests
     [Fact]
     public void CsvWritersAreCentralizedBehindTheSecurityPolicy()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = RepositoryPaths.Root;
         var productionRoot = Path.Combine(repositoryRoot, "Planarian", "Planarian");
         var directWriterFiles = Directory.EnumerateFiles(productionRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") &&
@@ -103,16 +104,4 @@ public sealed class CsvExportSecurityTests
         string Formula,
         string Normal);
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
-                return directory.FullName;
-        }
-
-        throw new InvalidOperationException("Could not locate the repository root.");
-    }
 }

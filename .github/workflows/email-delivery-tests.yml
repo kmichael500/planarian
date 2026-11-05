@@ -7,6 +7,7 @@ on:
       - "Planarian.Tests.EmailDelivery/**"
       - "Planarian.Tests.Unit/**"
       - "Planarian.Tests.Integration/**"
+      - "Templates/Emails/**"
       - ".github/workflows/email-delivery-tests.yml"
 
 jobs:
@@ -17,6 +18,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate compiled email template
+        working-directory: Templates/Emails
+        run: npm ci && npm run check
       - name: Run email delivery unit tests
         run: >-
           dotnet test Planarian.Tests.EmailDelivery/Planarian.Tests.EmailDelivery.csproj

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HandlebarsDotNet;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -15,24 +16,29 @@ using Southport.Messaging.Email.MailGun;
 
 namespace Planarian.Shared.Email.Services;
 
-public class EmailService : ServiceBase<MessageTypeRepository>
+public class EmailService : ServiceBase
 {
+    private const string SenderName = "Planarian";
+    private const string SenderLocalPart = "notifications";
+
     private readonly IEmailMessageFactory _emailMessageFactory;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly MessageLogRepository _messageLogRepository;
     private readonly EmailOptions _emailOptions;
+    private readonly ServerOptions _serverOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<EmailService> _logger;
 
-    public EmailService(MessageTypeRepository repository, RequestUser requestUser,
+    public EmailService(RequestUser requestUser,
         IEmailMessageFactory emailMessageFactory, ClientUrlBuilder clientUrlBuilder,
-        MessageLogRepository messageLogRepository, EmailOptions emailOptions,
-        IHostEnvironment hostEnvironment, ILogger<EmailService> logger) : base(repository, requestUser)
+        MessageLogRepository messageLogRepository, EmailOptions emailOptions, ServerOptions serverOptions,
+        IHostEnvironment hostEnvironment, ILogger<EmailService> logger) : base(requestUser)
     {
         _emailMessageFactory = emailMessageFactory;
         _clientUrlBuilder = clientUrlBuilder;
         _messageLogRepository = messageLogRepository;
         _emailOptions = emailOptions;
+        _serverOptions = serverOptions;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
@@ -44,24 +50,26 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         CancellationToken cancellationToken = default)
     {
         MessageLog? messageLog = null;
+        var messageLogPersisted = false;
         var providerSubmissionSucceeded = false;
 
         try
         {
-            var messageType =
-                await Repository.GetMessageTypeVm(TemplateKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
-
-            if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
-
-            substitutions.Substitutions["websiteUrl"] = _clientUrlBuilder.GetOrigin();
-            var html = Handlebars.Compile(messageType.Html)(substitutions.Substitutions);
+            var websiteUrl = _clientUrlBuilder.GetOrigin();
+            substitutions.Substitutions["websiteUrl"] = websiteUrl;
+            var html = Handlebars.Compile(GenericEmailTemplate.Html)(substitutions.Substitutions);
+            var senderDomain = string.IsNullOrWhiteSpace(_emailOptions.FromDomain)
+                ? _emailOptions.Domain
+                : _emailOptions.FromDomain.Trim();
+            var senderAddress = $"{SenderLocalPart}@{senderDomain}";
             var providerCorrelationId = IdGenerator.Generate();
 
             messageLog = new MessageLog(TemplateKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, purpose,
                 MessageProvider.Mailgun, _emailOptions.Domain, providerCorrelationId, subject, toEmailAddress, toName,
-                messageType.FromName, messageType.FromEmail,
+                SenderName, senderAddress,
                 MessageLogSubstitutionSerializer.Serialize(substitutions.Substitutions), accountInvitation);
             await _messageLogRepository.Create(messageLog, cancellationToken);
+            messageLogPersisted = true;
 
             if (beforeSend != null && !await beforeSend(messageLog.Id, CancellationToken.None))
             {
@@ -70,10 +78,12 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             }
 
             var message = _emailMessageFactory.Create()
-                .SetFromAddress(messageType.FromEmail, messageType.FromName)
+                .SetFromAddress(senderAddress, SenderName)
                 .SetHtml(html)
+                .SetText(substitutions.ToPlainText(websiteUrl))
                 .SetSubject(subject)
                 .AddToAddress(toEmailAddress, toName)
+                .SetTrackingClicks(false)
                 .AddCustomArgument(EmailDeliveryMetadata.MessageIdArgument, providerCorrelationId)
                 .AddCustomArgument(EmailDeliveryMetadata.EnvironmentArgument, _hostEnvironment.EnvironmentName);
 
@@ -101,12 +111,13 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await TryMarkSubmissionFailed(messageLog, "Email submission was canceled.");
+            if (messageLogPersisted)
+                await TryMarkSubmissionFailed(messageLog, "Email submission was canceled.");
             throw;
         }
         catch (Exception exception)
         {
-            if (!providerSubmissionSucceeded)
+            if (messageLogPersisted && !providerSubmissionSucceeded)
             {
                 await TryMarkSubmissionFailed(messageLog, exception.Message);
             }
@@ -114,7 +125,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
                 "Email {Purpose} processing failed after the caller may have committed its primary operation.", purpose);
 
             return new EmailSendResult(
-                messageLog?.Id,
+                messageLogPersisted ? messageLog?.Id : null,
                 providerSubmissionSucceeded ? MessageDeliveryStatus.Submitted : MessageDeliveryStatus.SendFailed);
         }
     }
@@ -164,6 +175,30 @@ public class EmailService : ServiceBase<MessageTypeRepository>
                 fullName, new GenericEmailSubstitutions(paragraphs, "Confirm your email address", "Confirm Email", link),
                 beforeSend: beforeSend, cancellationToken: cancellationToken);
         }, cancellationToken);
+    }
+
+    public Task<EmailSendResult> SendAccountAccessChangeEmail(User user, string? accountName,
+        string? notificationMessage, MessagePurpose purpose, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(notificationMessage))
+            throw new ArgumentException("A notification message is required.", nameof(notificationMessage));
+
+        var (subject, heading) = purpose switch
+        {
+            MessagePurpose.AccountAccessDisabled =>
+                ($"Your access to {accountName} has been disabled", "Account access disabled"),
+            MessagePurpose.AccountAccessRestored =>
+                ($"Your access to {accountName} has been restored", "Account access restored"),
+            MessagePurpose.AccountMembershipRevoked =>
+                ($"Your access to {accountName} has been removed", "Account access removed"),
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose))
+        };
+
+        return SendCommittedOperationEmail(purpose,
+            () => SendGenericEmail(purpose, subject, user.EmailAddress, user.FullName,
+                new GenericEmailSubstitutions(notificationMessage.Split('\n'), heading),
+                cancellationToken: cancellationToken),
+            cancellationToken);
     }
 
     public async Task<EmailSendResult> SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName,
@@ -216,12 +251,13 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     public async Task<EmailSendResult> SendPasswordChangedEmail(string emailAddress, string fullName,
         CancellationToken cancellationToken = default)
     {
-        const string message =
-            "Your password was just changed. If you did not make this request, please contact us immediately.";
+        var message = $"Your password was changed. If you did not make this change, please contact {_serverOptions.SupportName} immediately at {_serverOptions.SupportEmail}.";
+
+        var substitutions = new GenericEmailSubstitutions(message, "Password changed");
 
         return await SendCommittedOperationEmail(MessagePurpose.PasswordChanged,
             () => SendGenericEmail(MessagePurpose.PasswordChanged, "Planarian Password Changed", emailAddress,
-                fullName, new GenericEmailSubstitutions(message, "Planarian Password Changed"),
+                fullName, substitutions,
                 cancellationToken: cancellationToken),
             cancellationToken);
     }

@@ -4,7 +4,8 @@ import { ApiErrorResponse, ApiExceptionType } from "../Models/ApiErrorResponse";
 import { RequestRuntimeState } from "./RequestRuntimeState";
 
 let baseUrl: string | undefined;
-let unauthorizedHandler: (() => void) | null = null;
+export type AuthenticationFailureReason = "unauthorized" | "invalid-account";
+let unauthorizedHandler: ((reason: AuthenticationFailureReason) => void) | null = null;
 
 export const HttpClient = axios.create({ withCredentials: true });
 
@@ -17,7 +18,9 @@ export function configureHttpClient(apiBaseUrl: string): void {
   HttpClient.defaults.baseURL = apiBaseUrl;
 }
 
-export function registerUnauthorizedHandler(handler: () => void): () => void {
+export function registerUnauthorizedHandler(
+  handler: (reason: AuthenticationFailureReason) => void
+): () => void {
   unauthorizedHandler = handler;
   return () => {
     if (unauthorizedHandler === handler) {
@@ -76,7 +79,16 @@ HttpClient.interceptors.response.use(
           message.error(apiError.message);
         }
         if (statusCode === 401 || apiError.errorCode === ApiExceptionType.Unauthorized) {
-          unauthorizedHandler?.();
+          unauthorizedHandler?.("unauthorized");
+        } else if (apiError.errorCode === ApiExceptionType.InvalidAccountSelection) {
+          // Ignore stale errors from a previous account selection.
+          const requestAccountId = error.config?.headers
+            ? AxiosHeaders.from(error.config.headers).get("x-account")
+            : null;
+          if (!requestAccountId ||
+              requestAccountId === RequestRuntimeState.getCurrentAccountId()) {
+            unauthorizedHandler?.("invalid-account");
+          }
         }
         return Promise.reject(apiError);
       }
@@ -88,7 +100,7 @@ HttpClient.interceptors.response.use(
           statusCode,
         };
         if (statusCode === 401) {
-          unauthorizedHandler?.();
+          unauthorizedHandler?.("unauthorized");
         }
         return Promise.reject(apiError);
       }

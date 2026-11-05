@@ -1,8 +1,10 @@
+using System.Data;
 using System.Linq.Expressions;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using LinqToDB.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
@@ -931,11 +933,66 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     #endregion
 
-    public async Task<AccountUser?> GetAccountUser(string userId, string accountId)
+    public async Task<AccountUser?> GetAccountUser(string userId, string accountId,
+        bool asNoTracking = false)
     {
-        return await DbContext.AccountUsers
-            .Where(e => e.UserId == userId && e.AccountId == accountId)
-            .FirstOrDefaultAsyncEF();
+        var memberships = DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == accountId);
+        return await (asNoTracking ? memberships.AsNoTracking() : memberships).FirstOrDefaultAsyncEF();
+    }
+
+    public async Task<bool> RestoreAccessIfUnchanged(string userId, string accountId,
+        DateTime expectedDisabledOn, CancellationToken cancellationToken = default)
+    {
+        // ExecuteUpdate bypasses SaveChangesInterceptor, so preserve its modification metadata.
+        var modifiedOn = (DateTime?)DateTime.UtcNow;
+        var modifiedByUserId = string.IsNullOrWhiteSpace(RequestUser.Id) ? null : RequestUser.Id;
+        var updated = await DbContext.AccountUsers
+            .Where(m => m.UserId == userId && m.AccountId == accountId &&
+                        m.AccessDisabledOn == expectedDisabledOn)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(m => m.AccessDisabledOn, (DateTime?)null)
+                .SetProperty(m => m.AccessDisabledMessage, (string?)null)
+                .SetProperty(m => m.ModifiedOn, modifiedOn)
+                .SetProperty(m => m.ModifiedByUserId, modifiedByUserId), cancellationToken);
+
+        return updated == 1;
+    }
+
+    public Task<IDbContextTransaction> BeginAccountAccessTransactionAsync(CancellationToken cancellationToken)
+    {
+        return DbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+    }
+
+    public async Task<bool> WouldLeaveNoActiveAdministrator(string userId, string accountId,
+        CancellationToken cancellationToken = default)
+    {
+        var activeAdmins = DbContext.AccountUsers.Where(m =>
+            m.AccountId == accountId && m.AccessDisabledOn == null && m.User != null &&
+            !m.User.IsTemporary &&
+            DbContext.UserPermissions.Any(permission =>
+                permission.UserId == m.UserId &&
+                (permission.AccountId == accountId || permission.AccountId == null) &&
+                (permission.Permission!.Key == PermissionPolicyKey.Admin ||
+                 permission.Permission.Key == PermissionPolicyKey.PlanarianAdmin)));
+
+        if (!await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                activeAdmins, m => m.UserId == userId, cancellationToken))
+        {
+            return false;
+        }
+
+        return !await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+            activeAdmins, m => m.UserId != userId, cancellationToken);
+    }
+
+    public Task<bool> HasGlobalAdministratorPermission(string userId, CancellationToken cancellationToken = default)
+    {
+        return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+            DbContext.UserPermissions, permission =>
+                permission.UserId == userId && permission.AccountId == null &&
+                (permission.Permission!.Key == PermissionPolicyKey.Admin ||
+                 permission.Permission.Key == PermissionPolicyKey.PlanarianAdmin), cancellationToken);
     }
 
     public async Task<bool> GetDefaultViewAccess()

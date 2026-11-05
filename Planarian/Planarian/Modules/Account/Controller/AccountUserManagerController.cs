@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
@@ -64,12 +65,15 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return new JsonResult(result);
     }
 
-    [HttpDelete("{userId:length(10)}")]
+    [HttpPost("{userId:length(10)}/access-change")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> Revoke(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountAccessChangeResultVm>> ChangeAccess(string userId,
+        [FromBody] AccountAccessChangeRequest request, CancellationToken cancellationToken)
     {
-        await Service.RevokeAccess(userId, cancellationToken);
-        return Ok();
+        if (request == null)
+            throw ApiExceptionDictionary.BadRequest("An access change request is required.");
+
+        return new JsonResult(await Service.ChangeAccess(userId, request, cancellationToken));
     }
 
     #endregion

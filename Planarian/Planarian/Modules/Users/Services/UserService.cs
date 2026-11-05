@@ -26,15 +26,18 @@ public class UserService : ServiceBase<UserRepository>
     private readonly RequestThrottleService _requestThrottleService;
     private readonly IApiRequestOrigin _apiRequestOrigin;
     private readonly BlobService _blobService;
+    private readonly InvitationLifecycleService _invitationLifecycle;
 
     public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService,
-        IApiRequestOrigin apiRequestOrigin, RequestThrottleService requestThrottleService, BlobService blobService) : base(repository,
+        IApiRequestOrigin apiRequestOrigin, RequestThrottleService requestThrottleService, BlobService blobService,
+        InvitationLifecycleService invitationLifecycle) : base(repository,
         requestUser)
     {
         _emailService = emailService;
         _apiRequestOrigin = apiRequestOrigin;
         _requestThrottleService = requestThrottleService;
         _blobService = blobService;
+        _invitationLifecycle = invitationLifecycle;
     }
 
     public async Task UpdateCurrentUser(UpdateCurrentUserVm user, CancellationToken cancellationToken = default)
@@ -166,7 +169,7 @@ public class UserService : ServiceBase<UserRepository>
 
                 if (!user.InvitationCode.IsNullOrWhiteSpace())
                 {
-                    await ClaimInvitation(entity, user.InvitationCode, cancellationToken);
+                    await _invitationLifecycle.Claim(entity, user.InvitationCode, cancellationToken);
                 }
 
                 await dbTransaction.CommitAsync(cancellationToken);
@@ -198,10 +201,10 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByEmail(userEmail);
         if (user == null) throw ApiExceptionDictionary.NotFound("User");
 
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            await ClaimInvitation(user, invitationCode, cancellationToken);
+            await _invitationLifecycle.Claim(user, invitationCode, cancellationToken);
             await dbTransaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
@@ -209,54 +212,6 @@ public class UserService : ServiceBase<UserRepository>
             await dbTransaction.RollbackAsync(cancellationToken);
             throw;
         }
-    }
-
-    private async Task ClaimInvitation(User existingUser, string? invitationCode, CancellationToken cancellationToken)
-    {
-        var invitation = await Repository.GetInvitationEntities(invitationCode);
-
-        if (invitation.AccountUser == null || invitation.User == null)
-            throw ApiExceptionDictionary.NotFound("Invitation");
-
-        var userAlreadyInAccount = await Repository.UserInAccount(existingUser.Id, invitation.AccountUser.AccountId);
-
-        if (userAlreadyInAccount) throw ApiExceptionDictionary.UserAlreadyInAccount;
-
-        var accountUser = new AccountUser
-        {
-            AccountId = invitation.AccountUser.AccountId,
-            UserId = existingUser.Id,
-            InvitationAcceptedOn = DateTime.UtcNow,
-            InvitationSentOn = invitation.AccountUser.InvitationSentOn,
-            CreatedByUserId = invitation.AccountUser.CreatedByUserId,
-            ModifiedByUserId = invitation.AccountUser.ModifiedByUserId
-        };
-        Repository.Add(accountUser);
-
-        if (invitation.CavePermissions != null)
-        {
-            foreach (var cavePermission in invitation.CavePermissions)
-            {
-                cavePermission.User = existingUser;
-            }
-        }
-        
-        if (invitation.UserPermissions != null)
-        {
-            foreach (var userPermission in invitation.UserPermissions)
-            {
-                userPermission.User = existingUser;
-            }
-        }
-        
-        await Repository.SaveChangesAsync(cancellationToken);
-
-        await Repository.ReassignInvitationMessageLogs(
-            invitation.AccountUser.AccountId, invitation.AccountUser.UserId, existingUser.Id, cancellationToken);
-
-        await DeleteInvitation(invitation.AccountUser, invitation.User);
-
-        await Repository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SendResetPasswordEmail(string email)
@@ -376,30 +331,17 @@ public class UserService : ServiceBase<UserRepository>
         return await Repository.GetPendingInvitationsForCurrentUser();
     }
 
-    public async Task DeclineInvitation(string code)
-    {
-        var invitation = await Repository.GetInvitationEntities(code);
-
-        await DeleteInvitation(invitation.AccountUser, invitation.User);
-    }
-    
-    private async Task DeleteInvitation(AccountUser? accountUser, User? user)
-    {
-        if (accountUser == null || user == null) throw ApiExceptionDictionary.NotFound("Invitation");
-        Repository.Delete(accountUser);
-        Repository.Delete(user);
-        await Repository.SaveChangesAsync();
-    }
+    public Task DeclineInvitation(string code) => _invitationLifecycle.Decline(code);
 
     public async Task AcceptInvitation(string invitationCode, CancellationToken cancellationToken)
     {
         var user = await Repository.Get(RequestUser.Id);
         if (user == null) throw ApiExceptionDictionary.NotFound("User");
 
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            await ClaimInvitation(user, invitationCode, cancellationToken);
+            await _invitationLifecycle.Claim(user, invitationCode, cancellationToken);
             await dbTransaction.CommitAsync(cancellationToken);
         }
         catch (Exception)

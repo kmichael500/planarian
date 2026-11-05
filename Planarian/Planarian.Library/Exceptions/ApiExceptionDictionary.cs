@@ -21,6 +21,11 @@ public static class ApiExceptionDictionary
         return new ApiException(StatusCodes.Status403Forbidden, ApiExceptionType.Forbidden, message);
     }
 
+    public static ApiException InvalidAccountSelection => new(
+        StatusCodes.Status403Forbidden,
+        ApiExceptionType.InvalidAccountSelection,
+        "The selected account is unavailable or you no longer have access.");
+
     public static ApiException NotFound(string type)
     {
         return new ApiException(StatusCodes.Status404NotFound, ApiExceptionType.NotFound, $"{type} not found");
