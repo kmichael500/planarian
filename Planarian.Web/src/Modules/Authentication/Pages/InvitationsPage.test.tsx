@@ -129,12 +129,12 @@ describe("InvitationsPage", () => {
     jest.restoreAllMocks();
   });
 
-  it("explains revoked access when the user has no active account", async () => {
+  it("explains disabled access when the user has no active account", async () => {
     jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
 
     renderPage(false, {
       currentAccountId: null,
-      revokedAccountIds: [
+      disabledAccountIds: [
         {
           display: "Tennessee Cave Survey",
           value: "tcsaccount",
@@ -145,9 +145,9 @@ describe("InvitationsPage", () => {
     await screen.findByText(
       "No pending invitations were found for your email."
     );
-    expect(screen.getByText("Account access revoked")).toBeInTheDocument();
+    expect(screen.getByText("Account access disabled")).toBeInTheDocument();
     expect(
-      screen.getByText(/Your access to Tennessee Cave Survey has been revoked/)
+      screen.getByText(/Your access to Tennessee Cave Survey has been disabled/)
     ).toBeInTheDocument();
   });
 

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.App.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.App.Repositories;
@@ -15,18 +16,23 @@ public class AppRepository : RepositoryBase
     public async Task<List<SelectListItem<string>>> GetAccountIds()
     {
         return await DbContext.AccountUsers
-            .Where(e => e.UserId == RequestUser.Id && e.AccessRevokedOn == null)
+            .Where(e => e.UserId == RequestUser.Id && e.AccessDisabledOn == null)
             .OrderByDescending(e => e.Account!.Name)
             .Select(e => new SelectListItem<string> { Display = e.Account!.Name, Value = e.AccountId })
             .ToListAsync();
     }
 
-    public async Task<List<SelectListItem<string>>> GetRevokedAccountIds()
+    public async Task<List<DisabledAccountVm>> GetDisabledAccountIds()
     {
         return await DbContext.AccountUsers
-            .Where(e => e.UserId == RequestUser.Id && e.AccessRevokedOn != null)
+            .Where(e => e.UserId == RequestUser.Id && e.AccessDisabledOn != null)
             .OrderByDescending(e => e.Account!.Name)
-            .Select(e => new SelectListItem<string> { Display = e.Account!.Name, Value = e.AccountId })
+            .Select(e => new DisabledAccountVm
+            {
+                Display = e.Account!.Name,
+                Value = e.AccountId,
+                DisableMessage = e.AccessDisabledMessage
+            })
             .ToListAsync();
     }
 }

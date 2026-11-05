@@ -23,14 +23,14 @@ public sealed class InvitationLifecycleService : ServiceBase<UserRepository>
         var existingMembership = await Repository.GetUserAccountMembership(
             existingUser.Id, invitation.AccountUser.AccountId);
 
-        if (existingMembership?.AccessRevokedOn != null)
+        if (existingMembership?.AccessDisabledOn != null)
             throw ApiExceptionDictionary.Conflict(
-                "This invitation cannot restore revoked account access. Ask an account administrator to restore it.");
+                "This invitation cannot restore disabled account access. Ask an account administrator to restore it.");
 
         if (existingMembership != null)
         {
             // Keep the existing membership's permissions unchanged.
-            await Repository.DeletePendingInvitationAccess(
+            await Repository.DeleteAccountUserAccess(
                 invitation.User.Id, invitation.AccountUser.AccountId, cancellationToken);
             return;
         }
@@ -64,7 +64,7 @@ public sealed class InvitationLifecycleService : ServiceBase<UserRepository>
             invitation.AccountUser.AccountId, invitation.AccountUser.UserId,
             existingUser.Id, cancellationToken);
 
-        await Repository.DeletePendingInvitationAccess(
+        await Repository.DeleteAccountUserAccess(
             invitation.User.Id, invitation.AccountUser.AccountId, cancellationToken);
     }
 
@@ -76,7 +76,7 @@ public sealed class InvitationLifecycleService : ServiceBase<UserRepository>
         if (invitation.AccountUser == null || invitation.User == null)
             throw ApiExceptionDictionary.NotFound("Invitation");
 
-        await Repository.DeletePendingInvitationAccess(
+        await Repository.DeleteAccountUserAccess(
             invitation.User.Id, invitation.AccountUser.AccountId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

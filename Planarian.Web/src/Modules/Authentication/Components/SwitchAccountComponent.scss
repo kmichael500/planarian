@@ -30,3 +30,9 @@
 .planarian-account-choice:focus-visible {
   background: var(--hover-surface-color) !important;
 }
+
+.planarian-account-disabled-message {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

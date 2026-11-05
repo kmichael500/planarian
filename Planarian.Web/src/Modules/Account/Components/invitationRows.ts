@@ -117,11 +117,11 @@ export function previewInvitations(
     seen.add(email);
 
     const member = existing.get(email);
-    if (member?.accessRevokedOn) {
+    if (member?.accessDisabledOn) {
       return {
         row,
         disposition: "skipped",
-        reason: "Access revoked — use Restore access.",
+        reason: "Access disabled — use Restore access.",
       };
     }
     if (member?.hasActiveInvitation) {

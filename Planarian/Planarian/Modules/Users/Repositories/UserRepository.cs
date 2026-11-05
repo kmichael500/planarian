@@ -36,7 +36,7 @@ public class UserRepository : RepositoryBase
             .Where(membership => membership.AccountId == accountId &&
                 membership.InvitationCode != null &&
                 membership.InvitationAcceptedOn == null &&
-                membership.AccessRevokedOn == null &&
+                membership.AccessDisabledOn == null &&
                 membership.User != null && membership.User.IsTemporary &&
                 membership.User.EmailAddress.ToLower() == normalized)
             .Select(membership => membership.UserId)
@@ -98,7 +98,7 @@ public class UserRepository : RepositoryBase
 
     public async Task<User?> Get(string id)
     {
-        return await DbContext.Users.Where(e => e.Id == id && e.Id == id).FirstOrDefaultAsync();
+        return await DbContext.Users.FirstOrDefaultAsync(e => e.Id == id);
     }
 
     public async Task<bool> EmailExists(string email, bool ignoreCurrentUser = false)
@@ -373,8 +373,8 @@ public class UserRepository : RepositoryBase
             InvitationSentOn = e.InvitationSentOn,
             InvitationAcceptedOn = e.InvitationAcceptedOn,
             LastActiveOn = e.User.LastActiveOn,
-            AccessRevokedOn = e.AccessRevokedOn,
-            HasActiveInvitation = e.AccessRevokedOn == null && e.InvitationAcceptedOn == null &&
+            AccessDisabledOn = e.AccessDisabledOn,
+            HasActiveInvitation = e.AccessDisabledOn == null && e.InvitationAcceptedOn == null &&
                                   e.InvitationCode != null && e.User != null && e.User.IsTemporary,
             InvitationEmailAttemptCount = e.InvitationMessageLogs.Count
         });
@@ -434,9 +434,13 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<bool> DeletePendingInvitationAccess(string userId, string accountId,
+    public async Task<bool> DeleteAccountUserAccess(string userId, string accountId,
         CancellationToken cancellationToken = default)
     {
+        await DbContext.Favorites
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
         await DbContext.CavePermissions
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .ExecuteDeleteAsync(cancellationToken);

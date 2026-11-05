@@ -4,6 +4,8 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { PermissionType } from "../../Authentication/Models/PermissionType";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { InviteUserResultVm } from "../Models/InviteUserResultVm";
+import { DisableAccessResultVm } from "../Models/DisableAccessResultVm";
+import { RevokeMembershipResultVm } from "../Models/RevokeMembershipResultVm";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
@@ -30,9 +32,30 @@ const AccountUserManagerService = {
     return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request,
       accountId ? { headers: { "x-account": accountId } } : undefined)).data;
   },
-  async RevokeAccess(userId: string, accountId?: string): Promise<void> {
-    await HttpClient.delete(`${baseUrl}/${userId}`,
-      accountId ? { headers: { "x-account": accountId } } : undefined);
+  async DisableAccess(
+    userId: string,
+    accountId?: string,
+    disableMessage?: string,
+    sendEmail = true
+  ): Promise<DisableAccessResultVm> {
+    const response = await HttpClient.post<DisableAccessResultVm>(
+      `${baseUrl}/${userId}/disable-access`,
+      { disableMessage: sendEmail ? disableMessage || null : null, sendEmail },
+      accountId ? { headers: { "x-account": accountId } } : undefined
+    );
+    return response.data;
+  },
+  async RevokeMembership(
+    userId: string,
+    accountId?: string,
+    notificationMessage?: string,
+    sendEmail = true
+  ): Promise<RevokeMembershipResultVm> {
+    return (await HttpClient.post<RevokeMembershipResultVm>(
+      `${baseUrl}/${userId}/revoke-membership`,
+      { notificationMessage: sendEmail ? notificationMessage || null : null, sendEmail },
+      accountId ? { headers: { "x-account": accountId } } : undefined
+    )).data;
   },
   async RestoreAccess(userId: string): Promise<void> {
     await HttpClient.post(`${baseUrl}/${userId}/restore-access`, {});

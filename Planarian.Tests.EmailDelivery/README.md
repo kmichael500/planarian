@@ -10,8 +10,9 @@
 `TemporaryTestProjectLifecycleTests` fails when either project appears.
 
 1. Move unit and architecture-contract tests into `Planarian.Tests.Unit`.
-2. Move `AccountAccessPostgresTests`, `InvitationClaimPostgresTests`, and
-   `BulkInvitationPostgresTests` into `Planarian.Tests.Integration/Account`,
+2. Move `AccountAccessPostgresTests`, `DisabledAccountHttpPipelineTests`,
+   `InvitationClaimPostgresTests`, and `BulkInvitationPostgresTests`
+   into `Planarian.Tests.Integration/Account`,
    reusing its PostgreSQL fixtures rather than this project's Testcontainers helper.
 3. Run the moved tests, then remove this temporary project and
    `.github/workflows/email-delivery-tests.yml`.
@@ -26,7 +27,7 @@ Run the relevant cases with:
 
 ```bash
 dotnet test Planarian.Tests.EmailDelivery/Planarian.Tests.EmailDelivery.csproj \
-  --filter 'FullyQualifiedName~AccountAccessPostgresTests|FullyQualifiedName~InvitationClaimPostgresTests|FullyQualifiedName~BulkInvitationPostgresTests'
+  --filter 'FullyQualifiedName~AccountAccessPostgresTests|FullyQualifiedName~DisabledAccountHttpPipelineTests|FullyQualifiedName~InvitationClaimPostgresTests|FullyQualifiedName~BulkInvitationPostgresTests'
 ```
 
 For Colima, set `DOCKER_HOST` to its socket. If Ryuk cannot connect,

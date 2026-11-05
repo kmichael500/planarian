@@ -174,18 +174,18 @@ export const InvitePeopleModal: React.FC<Props> = ({
       const error = result.error as Partial<ApiErrorResponse>;
       const alreadyMember =
         error.errorCode === ApiExceptionType.UserAlreadyInAccount;
-      const revoked =
+      const disabled =
         error.statusCode === 409 &&
         error.message?.toLowerCase().includes("restore access");
       return {
         row,
         description: alreadyMember
           ? "Already a member."
-          : revoked
-          ? "Access revoked — use Restore access."
+          : disabled
+          ? "Access disabled — use Restore access."
           : error.message ||
             "Invitation failed. Check the account before retrying.",
-        failed: !alreadyMember && !revoked,
+        failed: !alreadyMember && !disabled,
       };
     }
     if (result.value?.alreadyInvited) {

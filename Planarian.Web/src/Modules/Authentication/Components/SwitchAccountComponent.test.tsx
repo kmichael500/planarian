@@ -28,7 +28,7 @@ beforeAll(() => {
   });
 });
 
-it("shows revoked accounts but does not allow switching to them", () => {
+it("shows disabled accounts but does not allow switching to them", () => {
   const switchAccount = jest.fn();
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => {
@@ -49,10 +49,11 @@ it("shows revoked accounts but does not allow switching to them", () => {
               value: "active0001",
             },
           ],
-          revokedAccountIds: [
+          disabledAccountIds: [
             {
-              display: "Revoked account",
-              value: "revoked001",
+              display: "Disabled account",
+              value: "disabled001",
+              disableMessage: "Annual review completed.",
             },
           ],
           switchAccount,
@@ -63,24 +64,29 @@ it("shows revoked accounts but does not allow switching to them", () => {
     );
   };
 
-  render(
-    <SwitchAccountComponent isVisible handleCancel={() => {}} />,
-    { wrapper: Wrapper }
-  );
+  render(<SwitchAccountComponent isVisible handleCancel={() => {}} />, {
+    wrapper: Wrapper,
+  });
 
-  const revokedAccount = screen.getByText("Revoked account").closest(".ant-list-item");
-  expect(revokedAccount).toHaveAttribute("aria-disabled", "true");
-  expect(screen.getByText("Access revoked")).toBeInTheDocument();
+  const disabledAccount = screen
+    .getByText("Disabled account")
+    .closest(".ant-list-item");
+  expect(disabledAccount).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByText("Access disabled")).toBeInTheDocument();
+  expect(screen.getByText("Annual review completed.")).toBeInTheDocument();
 
-  fireEvent.click(revokedAccount!);
+  fireEvent.click(disabledAccount!);
   expect(switchAccount).not.toHaveBeenCalled();
 
-  const activeAccountButton = screen.getByRole("button", { name: "Other active account" });
+  const activeAccountButton = screen.getByRole("button", {
+    name: "Other active account",
+  });
   expect(activeAccountButton.tagName).toBe("BUTTON");
   activeAccountButton.focus();
   userEvent.keyboard("{Enter}");
   expect(switchAccount).toHaveBeenCalledWith("active0001");
 
-  expect(screen.queryByRole("button", { name: "Revoked account" }))
-    .not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Disabled account" })
+  ).not.toBeInTheDocument();
 });

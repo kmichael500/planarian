@@ -152,11 +152,72 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         };
     }
 
-    public Task RevokeAccess(string userId, CancellationToken cancellationToken = default) =>
-        _accountAccessService.RevokeAccess(userId, cancellationToken);
+    public async Task<DisableAccessResultVm> DisableAccess(string userId, string? disableMessage = null,
+        CancellationToken cancellationToken = default, bool sendEmail = true)
+    {
+        disableMessage = sendEmail ? disableMessage?.Trim() : null;
+        var accountId = RequestUser.AccountId;
+        var shouldNotify = await _accountAccessService.DisableAccess(
+            userId, cancellationToken, disableMessage, sendEmail);
+        if (!shouldNotify || !sendEmail)
+            return new DisableAccessResultVm();
+
+        try
+        {
+            var user = await Repository.Get(userId);
+            var accountName = await _accountRepository.GetAccountName(accountId!);
+            if (user == null)
+                throw new InvalidOperationException("Disabled user could not be found for notification.");
+
+            var result = await _emailService.SendAccountAccessDisabledEmail(
+                user, accountName, disableMessage, CancellationToken.None);
+            return new DisableAccessResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Unable to send account-access disabling notification for {UserId}.",
+                userId);
+            return new DisableAccessResultVm { NotificationEmailDeliveryStatus = MessageDeliveryStatus.SendFailed };
+        }
+    }
 
     public Task RestoreAccess(string userId, CancellationToken cancellationToken = default) =>
         _accountAccessService.RestoreAccess(userId, cancellationToken);
+
+    public async Task<RevokeMembershipResultVm> RevokeMembership(string userId,
+        CancellationToken cancellationToken = default, string? notificationMessage = null, bool sendEmail = true)
+    {
+        notificationMessage = sendEmail ? notificationMessage?.Trim() : null;
+        if (sendEmail && string.IsNullOrWhiteSpace(notificationMessage))
+            throw ApiExceptionDictionary.BadRequest("A notification message is required when sending email.");
+        if (notificationMessage?.Length > 1000)
+            throw ApiExceptionDictionary.BadRequest("The notification message must be 1,000 characters or fewer.");
+
+        await _accountAccessService.RevokeMembership(userId, cancellationToken);
+        if (!sendEmail)
+            return new RevokeMembershipResultVm();
+
+        try
+        {
+            var recipient = await Repository.Get(userId);
+            if (recipient?.IsTemporary != false)
+                return new RevokeMembershipResultVm();
+
+            var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId!);
+            var result = await _emailService.SendAccountMembershipRevokedEmail(
+                recipient, accountName, notificationMessage, CancellationToken.None);
+            return new RevokeMembershipResultVm { NotificationEmailDeliveryStatus = result.DeliveryStatus };
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Unable to send membership revocation notification for {UserId}.",
+                userId);
+            return new RevokeMembershipResultVm
+            {
+                NotificationEmailDeliveryStatus = MessageDeliveryStatus.SendFailed
+            };
+        }
+    }
 
     public async Task ResendInvitation(string userId)
     {
@@ -177,7 +238,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        if (!user.IsTemporary || accountUser.AccessRevokedOn.HasValue ||
+        if (!user.IsTemporary || accountUser.AccessDisabledOn.HasValue ||
             accountUser.InvitationAcceptedOn.HasValue || string.IsNullOrWhiteSpace(accountUser.InvitationCode))
         {
             throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");

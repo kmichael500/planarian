@@ -25,7 +25,7 @@ const member = (emailAddress: string): UserManagerGridVm => ({
   invitationAcceptedOn: "2026-09-01T12:00:00Z",
   invitationSentOn: null,
   lastActiveOn: null,
-  accessRevokedOn: null,
+  accessDisabledOn: null,
   hasActiveInvitation: false,
   invitationEmailAttemptCount: 0,
 });

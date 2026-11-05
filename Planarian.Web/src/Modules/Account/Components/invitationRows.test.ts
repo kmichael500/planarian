@@ -13,14 +13,14 @@ const person = (emailAddress: string): InviteUserRequest => ({
   emailAddress,
 });
 const existing = (
-  status: "member" | "pending" | "revoked",
+  status: "member" | "pending" | "disabled",
   email: string
 ): UserManagerGridVm => ({
   userId: status + "0001",
   fullName: "Jane Doe",
   emailAddress: email,
   hasActiveInvitation: status === "pending",
-  accessRevokedOn: status === "revoked" ? "2026-11-01T12:00:00Z" : null,
+  accessDisabledOn: status === "disabled" ? "2026-11-01T12:00:00Z" : null,
   invitationAcceptedOn: status === "pending" ? null : "2026-09-01T12:00:00Z",
   invitationSentOn: null,
   lastActiveOn: null,
@@ -105,11 +105,11 @@ describe("bulk invitation parser", () => {
     expect(preview[1].reason).toContain("Duplicate");
   });
 
-  it("distinguishes pending, registered, and revoked memberships", () => {
+  it("distinguishes pending, registered, and disabled memberships", () => {
     const people = [
       existing("member", "a@example.test"),
       existing("pending", "b@example.test"),
-      existing("revoked", "c@example.test"),
+      existing("disabled", "c@example.test"),
     ];
     const result = previewInvitations(
       [

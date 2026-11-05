@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
@@ -64,12 +65,28 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return new JsonResult(result);
     }
 
-    [HttpDelete("{userId:length(10)}")]
+    [HttpPost("{userId:length(10)}/disable-access")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> Revoke(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<DisableAccessResultVm>> DisableAccess(string userId,
+        [FromBody] DisableAccessRequest request, CancellationToken cancellationToken)
     {
-        await Service.RevokeAccess(userId, cancellationToken);
-        return Ok();
+        if (request == null)
+            throw ApiExceptionDictionary.BadRequest("A notification request is required.");
+
+        return new JsonResult(await Service.DisableAccess(userId, request.DisableMessage, cancellationToken,
+            request.SendEmail));
+    }
+
+    [HttpPost("{userId:length(10)}/revoke-membership")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<RevokeMembershipResultVm>> RevokeMembership(string userId,
+        [FromBody] RevokeMembershipRequest request, CancellationToken cancellationToken)
+    {
+        if (request == null)
+            throw ApiExceptionDictionary.BadRequest("A notification request is required.");
+
+        return new JsonResult(await Service.RevokeMembership(userId, cancellationToken,
+            request.NotificationMessage, request.SendEmail));
     }
 
     [HttpPost("{userId:length(10)}/restore-access")]

@@ -25,6 +25,7 @@ public sealed class BulkInvitationPostgresTests
     private const string AccountId = "bulkacc001";
     private const string OtherAccountId = "bulkacc002";
     private const string AdministratorId = "admin00001";
+    private static readonly HttpClient TestHttpClient = new();
 
     [Fact]
     public async Task RepeatedInvitationReturnsExistingPendingIdentityWithoutAnotherUser()
@@ -93,7 +94,7 @@ public sealed class BulkInvitationPostgresTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ExistingMembershipIsNotReinvitedOrReactivated(bool revoked)
+    public async Task ExistingMembershipIsNotReinvitedOrReactivated(bool disabled)
     {
         await IsolatedPostgresDatabase.Run(async connectionString =>
         {
@@ -109,21 +110,257 @@ public sealed class BulkInvitationPostgresTests
                     AccountId = AccountId,
                     UserId = memberId,
                     InvitationAcceptedOn = DateTime.UtcNow,
-                    AccessRevokedOn = revoked ? DateTime.UtcNow : null
+                    AccessDisabledOn = disabled ? DateTime.UtcNow : null
                 });
                 await seed.SaveChangesAsync();
             }
 
             var error = await Assert.ThrowsAsync<ApiException>(() =>
                 Invite(connectionString, AccountId, "member@example.test"));
-            Assert.Equal(revoked ? 409 : 400, error.StatusCode);
+            Assert.Equal(disabled ? 409 : 400, error.StatusCode);
 
             await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
             Assert.False(await verify.Users.AnyAsync(u => u.IsTemporary));
             Assert.Single(await verify.AccountUsers.Where(m =>
                 m.AccountId == AccountId && m.UserId == memberId &&
-                m.AccessRevokedOn.HasValue == revoked).ToListAsync());
+                m.AccessDisabledOn.HasValue == disabled).ToListAsync());
         });
+    }
+
+    [Fact]
+    public async Task DisablingEmailFailureDoesNotRollbackAccessAndPendingInvitesAreNotEmailed()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            const string memberId = "member0001";
+            const string pendingId = "pending001";
+            const string explanation = " \nAnnual membership review\n\n  Please contact us.  \n ";
+            const string normalizedExplanation = "Annual membership review\n\n  Please contact us.";
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(seed) { Id = AdministratorId };
+                seed.RequestUser = actor;
+                seed.Users.AddRange(
+                    new User("Member", "Example", "member@example.test") { Id = memberId },
+                    new User("Pending", "Example", "pending@example.test")
+                        { Id = pendingId, IsTemporary = true });
+                seed.MessageTypes.Add(new MessageType
+                {
+                    Key = "GenericEmail", Type = "Email",
+                    Description = "Isolated generic email template",
+                    FromName = "Planarian", FromEmail = "planarian@example.test",
+                    Html = "<h1>{{header}}</h1>{{#each messages}}<p>{{this}}</p>{{/each}}"
+                });
+                await seed.SaveChangesAsync();
+                actor.AccountId = AccountId;
+                seed.AccountUsers.AddRange(
+                    new AccountUser
+                    {
+                        AccountId = AccountId, UserId = memberId,
+                        InvitationAcceptedOn = DateTime.UtcNow
+                    },
+                    new AccountUser
+                    {
+                        AccountId = AccountId, UserId = pendingId,
+                        InvitationCode = "pendcode1"
+                    });
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var action = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
+                action.RequestUser = actor;
+                var manager = CreateManager(action, actor);
+                var missingMessage = await Assert.ThrowsAsync<ApiException>(() =>
+                    manager.DisableAccess(memberId));
+                Assert.Equal(400, missingMessage.StatusCode);
+
+                var disabled = await manager.DisableAccess(memberId, explanation);
+                Assert.Equal(MessageDeliveryStatus.SendFailed, disabled.NotificationEmailDeliveryStatus);
+                var canceled = await manager.DisableAccess(pendingId, "Never email a pending invitee");
+                Assert.Null(canceled.NotificationEmailDeliveryStatus);
+                var repeated = await manager.DisableAccess(memberId, "Do not resend email");
+                Assert.Null(repeated.NotificationEmailDeliveryStatus);
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            var membership = await verify.AccountUsers.SingleAsync(m =>
+                m.AccountId == AccountId && m.UserId == memberId);
+            Assert.NotNull(membership.AccessDisabledOn);
+            Assert.Equal(normalizedExplanation, membership.AccessDisabledMessage);
+            Assert.False(await verify.AccountUsers.AnyAsync(m => m.UserId == pendingId));
+            var email = Assert.Single(await verify.MessageLogs.Where(m =>
+                m.Purpose == MessagePurpose.AccountAccessDisabled).ToListAsync());
+            Assert.Equal("member@example.test", email.ToEmailAddress);
+            Assert.Equal(MessageDeliveryStatus.SendFailed, email.DeliveryStatus);
+            using var substitutions = System.Text.Json.JsonDocument.Parse(email.Substitutions);
+            var paragraphs = substitutions.RootElement.GetProperty("messages")
+                .EnumerateArray().Select(element => element.GetString()).ToList();
+            Assert.Equal(new[] { "Annual membership review", "", "  Please contact us." }, paragraphs);
+            Assert.DoesNotContain("by an account administrator", email.Substitutions);
+            Assert.Contains(AccountId, email.Subject);
+        });
+    }
+
+    [Fact]
+    public async Task DisablingAccessWithoutEmailStoresNoMessageAndCreatesNoEmail()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            const string memberId = "member0001";
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(seed) { Id = AdministratorId };
+                seed.RequestUser = actor;
+                seed.Users.Add(new User("Member", "Example", "member@example.test") { Id = memberId });
+                await seed.SaveChangesAsync();
+                actor.AccountId = AccountId;
+                seed.AccountUsers.Add(new AccountUser
+                {
+                    AccountId = AccountId, UserId = memberId, InvitationAcceptedOn = DateTime.UtcNow
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var action = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
+                action.RequestUser = actor;
+                var result = await CreateManager(action, actor).DisableAccess(
+                    memberId, sendEmail: false);
+                Assert.Null(result.NotificationEmailDeliveryStatus);
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            var membership = await verify.AccountUsers.SingleAsync(m =>
+                m.AccountId == AccountId && m.UserId == memberId);
+            Assert.NotNull(membership.AccessDisabledOn);
+            Assert.Null(membership.AccessDisabledMessage);
+            Assert.Empty(await verify.MessageLogs.ToListAsync());
+        });
+    }
+
+    [Fact]
+    public async Task MembershipRevocationEmailFailureDoesNotRestoreMembership()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            const string memberId = "member0001";
+            const string explanation = "Membership has ended.";
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(seed) { Id = AdministratorId };
+                seed.RequestUser = actor;
+                seed.Users.Add(new User("Member", "Example", "member@example.test") { Id = memberId });
+                seed.MessageTypes.Add(new MessageType
+                {
+                    Key = "GenericEmail", Type = "Email",
+                    Description = "Isolated generic email template",
+                    FromName = "Planarian", FromEmail = "planarian@example.test",
+                    Html = "<h1>{{header}}</h1>{{#each messages}}<p>{{this}}</p>{{/each}}"
+                });
+                await seed.SaveChangesAsync();
+                actor.AccountId = AccountId;
+                seed.AccountUsers.Add(new AccountUser
+                {
+                    AccountId = AccountId, UserId = memberId, InvitationAcceptedOn = DateTime.UtcNow
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var action = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
+                action.RequestUser = actor;
+                var manager = CreateManager(action, actor);
+                var missing = await Assert.ThrowsAsync<ApiException>(() =>
+                    manager.RevokeMembership(memberId, sendEmail: true));
+                Assert.Equal(400, missing.StatusCode);
+                var tooLong = await Assert.ThrowsAsync<ApiException>(() =>
+                    manager.RevokeMembership(memberId, notificationMessage: new string('x', 1001),
+                        sendEmail: true));
+                Assert.Equal(400, tooLong.StatusCode);
+
+                var result = await manager.RevokeMembership(memberId,
+                    notificationMessage: "  " + explanation + "  ", sendEmail: true);
+                Assert.Equal(MessageDeliveryStatus.SendFailed, result.NotificationEmailDeliveryStatus);
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            Assert.False(await verify.AccountUsers.AnyAsync(m =>
+                m.AccountId == AccountId && m.UserId == memberId));
+            Assert.True(await verify.Users.AnyAsync(u => u.Id == memberId));
+            var email = Assert.Single(await verify.MessageLogs.ToListAsync());
+            Assert.Equal(MessagePurpose.AccountMembershipRevoked, email.Purpose);
+            Assert.Equal("GenericEmail", email.TemplateKey);
+            Assert.Equal(MessageDeliveryStatus.SendFailed, email.DeliveryStatus);
+            Assert.Contains("has been revoked", email.Subject);
+            using var substitutions = System.Text.Json.JsonDocument.Parse(email.Substitutions);
+            Assert.Equal("Membership revoked",
+                substitutions.RootElement.GetProperty("header").GetString());
+            Assert.Equal(explanation,
+                Assert.Single(substitutions.RootElement.GetProperty("messages").EnumerateArray())
+                    .GetString());
+        });
+    }
+
+    [Fact]
+    public async Task MembershipRevocationCanSkipEmailAndMessage()
+    {
+        await IsolatedPostgresDatabase.Run(async connectionString =>
+        {
+            await SeedAccounts(connectionString);
+            const string memberId = "member0001";
+            await using (var seed = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(seed) { Id = AdministratorId };
+                seed.RequestUser = actor;
+                seed.Users.Add(new User("Member", "Example", "member@example.test") { Id = memberId });
+                await seed.SaveChangesAsync();
+                actor.AccountId = AccountId;
+                seed.AccountUsers.Add(new AccountUser
+                {
+                    AccountId = AccountId, UserId = memberId, InvitationAcceptedOn = DateTime.UtcNow
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var action = IsolatedPostgresDatabase.NewContext(connectionString))
+            {
+                var actor = new RequestUser(action) { Id = AdministratorId, AccountId = AccountId };
+                action.RequestUser = actor;
+                var result = await CreateManager(action, actor).RevokeMembership(
+                    memberId, sendEmail: false);
+                Assert.Null(result.NotificationEmailDeliveryStatus);
+            }
+
+            await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
+            Assert.False(await verify.AccountUsers.AnyAsync(m =>
+                m.AccountId == AccountId && m.UserId == memberId));
+            Assert.Empty(await verify.MessageLogs.ToListAsync());
+        });
+    }
+
+    private static AccountUserManagerService CreateManager(PlanarianDbContext context, RequestUser actor)
+    {
+        var users = new UserRepository(context, actor);
+        var accounts = new AccountRepository(context, actor);
+        var emailOptions = new EmailOptions { Domain = "example.test" };
+        var emailService = new EmailService(
+            new MessageTypeRepository(context, actor, new MjmlService(TestHttpClient, emailOptions)),
+            actor, new NeverSendEmailFactory(),
+            new ClientUrlBuilder(new TestClientRequestOrigin()),
+            new MessageLogRepository(context, actor),
+            emailOptions, new TestHostEnvironment(), NullLogger<EmailService>.Instance);
+        return new AccountUserManagerService(
+            users, actor, emailService, accounts,
+            new PermissionRepository(context, actor),
+            new AccountAccessService(users, accounts, actor),
+            NullLogger<AccountUserManagerService>.Instance);
     }
 
     private static async Task<Planarian.Modules.Account.Model.InviteUserResultVm> Invite(
@@ -132,21 +369,7 @@ public sealed class BulkInvitationPostgresTests
         await using var context = IsolatedPostgresDatabase.NewContext(connectionString);
         var actor = new RequestUser(context) { Id = AdministratorId, AccountId = accountId };
         context.RequestUser = actor;
-        var users = new UserRepository(context, actor);
-        var accounts = new AccountRepository(context, actor);
-        var emailOptions = new EmailOptions { Domain = "example.test" };
-        using var httpClient = new HttpClient();
-        var emailService = new EmailService(
-            new MessageTypeRepository(context, actor, new MjmlService(httpClient, emailOptions)),
-            actor, new NeverSendEmailFactory(),
-            new ClientUrlBuilder(new ThrowingClientRequestOrigin()),
-            new MessageLogRepository(context, actor),
-            emailOptions, new TestHostEnvironment(), NullLogger<EmailService>.Instance);
-        var service = new AccountUserManagerService(
-            users, actor, emailService, accounts,
-            new PermissionRepository(context, actor),
-            new AccountAccessService(users, accounts, actor),
-            NullLogger<AccountUserManagerService>.Instance);
+        var service = CreateManager(context, actor);
 
         return await service.InviteUser(new InviteUserRequest
         {
@@ -193,9 +416,8 @@ public sealed class BulkInvitationPostgresTests
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
-    private sealed class ThrowingClientRequestOrigin : IClientRequestOrigin
+    private sealed class TestClientRequestOrigin : IClientRequestOrigin
     {
-        public string GetOrigin() => throw new InvalidOperationException(
-            "No email provider should be called in isolated invitation tests.");
+        public string GetOrigin() => "https://planarian.example.test";
     }
 }

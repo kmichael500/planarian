@@ -3,11 +3,14 @@ import {
   Checkbox,
   Input,
   message,
+  Modal,
   Select,
   Typography,
 } from "antd";
 import {
   CheckSquareOutlined,
+  CloseOutlined,
+  DeleteOutlined,
   EditOutlined,
   MailOutlined,
   RedoOutlined,
@@ -17,10 +20,10 @@ import { useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
-import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -37,13 +40,13 @@ import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevea
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { InvitePeopleModal } from "./InvitePeopleModal";
-import { BulkRevokeModal } from "./BulkRevokeModal";
+import { BulkDisableModal } from "./BulkDisableModal";
 import "./UserManagerComponent.scss";
 
 const { Text } = Typography;
 const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
-type UserStatusFilter = "all" | "accepted" | "pending" | "revoked";
+type UserStatusFilter = "all" | "accepted" | "pending" | "disabled";
 type UserSortBy =
   | "fullName"
   | "emailAddress"
@@ -57,7 +60,15 @@ const UserManagerComponent: React.FC = () => {
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkRevokeVisible, setBulkRevokeVisible] = useState(false);
+  const [disableTargets, setDisableTargets] = useState<UserManagerGridVm[] | null>(null);
+  const [membershipRevocationTarget, setMembershipRevocationTarget] = useState<{
+    user: UserManagerGridVm;
+    accountId: string;
+  } | null>(null);
+  const [revocationConfirmation, setRevocationConfirmation] = useState("");
+  const [sendRevocationEmail, setSendRevocationEmail] = useState(true);
+  const [revocationMessage, setRevocationMessage] = useState("");
+  const [revokingMembership, setRevokingMembership] = useState(false);
   const [searchText, setSearchText] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
@@ -72,12 +83,16 @@ const UserManagerComponent: React.FC = () => {
     InvitationEmailAttemptVm[]
   >([]);
   const navigate = useNavigate();
-  const { currentUser } = useContext(AppContext);
+  const { currentUser, currentAccountName } = useContext(AppContext);
   const listRequest = useRef(0);
   useEffect(() => {
     setSelecting(false);
     setSelectedIds([]);
-    setBulkRevokeVisible(false);
+    setDisableTargets(null);
+    setMembershipRevocationTarget(null);
+    setRevocationConfirmation("");
+    setSendRevocationEmail(true);
+    setRevocationMessage("");
     setInviteModalVisible(false);
     setInvitationHistoryVisible(false);
     setInvitationHistoryUser(null);
@@ -138,22 +153,6 @@ const UserManagerComponent: React.FC = () => {
     }
   };
 
-  const [isRevoking, setIsRevoking] = useState<boolean>(false);
-  const handleRevokeAccess = async (user: UserManagerGridVm) => {
-    try {
-      setIsRevoking(true);
-      await AccountUserManagerService.RevokeAccess(user.userId);
-      message.success(
-        user.hasActiveInvitation ? "Invitation removed." : "Access revoked."
-      );
-      fetchUsers();
-    } catch (err) {
-      const error = err as PlanarianError;
-      message.error(error.message);
-    }
-    setIsRevoking(false);
-  };
-
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
   const handleRestoreAccess = async (userId: string) => {
     try {
@@ -166,6 +165,52 @@ const UserManagerComponent: React.FC = () => {
       message.error(error.message);
     }
     setIsRestoring(false);
+  };
+
+  const closeMembershipRevocation = () => {
+    if (revokingMembership) return;
+    setMembershipRevocationTarget(null);
+    setRevocationConfirmation("");
+    setSendRevocationEmail(true);
+    setRevocationMessage("");
+  };
+
+  const handleMembershipRevocation = async () => {
+    if (!membershipRevocationTarget || revocationConfirmation !== "REVOKE" || revokingMembership ||
+        (sendRevocationEmail && !revocationMessage.trim())) return;
+    const { user, accountId } = membershipRevocationTarget;
+    if (RequestRuntimeState.getCurrentAccountId() !== accountId) {
+      message.error("The selected account changed. Reopen the confirmation before revoking any membership.");
+      setMembershipRevocationTarget(null);
+      setRevocationConfirmation("");
+      return;
+    }
+
+    setRevokingMembership(true);
+    try {
+      const result = await AccountUserManagerService.RevokeMembership(
+        user.userId, accountId,
+        sendRevocationEmail ? revocationMessage.trim() : undefined, sendRevocationEmail
+      );
+      if (RequestRuntimeState.getCurrentAccountId() === accountId) {
+        if (result.notificationEmailDeliveryStatus === MessageDeliveryStatus.SendFailed) {
+          message.warning("Membership revoked, but notification email failed.");
+        } else if (result.notificationEmailDeliveryStatus === MessageDeliveryStatus.Submitted) {
+          message.success("Membership revoked. Notification email submitted.");
+        } else {
+          message.success("Membership revoked from this account.");
+        }
+        setMembershipRevocationTarget(null);
+        setRevocationConfirmation("");
+        await fetchUsers();
+      }
+    } catch (err) {
+      if (RequestRuntimeState.getCurrentAccountId() === accountId) {
+        message.error((err as PlanarianError).message);
+      }
+    } finally {
+      setRevokingMembership(false);
+    }
   };
 
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -183,7 +228,7 @@ const UserManagerComponent: React.FC = () => {
   };
 
   const getUserStatus = (user: UserManagerGridVm): UserStatusFilter => {
-    if (user.accessRevokedOn) return "revoked";
+    if (user.accessDisabledOn) return "disabled";
     return user.hasActiveInvitation ? "pending" : "accepted";
   };
 
@@ -239,7 +284,7 @@ const UserManagerComponent: React.FC = () => {
     });
 
   const eligibleIds = filteredUsers
-    .filter((user) => !user.accessRevokedOn && user.userId !== currentUser?.id)
+    .filter((user) => !user.accessDisabledOn && user.userId !== currentUser?.id)
     .map((user) => user.userId);
   const selectedUsers = filteredUsers.filter((user) => selectedIds.includes(user.userId));
   const selectedAll = eligibleIds.length > 0 &&
@@ -256,7 +301,7 @@ const UserManagerComponent: React.FC = () => {
 
   const renderUserCard = (user: UserManagerGridVm) => {
     const isPending = user.hasActiveInvitation;
-    const isRevoked = !!user.accessRevokedOn;
+    const isDisabled = !!user.accessDisabledOn;
     const actions: GridCardAction[] = [
       {
         key: "edit",
@@ -267,7 +312,7 @@ const UserManagerComponent: React.FC = () => {
       },
     ];
 
-    if (isPending && !isRevoked) {
+    if (isPending && !isDisabled) {
       actions.push({
         key: "resend",
         label: "Resend",
@@ -277,7 +322,7 @@ const UserManagerComponent: React.FC = () => {
       });
     }
 
-    if (isRevoked) {
+    if (isDisabled) {
       actions.push({
         key: "restore",
         label: "Restore access",
@@ -297,24 +342,19 @@ const UserManagerComponent: React.FC = () => {
     } else if (user.userId !== currentUser?.id) {
       actions.push({
         key: "remove",
-        label: isPending ? "Remove invitation" : "Revoke access",
+        label: isPending ? "Remove invitation" : "Disable access",
         render: (
-          <DeleteButtonComponent
+          <PlanarianButton
             alwaysShowChildren
             permissionKey={PermissionKey.Admin}
-            loading={isRevoking}
+            danger
             type="default"
-            title={
-              isPending
-                ? `Are you sure you want to remove the invitation for ${user.fullName}?`
-                : `Are you sure you want to revoke access for ${user.fullName}? Their existing permissions will be preserved and can be restored later.`
-            }
-            onConfirm={() => handleRevokeAccess(user)}
-            okText="Yes"
-            cancelText="No"
+            icon={<DeleteOutlined />}
+            aria-label={isPending ? "Remove invitation" : "Disable access"}
+            onClick={() => setDisableTargets([user])}
           >
-            {isPending ? "Remove invitation" : "Revoke access"}
-          </DeleteButtonComponent>
+            {isPending ? "Remove invitation" : "Disable access"}
+          </PlanarianButton>
         ),
       });
     }
@@ -337,12 +377,12 @@ const UserManagerComponent: React.FC = () => {
         }
         headerExtra={
           <div className="user-manager-grid-card__header-extra">
-            {isRevoked ? (
-              <span className="user-manager-grid-card__status">Access revoked</span>
+            {isDisabled ? (
+              <span className="user-manager-grid-card__status">Access disabled</span>
             ) : isPending ? (
               <span className="user-manager-grid-card__status">Pending</span>
             ) : null}
-            {selecting && !isRevoked && user.userId !== currentUser?.id && (
+            {selecting && !isDisabled && user.userId !== currentUser?.id && (
               <Checkbox
                 aria-label={`Select ${user.fullName}`}
                 checked={selectedIds.includes(user.userId)}
@@ -365,10 +405,10 @@ const UserManagerComponent: React.FC = () => {
             <Text type="secondary">Last Active</Text>
             <span>{renderDate(user.lastActiveOn)}</span>
           </div>
-          {user.accessRevokedOn ? (
+          {user.accessDisabledOn ? (
             <div className="user-manager-grid-card__detail">
-              <Text type="secondary">Access Revoked</Text>
-              <span>{renderDate(user.accessRevokedOn)}</span>
+              <Text type="secondary">Access Disabled</Text>
+              <span>{renderDate(user.accessDisabledOn)}</span>
             </div>
           ) : null}
           {user.invitationEmailAttemptCount > 0 ? (
@@ -384,6 +424,29 @@ const UserManagerComponent: React.FC = () => {
               </PlanarianButton>
             </div>
           ) : null}
+          {!selecting && !isPending && user.userId !== currentUser?.id && (
+            <PlanarianButton
+              className="user-manager-grid-card__membership-revoke"
+              alwaysShowChildren
+              permissionKey={PermissionKey.Admin}
+              danger
+              type="link"
+              icon={<DeleteOutlined />}
+              aria-label="Revoke membership"
+              onClick={() => {
+                const accountId = RequestRuntimeState.getCurrentAccountId();
+                if (!accountId || accountId !== currentUser?.currentAccountId) return;
+                setMembershipRevocationTarget({ user, accountId });
+                setRevocationConfirmation("");
+                setSendRevocationEmail(true);
+                setRevocationMessage(
+                  `An administrator has revoked your membership in ${currentAccountName || "this account"} on Planarian. You'll need a new invitation to rejoin.`
+                );
+              }}
+            >
+              Revoke membership
+            </PlanarianButton>
+          )}
         </div>
       </GridCard>
     );
@@ -425,7 +488,7 @@ const UserManagerComponent: React.FC = () => {
                     { label: "All statuses", value: "all" },
                     { label: "Accepted", value: "accepted" },
                     { label: "Pending", value: "pending" },
-                    { label: "Access revoked", value: "revoked" },
+                    { label: "Access disabled", value: "disabled" },
                   ]}
                 />
                 <SplitSortControl
@@ -487,7 +550,7 @@ const UserManagerComponent: React.FC = () => {
               type="primary"
               danger
               disabled={selectedIds.length === 0}
-              onClick={() => setBulkRevokeVisible(true)}
+              onClick={() => setDisableTargets([...selectedUsers])}
             >
               Review access changes
             </PlanarianButton>
@@ -530,10 +593,82 @@ const UserManagerComponent: React.FC = () => {
           navigate(`${userId}/permissions/${PermissionKey.View}`);
         }}
       />
-      <BulkRevokeModal
-        open={bulkRevokeVisible}
-        selected={selectedUsers}
-        onClose={() => setBulkRevokeVisible(false)}
+      <Modal
+        open={membershipRevocationTarget !== null}
+        title="Revoke membership?"
+        onCancel={closeMembershipRevocation}
+        closable={!revokingMembership}
+        maskClosable={!revokingMembership}
+        footer={[
+          <PlanarianButton
+            key="cancel"
+            icon={<CloseOutlined />}
+            onClick={closeMembershipRevocation}
+            disabled={revokingMembership}
+          >
+            Cancel
+          </PlanarianButton>,
+          <PlanarianButton
+            key="revoke-membership"
+            danger
+            icon={<DeleteOutlined />}
+            aria-label="Revoke membership"
+            loading={revokingMembership}
+            disabled={revocationConfirmation !== "REVOKE" || (sendRevocationEmail && !revocationMessage.trim())}
+            onClick={handleMembershipRevocation}
+          >
+            Revoke membership
+          </PlanarianButton>,
+        ]}
+      >
+        <Typography.Paragraph>
+          Revoking <strong>{membershipRevocationTarget?.user.fullName}</strong>'s membership will delete their saved favorites and account-specific permissions.
+        </Typography.Paragraph>
+        <Typography.Paragraph>
+          This cannot be undone. Rejoining will require a new invitation and permissions.
+        </Typography.Paragraph>
+        <div className="user-manager-notification-message">
+          <Checkbox
+            checked={sendRevocationEmail}
+            disabled={revokingMembership}
+            onChange={(event) => setSendRevocationEmail(event.target.checked)}
+          >
+            Send notification email
+          </Checkbox>
+          {sendRevocationEmail && (
+            <>
+              <label htmlFor="membership-revocation-message">Message to user</label>
+              <Input.TextArea
+                id="membership-revocation-message"
+                value={revocationMessage}
+                onChange={(event) => setRevocationMessage(event.target.value)}
+                disabled={revokingMembership}
+                required
+                rows={3}
+                maxLength={1000}
+                showCount
+              />
+              <Typography.Text type="secondary">
+                Edit or replace the message sent to this member.
+              </Typography.Text>
+            </>
+          )}
+        </div>
+        <label htmlFor="confirm-membership-revocation">
+          Type <strong>REVOKE</strong> to confirm.
+        </label>
+        <Input
+          id="confirm-membership-revocation"
+          value={revocationConfirmation}
+          onChange={(event) => setRevocationConfirmation(event.target.value)}
+          disabled={revokingMembership}
+          autoComplete="off"
+        />
+      </Modal>
+      <BulkDisableModal
+        open={disableTargets !== null}
+        selected={disableTargets ?? []}
+        onClose={() => setDisableTargets(null)}
         onFinished={async () => {
           await fetchUsers();
           setSelectedIds([]);

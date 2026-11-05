@@ -30,7 +30,7 @@ public sealed class InvitationClaimPostgresTests
             await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
             var membership = Assert.Single(await verify.AccountUsers.AsNoTracking().ToListAsync());
             Assert.Equal(MemberId, membership.UserId);
-            Assert.Null(membership.AccessRevokedOn);
+            Assert.Null(membership.AccessDisabledOn);
             Assert.NotNull(membership.InvitationAcceptedOn);
             Assert.True(await verify.Users.AnyAsync(u => u.Id == MemberId));
             Assert.False(await verify.Users.AnyAsync(u => u.Id == InvitationUserId));
@@ -92,11 +92,11 @@ public sealed class InvitationClaimPostgresTests
     }
 
     [Fact]
-    public async Task RevokedMemberCannotUseInvitationToRestoreAccessOrRemoveItsHistory()
+    public async Task DisabledMemberCannotUseInvitationToRestoreAccessOrRemoveItsHistory()
     {
         await IsolatedPostgresDatabase.Run(async connectionString =>
         {
-            await SeedInvitation(connectionString, alreadyMember: true, revoked: true);
+            await SeedInvitation(connectionString, alreadyMember: true, disabled: true);
 
             var error = await Assert.ThrowsAsync<ApiException>(() =>
                 Claim(connectionString, selectedAccountId: null));
@@ -104,7 +104,7 @@ public sealed class InvitationClaimPostgresTests
 
             await using var verify = IsolatedPostgresDatabase.NewContext(connectionString);
             Assert.NotNull((await verify.AccountUsers.SingleAsync(m =>
-                m.UserId == MemberId)).AccessRevokedOn);
+                m.UserId == MemberId)).AccessDisabledOn);
             Assert.True(await verify.AccountUsers.AnyAsync(m => m.UserId == InvitationUserId));
             Assert.True(await verify.Users.AnyAsync(u => u.Id == InvitationUserId));
             Assert.Equal(2, await verify.UserPermissions.CountAsync());
@@ -202,7 +202,7 @@ public sealed class InvitationClaimPostgresTests
         await transaction.CommitAsync();
     }
 
-    private static async Task SeedInvitation(string connectionString, bool alreadyMember, bool revoked = false)
+    private static async Task SeedInvitation(string connectionString, bool alreadyMember, bool disabled = false)
     {
         await using var context = IsolatedPostgresDatabase.NewContext(connectionString);
         context.RequestUser = new RequestUser(context) { Id = MemberId };
@@ -228,7 +228,7 @@ public sealed class InvitationClaimPostgresTests
                 AccountId = AccountId,
                 UserId = MemberId,
                 InvitationAcceptedOn = DateTime.UtcNow,
-                AccessRevokedOn = revoked ? DateTime.UtcNow : null
+                AccessDisabledOn = disabled ? DateTime.UtcNow : null
             });
 
         var invitation = new AccountUser

@@ -13,7 +13,8 @@ public class AccountUser : EntityBase
 
     public DateTime? InvitationAcceptedOn { get; set; }
     public DateTime? InvitationSentOn { get; set; }
-    public DateTime? AccessRevokedOn { get; set; }
+    public DateTime? AccessDisabledOn { get; set; }
+    [MaxLength(1000)] public string? AccessDisabledMessage { get; set; }
 
     [MaxLength(PropertyLength.InvitationCode)]
     public string? InvitationCode { get; set; }

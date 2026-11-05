@@ -30,16 +30,16 @@ public sealed class AuthenticationMigrationContractTests
     }
 
     [Fact]
-    public void V33AddsNullableRevocationStateAndRefusesUnsafeDowngrade()
+    public void V33AddsNullableDisablingStateAndRefusesUnsafeDowngrade()
     {
         var migrationsDirectory = Path.Combine(RepositoryPaths.Root,
             "Planarian", "Planarian.Migrations", "Migrations");
         var source = File.ReadAllText(Assert.Single(Directory.GetFiles(migrationsDirectory, "*_v33.cs")));
 
-        Assert.Contains("name: \"AccessRevokedOn\"", source);
+        Assert.Contains("name: \"AccessDisabledOn\"", source);
         Assert.Contains("nullable: true", source);
         Assert.Contains("RAISE EXCEPTION", source);
-        Assert.Contains("WHERE \"AccessRevokedOn\" IS NOT NULL", source);
+        Assert.Contains("WHERE \"AccessDisabledOn\" IS NOT NULL", source);
         Assert.Contains("DropColumn", source);
         Assert.DoesNotContain("DeleteData", source);
     }

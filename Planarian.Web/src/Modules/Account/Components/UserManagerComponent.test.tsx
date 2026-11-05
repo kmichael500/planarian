@@ -10,20 +10,6 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { UserManagerComponent } from "./UserManagerComponent";
 
-jest.mock("../../../Shared/Components/Buttons/DeleteButtonComponent", () => ({
-  DeleteButtonComponent: ({
-    children,
-    onConfirm,
-  }: {
-    children: React.ReactNode;
-    onConfirm?: () => void;
-  }) => (
-    <button type="button" onClick={onConfirm}>
-      {children}
-    </button>
-  ),
-}));
-
 jest.mock(
   "../../../Shared/Components/EmailHistoryModal/EmailHistoryModal",
   () => ({
@@ -69,7 +55,11 @@ const AppContextWithPermissions: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const defaults = useContext(AppContext);
   return (
-    <AppContext.Provider value={{ ...defaults, hasPermission: () => true }}>
+    <AppContext.Provider value={{
+      ...defaults,
+      currentUser: { id: "admin00001", fullName: "Test Admin", currentAccountId: "account0001" },
+      hasPermission: () => true,
+    }}>
       {children}
     </AppContext.Provider>
   );
@@ -82,7 +72,7 @@ const pendingUser: UserManagerGridVm = {
   invitationAcceptedOn: null,
   invitationSentOn: null,
   lastActiveOn: null,
-  accessRevokedOn: null,
+  accessDisabledOn: null,
   hasActiveInvitation: true,
   invitationEmailAttemptCount: 2,
 };
@@ -111,8 +101,9 @@ describe("UserManagerComponent", () => {
   let getHistory: jest.SpyInstance;
   let inviteUser: jest.SpyInstance;
   let resendInvitation: jest.SpyInstance;
-  let revokeAccess: jest.SpyInstance;
+  let disableAccess: jest.SpyInstance;
   let restoreAccess: jest.SpyInstance;
+  let revokeMembership: jest.SpyInstance;
   let warningSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -133,12 +124,15 @@ describe("UserManagerComponent", () => {
     resendInvitation = jest
       .spyOn(AccountUserManagerService, "ResendInvitation")
       .mockResolvedValue();
-    revokeAccess = jest
-      .spyOn(AccountUserManagerService, "RevokeAccess")
-      .mockResolvedValue();
+    disableAccess = jest
+      .spyOn(AccountUserManagerService, "DisableAccess")
+      .mockResolvedValue({});
     restoreAccess = jest
       .spyOn(AccountUserManagerService, "RestoreAccess")
       .mockResolvedValue();
+    revokeMembership = jest
+      .spyOn(AccountUserManagerService, "RevokeMembership")
+      .mockResolvedValue({});
     warningSpy = jest
       .spyOn(message, "warning")
       .mockImplementation(() => undefined as never);
@@ -291,7 +285,7 @@ describe("UserManagerComponent", () => {
     ).toBeInTheDocument();
   });
 
-  it("revokes an accepted user's access and refreshes the authoritative list", async () => {
+  it("disables an accepted user's access and refreshes the authoritative list", async () => {
     getUsers.mockResolvedValue([
       {
         ...pendingUser,
@@ -303,30 +297,34 @@ describe("UserManagerComponent", () => {
     renderManager();
     await screen.findByText("Invited User");
 
-    fireEvent.click(screen.getByRole("button", { name: "Revoke access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable access" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Message to users" }), {
+      target: { value: "  Access review  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm changes for 1" }));
 
     await waitFor(() =>
-      expect(revokeAccess).toHaveBeenCalledWith("user123456")
+      expect(disableAccess).toHaveBeenCalledWith("user123456", "account0001", "Access review", true)
     );
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 
-  it("restores a revoked user's access instead of offering another revoke", async () => {
+  it("restores a disabled user's access instead of offering another disable", async () => {
     getUsers.mockResolvedValue([
       {
         ...pendingUser,
         hasActiveInvitation: false,
         invitationAcceptedOn: "2026-08-14T14:00:00Z",
-        accessRevokedOn: "2026-09-28T18:00:00Z",
+        accessDisabledOn: "2026-09-28T18:00:00Z",
       },
     ]);
 
     renderManager();
     await screen.findByText("Invited User");
 
-    expect(screen.getByText("Access revoked")).toBeInTheDocument();
+    expect(screen.getByText("Access disabled")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Revoke access" })
+      screen.queryByRole("button", { name: "Disable access" })
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
@@ -337,7 +335,198 @@ describe("UserManagerComponent", () => {
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 
-  it("selects only eligible visible people and confirms a mixed revocation batch", async () => {
+  it("requires explicit confirmation before revoking the membership of an accepted member", async () => {
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    expect(dialog).toHaveTextContent("Invited User");
+    expect(dialog).toHaveTextContent("saved favorites");
+    expect(dialog).toHaveTextContent("Rejoining will require a new invitation");
+    expect(dialog).toHaveTextContent("cannot be undone");
+    const confirm = screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!;
+    expect(confirm).toBeDisabled();
+    expect(revokeMembership).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "remove" },
+    });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(revokeMembership).toHaveBeenCalledWith("user123456", "account0001",
+        expect.stringContaining("revoked your membership"), true));
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("requires a message only if membership revocation emails are enabled", async () => {
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    const notification = screen.getByRole("checkbox", { name: "Send notification email" });
+    expect(notification).toBeChecked();
+
+    const emailMessage = screen.getByRole("textbox", { name: "Message to user" }) as HTMLTextAreaElement;
+    expect(emailMessage.value).toContain("revoked your membership");
+    expect(emailMessage.value).not.toContain("favorites");
+    fireEvent.change(emailMessage, { target: { value: "  " } });
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    const confirm = screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!;
+    expect(confirm).toBeDisabled();
+    fireEvent.click(notification);
+    expect(screen.queryByRole("textbox", { name: "Message to user" })).not.toBeInTheDocument();
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(revokeMembership).toHaveBeenCalledWith(
+      "user123456", "account0001", undefined, false
+    ));
+  });
+
+  it("reports email failure separately from completed membership revocation", async () => {
+    revokeMembership.mockResolvedValue({
+      notificationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
+    });
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!);
+    await waitFor(() => expect(warningSpy)
+      .toHaveBeenCalledWith("Membership revoked, but notification email failed."));
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
+      .not.toBeInTheDocument());
+  });
+
+  it("never claims an email was submitted when removal has no delivery status", async () => {
+    const successSpy = jest.spyOn(message, "success")
+      .mockImplementation(() => undefined as never);
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!);
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith(
+      "Membership revoked from this account."
+    ));
+    expect(successSpy).not.toHaveBeenCalledWith(
+      "Membership revoked. Notification email submitted."
+    );
+  });
+
+  it("never submits membership revocation for a different selected account", async () => {
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+
+    RequestRuntimeState.setCurrentAccountId("account0002");
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!);
+
+    expect(revokeMembership).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("selected account changed"));
+    expect(screen.queryByRole("dialog", { name: "Revoke membership?" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("allows membership revocation after disabling but not for a pending invitation", async () => {
+    getUsers.mockResolvedValue([pendingUser, {
+      ...pendingUser,
+      userId: "disab00001",
+      emailAddress: "disabled@example.com",
+      fullName: "Disabled Member",
+      hasActiveInvitation: false,
+      accessDisabledOn: "2026-11-01T12:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Disabled Member");
+    expect(screen.getAllByRole("button", { name: "Revoke membership" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Remove invitation" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!);
+    await waitFor(() => expect(revokeMembership).toHaveBeenCalledWith(
+      "disab00001", "account0001",
+      expect.stringContaining("revoked your membership"), true));
+  });
+
+  it("keeps membership revocation confirmation available when deletion fails", async () => {
+    revokeMembership.mockRejectedValue({ message: "Cannot revoke the membership of the last administrator." });
+    getUsers.mockResolvedValue([{
+      ...pendingUser,
+      hasActiveInvitation: false,
+      invitationAcceptedOn: "2026-08-14T14:00:00Z",
+    }]);
+    renderManager();
+    await screen.findByText("Invited User");
+    fireEvent.click(screen.getByRole("button", { name: "Revoke membership" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Type REVOKE to confirm/ }), {
+      target: { value: "REVOKE" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Revoke membership?" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Revoke membership" })
+      .find(button => dialog.contains(button))!);
+    await waitFor(() => expect(errorSpy)
+      .toHaveBeenCalledWith("Cannot revoke the membership of the last administrator."));
+    expect(dialog).toBeInTheDocument();
+    expect(getUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects only eligible visible people and confirms a mixed disabling batch", async () => {
     const accepted = {
       ...pendingUser,
       userId: "accept0001",
@@ -346,32 +535,33 @@ describe("UserManagerComponent", () => {
       hasActiveInvitation: false,
       invitationAcceptedOn: "2026-10-01T12:00:00Z",
     };
-    const revoked = {
+    const disabled = {
       ...accepted,
-      userId: "revok00001",
-      emailAddress: "revoked@example.com",
-      fullName: "Revoked Member",
-      accessRevokedOn: "2026-10-30T12:00:00Z",
+      userId: "disab00001",
+      emailAddress: "disabled@example.com",
+      fullName: "Disabled Member",
+      accessDisabledOn: "2026-10-30T12:00:00Z",
     };
-    getUsers.mockResolvedValue([pendingUser, accepted, revoked]);
+    getUsers.mockResolvedValue([pendingUser, accepted, disabled]);
     renderManager();
     await screen.findByText("Accepted Member");
 
     fireEvent.click(screen.getByRole("button", { name: /Select people$/ }));
-    expect(screen.queryByRole("checkbox", { name: "Select Revoked Member" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Select Disabled Member" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: /Select all shown/ }));
     expect(screen.getByText("2 selected")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Review access changes$/ }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("1 active member to revoke");
+    expect(screen.getByRole("dialog")).toHaveTextContent("1 active member to disable");
     expect(screen.getByRole("dialog")).toHaveTextContent("1 pending invitation to remove");
     fireEvent.click(screen.getByRole("button", { name: /Confirm changes for 2$/ }));
 
     await waitFor(() => {
-      expect(revokeAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001");
-      expect(revokeAccess).toHaveBeenCalledWith(accepted.userId, "account0001");
+      expect(disableAccess).toHaveBeenCalledWith(pendingUser.userId, "account0001", undefined, false);
+      expect(disableAccess).toHaveBeenCalledWith(accepted.userId, "account0001",
+        "An administrator has disabled your access to this account on Planarian. An administrator can restore your access.", true);
     });
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
-    expect(revokeAccess).not.toHaveBeenCalledWith(revoked.userId, "account0001");
+    expect(disableAccess).not.toHaveBeenCalledWith(disabled.userId, "account0001", undefined);
   });
 
   it("refreshes users on account changes and discards late responses from the previous tenant", async () => {

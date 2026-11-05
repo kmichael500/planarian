@@ -16,7 +16,7 @@ const SwitchAccountComponent = ({
 }: SwitchAccountComponentProps) => {
   const {
     accountIds,
-    revokedAccountIds,
+    disabledAccountIds,
     currentAccountId,
     currentAccountName,
     switchAccount,
@@ -26,10 +26,10 @@ const SwitchAccountComponent = ({
     () => [
       ...accountIds
         .filter((item) => item.value !== currentAccountId)
-        .map((item) => ({ ...item, isRevoked: false })),
-      ...revokedAccountIds.map((item) => ({ ...item, isRevoked: true })),
+        .map((item) => ({ ...item, isDisabled: false, disableMessage: null as string | null })),
+      ...disabledAccountIds.map((item) => ({ ...item, isDisabled: true })),
     ],
-    [accountIds, revokedAccountIds, currentAccountId]
+    [accountIds, disabledAccountIds, currentAccountId]
   );
 
   const handleSwitch = (accountId: string) => {
@@ -64,24 +64,29 @@ const SwitchAccountComponent = ({
         <List
             dataSource={accountList}
             renderItem={(item) => {
-              const isRevoked = item.isRevoked;
+              const isDisabled = item.isDisabled;
               return (
                 <List.Item
                   className="planarian-account-option"
                   key={item.value}
-                  aria-disabled={isRevoked || undefined}
+                  aria-disabled={isDisabled || undefined}
                   style={{
-                    opacity: isRevoked ? 0.65 : 1,
-                    padding: isRevoked ? "10px" : 0,
+                    opacity: isDisabled ? 0.65 : 1,
+                    padding: isDisabled ? "10px" : 0,
                     border: "1px solid #d9d9d9",
                     borderRadius: "4px",
                     marginBottom: "10px",
                   }}
                 >
-                  {isRevoked ? (
+                  {isDisabled ? (
                     <>
                       <span>{item.display}</span>
-                      <Typography.Text type="danger">Access revoked</Typography.Text>
+                      <Typography.Text type="danger">Access disabled</Typography.Text>
+                      {item.disableMessage && (
+                        <Typography.Paragraph className="planarian-account-disabled-message">
+                          {item.disableMessage}
+                        </Typography.Paragraph>
+                      )}
                     </>
                   ) : (
                     <PlanarianButton

@@ -945,11 +945,11 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return DbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
     }
 
-    public async Task<bool> WouldRevokeLastAdministrator(string userId, string accountId,
+    public async Task<bool> WouldLeaveNoActiveAdministrator(string userId, string accountId,
         CancellationToken cancellationToken = default)
     {
         var activeAdmins = DbContext.AccountUsers.Where(m =>
-            m.AccountId == accountId && m.AccessRevokedOn == null && m.User != null &&
+            m.AccountId == accountId && m.AccessDisabledOn == null && m.User != null &&
             !m.User.IsTemporary &&
             DbContext.UserPermissions.Any(permission =>
                 permission.UserId == m.UserId &&

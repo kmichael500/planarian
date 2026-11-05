@@ -166,6 +166,38 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         }, cancellationToken);
     }
 
+    public Task<EmailSendResult> SendAccountAccessDisabledEmail(User user, string? accountName,
+        string? disableMessage, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(disableMessage))
+            throw new ArgumentException("A notification message is required.", nameof(disableMessage));
+
+        var paragraphs = disableMessage.Split('\n');
+
+        return SendCommittedOperationEmail(MessagePurpose.AccountAccessDisabled,
+            () => SendGenericEmail(MessagePurpose.AccountAccessDisabled,
+                $"Your access to {accountName} has been disabled",
+                user.EmailAddress, user.FullName,
+                new GenericEmailSubstitutions(paragraphs, "Account access disabled"),
+                cancellationToken: cancellationToken),
+            cancellationToken);
+    }
+
+    public Task<EmailSendResult> SendAccountMembershipRevokedEmail(User user, string? accountName,
+        string? notificationMessage, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(notificationMessage))
+            throw new ArgumentException("A notification message is required.", nameof(notificationMessage));
+
+        return SendCommittedOperationEmail(MessagePurpose.AccountMembershipRevoked,
+            () => SendGenericEmail(MessagePurpose.AccountMembershipRevoked,
+                $"Your membership in {accountName} has been revoked",
+                user.EmailAddress, user.FullName,
+                new GenericEmailSubstitutions(notificationMessage.Split('\n'), "Membership revoked"),
+                cancellationToken: cancellationToken),
+            cancellationToken);
+    }
+
     public async Task<EmailSendResult> SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName,
         CancellationToken cancellationToken = default)
     {

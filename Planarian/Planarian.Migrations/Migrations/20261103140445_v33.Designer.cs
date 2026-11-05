@@ -604,8 +604,12 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<DateTime?>("AccessRevokedOn")
+                    b.Property<DateTime?>("AccessDisabledOn")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AccessDisabledMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("CreatedByUserId")
                         .HasMaxLength(10)

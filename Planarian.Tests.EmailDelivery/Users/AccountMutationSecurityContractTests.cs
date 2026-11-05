@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Controller;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Users.Controllers;
 using Planarian.Modules.Users.Models;
 using Xunit;
@@ -13,8 +14,9 @@ namespace Planarian.Tests.EmailDelivery.Users;
 public sealed class AccountMutationSecurityContractTests
 {
     [Theory]
-    [InlineData(nameof(AccountUserManagerController.Revoke), typeof(HttpDeleteAttribute))]
+    [InlineData(nameof(AccountUserManagerController.DisableAccess), typeof(HttpPostAttribute))]
     [InlineData(nameof(AccountUserManagerController.RestoreAccess), typeof(HttpPostAttribute))]
+    [InlineData(nameof(AccountUserManagerController.RevokeMembership), typeof(HttpPostAttribute))]
     public void AccountAccessMutationsRequireAdmin(string methodName, Type httpMethodAttributeType)
     {
         var method = typeof(AccountUserManagerController).GetMethod(methodName)!;
@@ -23,6 +25,13 @@ public sealed class AccountMutationSecurityContractTests
         Assert.Equal(PermissionPolicyKey.Admin, authorize.Policy);
         Assert.Contains(method.GetCustomAttributes(), attribute =>
             attribute.GetType() == httpMethodAttributeType);
+    }
+
+    [Fact]
+    public void AccountAccessNotificationsAreEnabledByDefault()
+    {
+        Assert.True(new DisableAccessRequest().SendEmail);
+        Assert.True(new RevokeMembershipRequest().SendEmail);
     }
 
     [Fact]

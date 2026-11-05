@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { message } from "antd";
+import { message, notification } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
@@ -19,7 +19,7 @@ const active = (id: string): AppInitializeVm => ({
   antiforgeryRequestToken: null,
   currentUser: { id: "testuser01", fullName: "Test User", currentAccountId: id },
   accountIds: [{ display: "Active account", value: id }],
-  revokedAccountIds: [],
+  disabledAccountIds: [],
   permissions: [],
 });
 
@@ -27,7 +27,7 @@ const NoAccount = {
   ...active("active0001"),
   currentUser: { id: "testuser01", fullName: "Test User", currentAccountId: null },
   accountIds: [],
-  revokedAccountIds: [{ display: "Revoked account", value: "revoked001" }],
+  disabledAccountIds: [{ display: "Disabled account", value: "disabled001", disableMessage: "Your annual membership expired." }],
 };
 
 const deferred = <T,>() => {
@@ -67,7 +67,9 @@ const SessionProbe = () => {
   );
 };
 
-describe("AppProvider revoked account recovery", () => {
+describe("AppProvider disabled account recovery", () => {
+  let notifyWarning: jest.Mock;
+
   beforeEach(() => {
     AuthenticationService.ClearRuntimeSession();
     AuthenticationService.ResetUnauthorizedHandling();
@@ -76,6 +78,11 @@ describe("AppProvider revoked account recovery", () => {
     jest.spyOn(AccountService, "GetFeatureSettings").mockResolvedValue([]);
     jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
     jest.spyOn(message, "warning").mockImplementation(() => undefined as never);
+    notifyWarning = jest.fn();
+    jest.spyOn(notification, "useNotification").mockReturnValue([
+      { warning: notifyWarning } as unknown as ReturnType<typeof notification.useNotification>[0],
+      <span data-testid="disabling-notification-holder" />,
+    ]);
   });
 
   afterEach(() => {
@@ -87,12 +94,12 @@ describe("AppProvider revoked account recovery", () => {
   it("switches to an available account without invalidating the user's login", async () => {
     let requestAccountDuringRefresh: string | null = "not-cleared";
     const initialize = jest.spyOn(AppService, "InitializeApp")
-      .mockResolvedValueOnce(active("revoked001"))
+      .mockResolvedValueOnce(active("disabled001"))
       .mockImplementationOnce(async () => {
         requestAccountDuringRefresh = RequestRuntimeState.getCurrentAccountId();
         return {
           ...active("active0001"),
-          revokedAccountIds: [{ display: "Former account", value: "revoked001" }],
+          disabledAccountIds: [{ display: "Former account", value: "disabled001" }],
         };
       });
 
@@ -101,7 +108,7 @@ describe("AppProvider revoked account recovery", () => {
         <AppProvider><SessionProbe /></AppProvider>
       </MemoryRouter>
     );
-    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("revoked001"));
+    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("disabled001"));
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
     await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("active0001"));
@@ -109,12 +116,12 @@ describe("AppProvider revoked account recovery", () => {
     expect(screen.getByTestId("pathname")).toHaveTextContent("/");
     expect(requestAccountDuringRefresh).toBeNull();
     expect(initialize).toHaveBeenLastCalledWith(null);
-    expect(message.warning).toHaveBeenCalledWith(expect.stringContaining("revoked"));
+    expect(notifyWarning).toHaveBeenCalledWith(expect.objectContaining({ message: "Access disabled: Former account" }));
   });
 
   it("keeps an authenticated user with no remaining account on the accountless route", async () => {
     const initialize = jest.spyOn(AppService, "InitializeApp")
-      .mockResolvedValueOnce(active("revoked001"))
+      .mockResolvedValueOnce(active("disabled001"))
       .mockResolvedValueOnce(NoAccount);
 
     render(
@@ -122,7 +129,7 @@ describe("AppProvider revoked account recovery", () => {
         <AppProvider><SessionProbe /></AppProvider>
       </MemoryRouter>
     );
-    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("revoked001"));
+    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("disabled001"));
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
     await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("none"));
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
@@ -130,9 +137,28 @@ describe("AppProvider revoked account recovery", () => {
     expect(initialize).toHaveBeenLastCalledWith(null);
   });
 
+  it("shows a persistent login notice when all account access was disabled", async () => {
+    jest.spyOn(AppService, "InitializeApp").mockResolvedValue(NoAccount);
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppProvider><SessionProbe /></AppProvider>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(notifyWarning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Access disabled: Disabled account",
+        description: "Your annual membership expired.",
+        duration: 0,
+      })
+    ));
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    expect(screen.getByTestId("account")).toHaveTextContent("none");
+    expect(screen.getByTestId("disabling-notification-holder")).toBeInTheDocument();
+  });
+
   it("keeps a valid session when account settings and invitation lookups fail", async () => {
     jest.spyOn(AppService, "InitializeApp")
-      .mockResolvedValueOnce(active("revoked001"))
+      .mockResolvedValueOnce(active("disabled001"))
       .mockResolvedValueOnce(active("active0001"));
     jest.spyOn(AccountService, "GetFeatureSettings")
       .mockResolvedValueOnce([])
@@ -158,7 +184,7 @@ describe("AppProvider revoked account recovery", () => {
 
   it("does not turn a transient bootstrap outage into a forced login", async () => {
     jest.spyOn(AppService, "InitializeApp")
-      .mockResolvedValueOnce(active("revoked001"))
+      .mockResolvedValueOnce(active("disabled001"))
       .mockRejectedValueOnce({
         statusCode: 503,
         errorCode: ApiExceptionType.InternalServerError,
@@ -214,7 +240,7 @@ describe("AppProvider revoked account recovery", () => {
   it("ignores account settings from a previous session after recovery", async () => {
     const oldSettings = deferred<FeatureSettingVm[]>();
     jest.spyOn(AppService, "InitializeApp")
-      .mockResolvedValueOnce(active("revoked001"))
+      .mockResolvedValueOnce(active("disabled001"))
       .mockResolvedValueOnce(active("active0001"));
     jest.spyOn(AccountService, "GetFeatureSettings")
       .mockImplementationOnce(() => oldSettings.promise)
@@ -225,7 +251,7 @@ describe("AppProvider revoked account recovery", () => {
         <AppProvider><SessionProbe /></AppProvider>
       </MemoryRouter>
     );
-    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("revoked001"));
+    await waitFor(() => expect(screen.getByTestId("account")).toHaveTextContent("disabled001"));
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate unauthorized response" }));
     await waitFor(() => expect(screen.getByTestId("features"))

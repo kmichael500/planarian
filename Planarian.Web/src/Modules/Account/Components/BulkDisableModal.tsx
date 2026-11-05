@@ -1,11 +1,14 @@
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Modal, Typography } from "antd";
-import React, { useEffect, useRef, useState } from "react";
+import { Checkbox, Input, Modal, Typography } from "antd";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
+import { DisableAccessResultVm } from "../Models/DisableAccessResultVm";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { runAccountBatch } from "./runAccountBatch";
 import "./InvitePeopleModal.scss";
@@ -17,33 +20,75 @@ interface Props {
   onFinished: () => Promise<void>;
 }
 
-type Outcome = { user: UserManagerGridVm; message: string; failed?: boolean };
+type Outcome = {
+  user: UserManagerGridVm;
+  message: string;
+  failed?: boolean;
+  emailFailed?: boolean;
+};
+
+const describeResult = (
+  user: UserManagerGridVm,
+  result?: DisableAccessResultVm
+): Outcome => {
+  if (user.hasActiveInvitation) return { user, message: "Invitation removed." };
+  if (
+    result?.notificationEmailDeliveryStatus === MessageDeliveryStatus.SendFailed
+  )
+    return {
+      user,
+      message: "Access disabled. Notification email failed.",
+      emailFailed: true,
+    };
+  if (
+    result?.notificationEmailDeliveryStatus === MessageDeliveryStatus.Submitted
+  )
+    return { user, message: "Access disabled. Notification email submitted." };
+  return { user, message: "Access disabled." };
+};
 type Phase = "review" | "processing" | "results";
 
-export const BulkRevokeModal: React.FC<Props> = ({
+export const BulkDisableModal: React.FC<Props> = ({
   open,
   selected,
   onClose,
   onFinished,
 }) => {
+  const { currentAccountName } = useContext(AppContext);
+  const defaultMessage =
+    `An administrator has disabled your access to ${currentAccountName || "this account"} on Planarian. An administrator can restore your access.`;
   const [phase, setPhase] = useState<Phase>("review");
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [processed, setProcessed] = useState(0);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [disableMessage, setDisableMessage] = useState(defaultMessage);
+  const [sendEmail, setSendEmail] = useState(true);
+  const wasOpen = useRef(false);
+  const messageEdited = useRef(false);
   const openedAccountId = useRef<string | null>(null);
   const pending = selected.filter((user) => user.hasActiveInvitation);
   const active = selected.filter((user) => !user.hasActiveInvitation);
 
   useEffect(() => {
+    const newlyOpened = open && !wasOpen.current;
+    wasOpen.current = open;
     if (!open) return;
-    openedAccountId.current = RequestRuntimeState.getCurrentAccountId();
-    setPhase("review");
-    setOutcomes([]);
-    setProcessed(0);
-    setRetryingId(null);
-    setError("");
-  }, [open]);
+
+    if (newlyOpened) {
+      openedAccountId.current = RequestRuntimeState.getCurrentAccountId();
+      setPhase("review");
+      setOutcomes([]);
+      setProcessed(0);
+      setRetryingId(null);
+      setError("");
+      setSendEmail(true);
+      messageEdited.current = false;
+    }
+
+    // Refresh the default while untouched, without discarding administrator edits.
+    if (!messageEdited.current) setDisableMessage(defaultMessage);
+  }, [open, defaultMessage]);
 
   const displayed: Outcome[] =
     phase === "results"
@@ -52,7 +97,7 @@ export const BulkRevokeModal: React.FC<Props> = ({
           user,
           message: user.hasActiveInvitation
             ? "Remove invitation"
-            : "Revoke access",
+            : "Disable access",
         }));
 
   const dismiss = () => {
@@ -71,16 +116,13 @@ export const BulkRevokeModal: React.FC<Props> = ({
     setRetryingId(outcome.user.userId);
     let next: Outcome;
     try {
-      await AccountUserManagerService.RevokeAccess(
+      const result = await AccountUserManagerService.DisableAccess(
         outcome.user.userId,
-        accountId
+        accountId,
+        outcome.user.hasActiveInvitation || !sendEmail ? undefined : disableMessage.trim(),
+        !outcome.user.hasActiveInvitation && sendEmail
       );
-      next = {
-        user: outcome.user,
-        message: outcome.user.hasActiveInvitation
-          ? "Invitation removed."
-          : "Access revoked.",
-      };
+      next = describeResult(outcome.user, result);
     } catch (error) {
       const apiError = error as Partial<ApiErrorResponse>;
       next = {
@@ -104,7 +146,11 @@ export const BulkRevokeModal: React.FC<Props> = ({
     }
   };
 
-  const revoke = async () => {
+  const disable = async () => {
+    if (sendEmail && active.length > 0 && !disableMessage.trim()) {
+      setError("Enter a message before disabling access.");
+      return;
+    }
     const accountId = openedAccountId.current;
     if (!accountId || RequestRuntimeState.getCurrentAccountId() !== accountId) {
       setError(
@@ -117,7 +163,13 @@ export const BulkRevokeModal: React.FC<Props> = ({
     const completedIds = new Set<string>();
     await runAccountBatch(
       selected,
-      (user) => AccountUserManagerService.RevokeAccess(user.userId, accountId),
+      (user) =>
+        AccountUserManagerService.DisableAccess(
+          user.userId,
+          accountId,
+          user.hasActiveInvitation || !sendEmail ? undefined : disableMessage.trim(),
+          !user.hasActiveInvitation && sendEmail
+        ),
       () => RequestRuntimeState.getCurrentAccountId() === accountId,
       (user, result) => {
         completedIds.add(user.userId);
@@ -128,12 +180,7 @@ export const BulkRevokeModal: React.FC<Props> = ({
               message: failure.message || "Unable to change access.",
               failed: true,
             }
-          : {
-              user,
-              message: user.hasActiveInvitation
-                ? "Invitation removed."
-                : "Access revoked.",
-            };
+          : describeResult(user, result.value);
         setOutcomes((current) => [...current, outcome]);
         setProcessed((current) => current + 1);
       }
@@ -176,15 +223,47 @@ export const BulkRevokeModal: React.FC<Props> = ({
         <>
           <Typography.Paragraph>
             <strong>{active.length}</strong> active{" "}
-            {active.length === 1 ? "member" : "members"} to revoke,{" "}
+            {active.length === 1 ? "member" : "members"} to disable,{" "}
             <strong>{pending.length}</strong> pending{" "}
             {pending.length === 1 ? "invitation" : "invitations"} to remove.
           </Typography.Paragraph>
           <Typography.Paragraph type="secondary">
-            Revoked memberships keep their permissions so an administrator can
+            Disabled memberships keep their permissions so an administrator can
             restore access. Pending invitations and their unused temporary
             permissions are deleted. Email-delivery history is preserved.
           </Typography.Paragraph>
+          {phase === "review" && active.length > 0 && (
+            <div className="user-manager-notification-message">
+              <Checkbox
+                checked={sendEmail}
+                onChange={(event) => setSendEmail(event.target.checked)}
+              >
+                Send notification email to disabled members
+              </Checkbox>
+              {sendEmail && (
+                <>
+                  <label htmlFor="disabling-message">Message to users</label>
+                  <Input.TextArea
+                    id="disabling-message"
+                    required
+                    value={disableMessage}
+                    onChange={(event) => {
+                      messageEdited.current = true;
+                      setDisableMessage(event.target.value);
+                    }}
+                    rows={3}
+                    maxLength={1000}
+                    showCount
+                    placeholder="Enter the message users will receive"
+                  />
+                  <Typography.Text type="secondary">
+                    Edit or replace this message. It will be included in each
+                    disabled member's email and account notice.
+                  </Typography.Text>
+                </>
+              )}
+            </div>
+          )}
           {phase === "processing" && (
             <Typography.Text role="status">
               Processing {processed} of {selected.length} people…
@@ -210,13 +289,17 @@ export const BulkRevokeModal: React.FC<Props> = ({
       )}
 
       <div className="invite-people-modal__review-list">
-        {displayed.map(({ user, message, failed }) => (
+        {displayed.map(({ user, message, failed, emailFailed }) => (
           <div className="invite-people-modal__review-item" key={user.userId}>
             <span>
               <strong>{user.fullName}</strong>
               <small>{user.emailAddress}</small>
             </span>
-            <span className={failed ? "invite-people-modal__failure" : ""}>
+            <span
+              className={
+                failed || emailFailed ? "invite-people-modal__failure" : ""
+              }
+            >
               {message}
               {phase === "results" && failed && (
                 <PlanarianButton
@@ -258,9 +341,9 @@ export const BulkRevokeModal: React.FC<Props> = ({
             alwaysShowChildren
             icon={<DeleteOutlined />}
             permissionKey={PermissionKey.Admin}
-            disabled={selected.length === 0}
+            disabled={selected.length === 0 || (sendEmail && active.length > 0 && !disableMessage.trim())}
             aria-label={`Confirm changes for ${selected.length}`}
-            onClick={() => void revoke()}
+            onClick={() => void disable()}
           >
             Confirm changes for {selected.length}
           </PlanarianButton>

@@ -29,21 +29,26 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
             return;
 
         var membership = await _accountRepository.GetAccountUser(existingUser.Id, RequestUser.AccountId);
-        if (membership?.AccessRevokedOn.HasValue == true)
+        if (membership?.AccessDisabledOn.HasValue == true)
             throw ApiExceptionDictionary.Conflict(
-                "This user already belongs to the account with revoked access. Restore access instead of inviting them again.");
+                "This user already belongs to the account with disabled access. Restore access instead of inviting them again.");
 
         if (membership != null)
             throw ApiExceptionDictionary.UserAlreadyInAccount;
     }
 
-    public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
+    public async Task<bool> DisableAccess(string userId, CancellationToken cancellationToken = default,
+        string? disableMessage = null, bool sendEmail = true)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw ApiExceptionDictionary.NoAccount;
 
         if (userId == RequestUser.Id)
-            throw ApiExceptionDictionary.BadRequest("You cannot revoke your own account access.");
+            throw ApiExceptionDictionary.BadRequest("You cannot disable your own account access.");
+
+        disableMessage = sendEmail ? disableMessage?.Trim() : null;
+        if (disableMessage?.Length > 1000)
+            throw ApiExceptionDictionary.BadRequest("The notification message must be 1,000 characters or fewer.");
 
         try
         {
@@ -54,27 +59,66 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
             if (membership == null)
                 throw ApiExceptionDictionary.NotFound("User");
 
-            if (membership.AccessRevokedOn.HasValue)
-                return;
+            if (membership.AccessDisabledOn.HasValue)
+                return false;
 
             var user = await Repository.Get(userId);
             if (user?.IsTemporary == true &&
                 !membership.InvitationAcceptedOn.HasValue &&
                 !string.IsNullOrWhiteSpace(membership.InvitationCode))
             {
-                if (!await Repository.DeletePendingInvitationAccess(userId, RequestUser.AccountId, cancellationToken))
+                if (!await Repository.DeleteAccountUserAccess(userId, RequestUser.AccountId, cancellationToken))
                     throw ApiExceptionDictionary.NotFound("User");
             }
             else
             {
-                if (await _accountRepository.WouldRevokeLastAdministrator(
+                if (sendEmail && string.IsNullOrWhiteSpace(disableMessage))
+                    throw ApiExceptionDictionary.BadRequest("A notification message is required when sending email.");
+
+                if (await _accountRepository.WouldLeaveNoActiveAdministrator(
                         userId, RequestUser.AccountId, cancellationToken))
                     throw ApiExceptionDictionary.Conflict(
-                        "Cannot revoke access for the account's last active administrator.");
+                        "Cannot disable access for the account's last active administrator.");
 
-                membership.AccessRevokedOn = DateTime.UtcNow;
+                membership.AccessDisabledOn = DateTime.UtcNow;
+                membership.AccessDisabledMessage = disableMessage;
                 await _accountRepository.SaveChangesAsync(cancellationToken);
             }
+
+            await transaction.CommitAsync(cancellationToken);
+            return user?.IsTemporary == false;
+        }
+        catch (Exception exception) when (IsSerializationFailure(exception))
+        {
+            throw ApiExceptionDictionary.Conflict("Account access changed concurrently. Please try again.");
+        }
+    }
+
+    public async Task RevokeMembership(string userId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw ApiExceptionDictionary.NoAccount;
+
+        if (userId == RequestUser.Id)
+            throw ApiExceptionDictionary.BadRequest("You cannot revoke your own account membership.");
+
+        try
+        {
+            await using var transaction =
+                await _accountRepository.BeginAccountAccessTransactionAsync(cancellationToken);
+
+            var membership = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+            if (membership == null)
+                throw ApiExceptionDictionary.NotFound("User");
+
+            if (await _accountRepository.WouldLeaveNoActiveAdministrator(
+                    userId, RequestUser.AccountId, cancellationToken))
+                throw ApiExceptionDictionary.Conflict(
+                    "Cannot revoke the membership of the account's last active administrator.");
+
+            if (!await Repository.DeleteAccountUserAccess(
+                    userId, RequestUser.AccountId, cancellationToken))
+                throw ApiExceptionDictionary.NotFound("User");
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -93,10 +137,11 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
         if (membership == null)
             throw ApiExceptionDictionary.NotFound("User");
 
-        if (!membership.AccessRevokedOn.HasValue)
+        if (!membership.AccessDisabledOn.HasValue)
             return;
 
-        membership.AccessRevokedOn = null;
+        membership.AccessDisabledOn = null;
+        membership.AccessDisabledMessage = null;
         await _accountRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -130,7 +175,7 @@ public sealed class AccountAccessService : ServiceBase<UserRepository>
 
             if (permissionKey == PermissionKey.Admin &&
                 !await _accountRepository.HasGlobalAdministratorPermission(userId, cancellationToken) &&
-                await _accountRepository.WouldRevokeLastAdministrator(userId, RequestUser.AccountId, cancellationToken))
+                await _accountRepository.WouldLeaveNoActiveAdministrator(userId, RequestUser.AccountId, cancellationToken))
                 throw ApiExceptionDictionary.Conflict(
                     "Cannot remove the last active administrator's Admin permission.");
 

@@ -158,6 +158,20 @@
   padding: 0;
 }
 
+.user-manager-notification-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 22px;
+}
+
+.user-manager-grid-card__membership-revoke.ant-btn {
+  align-self: flex-start;
+  height: auto;
+  margin-top: 8px;
+  padding: 0;
+}
+
 .user-manager-search {
   flex: 1 1 220px;
   min-width: 160px;
