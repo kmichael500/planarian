@@ -34,7 +34,8 @@ public class PlanarianSettingsService : ServiceBase<PlanarianSettingsRepository>
         (FeatureKey.EnabledFieldEntranceStatusTags, true),
         (FeatureKey.EnabledFieldEntranceFieldIndicationTags, true),
         (FeatureKey.EnabledFieldEntranceHydrologyTags, true),
-        (FeatureKey.EnabledFieldEntranceDescription, true)
+        (FeatureKey.EnabledFieldEntranceDescription, true),
+        (FeatureKey.EnabledFieldEntranceOtherTags, true)
     };
 
     public PlanarianSettingsService(PlanarianSettingsRepository repository, RequestUser requestUser) : base(repository,
